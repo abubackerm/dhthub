@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/home',
-        destination: '/dashboard',
+        destination: '/dhthub-admin',
         permanent: true,
       },
     ];
