@@ -83,3 +83,126 @@ model Role {
   @@unique([name, organizationId])
   @@map("roles")
 }
+
+// ============================================
+// CATALOG MODULE - Product Catalog Management
+// ============================================
+
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+enum ProductType {
+  simple
+  variable
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  version       Int      @default(0)
+  sku           String?  @unique
+  name          String
+  slug          String   @unique
+  description   String?
+  type          ProductType @default(simple)
+  status        ProductStatus @default(draft)
+  // TRANSITIONAL: Pricing moves to Pricing module
+  price         Int?
+  compareAtPrice Int?      @map("compare_at_price")
+  costPrice     Int?      @map("cost_price")
+  currency      String   @default("USD")
+  // TRANSITIONAL: Stock moves to Inventory module
+  quantity      Int      @default(0)
+  categoryId    String?  @map("category_id")
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdBy     String?  @map("created_by")
+  updatedBy     String?  @map("updated_by")
+
+  category      Category?       @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  images        ProductImage[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([sku])
+  @@index([slug])
+  @@map("products")
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String   @map("product_id")
+  version       Int      @default(0)
+  sku           String   @unique
+  name          String
+  // TRANSITIONAL: Pricing moves to Pricing module
+  price         Int?
+  compareAtPrice Int?      @map("compare_at_price")
+  costPrice     Int?      @map("cost_price")
+  quantity      Int      @default(0)
+  // TRANSITIONAL: Will be replaced by AttributeDefinition system
+  attributes    Json
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdBy     String?  @map("created_by")
+  updatedBy     String?  @map("updated_by")
+
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  images        ProductImage[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  parentId    String?  @map("parent_id")
+  path        String   @unique
+  imageUrl    String?  @map("image_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@index([path])
+  @@map("categories")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  variantId String?  @map("variant_id")
+  url       String
+  altText   String?  @map("alt_text")
+  sortOrder Int      @default(0) @map("sort_order")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([variantId])
+  @@map("product_images")
+}

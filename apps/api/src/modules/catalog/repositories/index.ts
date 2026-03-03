@@ -1,0 +1,4 @@
+export { ProductRepository } from './product.repository';
+export { ProductVariantRepository } from './product-variant.repository';
+export { CategoryRepository } from './category.repository';
+export { ProductImageRepository } from './product-image.repository';

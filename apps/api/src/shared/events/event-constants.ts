@@ -8,3 +8,12 @@ export const AUTH_EVENTS = {
   MEMBERSHIP_STATUS_CHANGED: 'auth.membership.status_changed',
   ROLE_CREATED: 'auth.role.created',
 } as const;
+
+export const CATALOG_EVENTS = {
+  PRODUCT_CREATED: 'catalog.product.created',
+  PRODUCT_UPDATED: 'catalog.product.updated',
+  PRODUCT_STATUS_CHANGED: 'catalog.product.status_changed',
+  PRODUCT_VARIANT_CREATED: 'catalog.product_variant.created',
+  CATEGORY_CREATED: 'catalog.category.created',
+  CATEGORY_UPDATED: 'catalog.category.updated',
+} as const;

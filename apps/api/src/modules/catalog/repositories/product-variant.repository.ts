@@ -1,0 +1,99 @@
+import { Injectable } from '@nestjs/common';
+import { DatabaseProvider, TransactionClient } from '@core/database/database.provider';
+import { transactionContext } from '@core/database/transaction-context.store';
+import { ProductVariantEntity } from '../entities/product-variant.entity';
+
+@Injectable()
+export class ProductVariantRepository {
+  constructor(private readonly db: DatabaseProvider) {}
+
+  private getClient(): TransactionClient | DatabaseProvider {
+    const tx = transactionContext.getStore();
+    return tx ?? this.db;
+  }
+
+  async findById(id: string): Promise<ProductVariantEntity | null> {
+    return this.getClient().productVariant.findUnique({
+      where: { id },
+    });
+  }
+
+  async findByProductId(productId: string): Promise<ProductVariantEntity[]> {
+    return this.getClient().productVariant.findMany({
+      where: { productId },
+    });
+  }
+
+  async findDefaultVariant(productId: string): Promise<ProductVariantEntity | null> {
+    return this.getClient().productVariant.findFirst({
+      where: { productId, isDefault: true },
+    });
+  }
+
+  async findBySku(sku: string): Promise<ProductVariantEntity | null> {
+    return this.getClient().productVariant.findUnique({
+      where: { sku },
+    });
+  }
+
+  async create(data: {
+    productId: string;
+    sku: string;
+    name: string;
+    price?: number | null;
+    compareAtPrice?: number | null;
+    costPrice?: number | null;
+    quantity?: number;
+    attributes: Record<string, string>;
+    isDefault?: boolean;
+    createdBy?: string;
+  }): Promise<ProductVariantEntity> {
+    return this.getClient().productVariant.create({
+      data: {
+        productId: data.productId,
+        sku: data.sku,
+        name: data.name,
+        price: data.price ?? null,
+        compareAtPrice: data.compareAtPrice ?? null,
+        costPrice: data.costPrice ?? null,
+        quantity: data.quantity ?? 1,
+        attributes: data.attributes,
+        isDefault: data.isDefault ?? false,
+        createdBy: data.createdBy,
+      },
+    });
+  }
+
+  async update(
+    id: string,
+    data: Partial<{
+      sku: string;
+      name: string;
+      price: number | null;
+      compareAtPrice: number | null;
+      costPrice: number | null;
+      quantity: number;
+      attributes: Record<string, string>;
+      isDefault: boolean;
+      updatedBy: string;
+    }>,
+  ): Promise<ProductVariantEntity> {
+    return this.getClient().productVariant.update({
+      where: { id },
+      data: {
+        ...data,
+        version: { increment: 1 },
+      },
+    });
+  }
+
+  async delete(id: string): Promise<ProductVariantEntity> {
+    return this.getClient().productVariant.delete({
+      where: { id },
+    });
+  }
+
+  async count(where?: Record<string, unknown>): Promise<number> {
+    return this.getClient().productVariant.count({ where });
+  }
+}

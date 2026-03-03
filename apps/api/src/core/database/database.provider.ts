@@ -9,6 +9,7 @@ export type PrismaDelegate<T> = {
   create: (args: any) => Promise<T>;
   update: (args: any) => Promise<T>;
   delete: (args: any) => Promise<T>;
+  deleteMany: (args: any) => Promise<{ count: number }>;
   count: (args?: any) => Promise<number>;
 };
 
@@ -32,6 +33,22 @@ export class DatabaseProvider {
 
   get role(): PrismaDelegate<any> {
     return this.prisma.role;
+  }
+
+  get product(): PrismaDelegate<any> {
+    return this.prisma.product;
+  }
+
+  get productVariant(): PrismaDelegate<any> {
+    return this.prisma.productVariant;
+  }
+
+  get category(): PrismaDelegate<any> {
+    return this.prisma.category;
+  }
+
+  get productImage(): PrismaDelegate<any> {
+    return this.prisma.productImage;
   }
 
   /**
