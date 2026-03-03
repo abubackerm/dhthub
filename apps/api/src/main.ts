@@ -5,7 +5,7 @@ import {
   FastifyAdapter,
 } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
-import { DomainExceptionFilter } from '@shared/infrastructure';
+import { DomainExceptionFilter, LoggingInterceptor } from '@shared/infrastructure';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -23,9 +23,15 @@ async function bootstrap() {
     }),
   );
 
+  app.useGlobalInterceptors(new LoggingInterceptor());
   app.useGlobalFilters(new DomainExceptionFilter());
 
-  app.enableCors();
+  app.enableCors({
+    origin: process.env.WEB_URL || 'http://localhost:3005',
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   const port = process.env.API_PORT || 3001;
   await app.listen(port);

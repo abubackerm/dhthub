@@ -35,7 +35,7 @@ build_output*.log
 
 # Testing
 coverage
-
+plan update.md
 # Prisma
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal

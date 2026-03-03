@@ -20,3 +20,12 @@ export class CategoryCircularReferenceError extends InvalidOperationError {
     );
   }
 }
+
+export class CategoryHasChildrenError extends InvalidOperationError {
+  constructor(categoryName: string, childCount: number) {
+    super(
+      `Cannot delete category "${categoryName}" because it has ${childCount} subcategories. Delete or move subcategories first.`,
+      'CATEGORY_HAS_CHILDREN',
+    );
+  }
+}

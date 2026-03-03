@@ -22,6 +22,7 @@
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.14",
     "@nestjs/event-emitter": "^3.0.1",
+    "@nestjs/mapped-types": "^2.0.5",
     "@nestjs/platform-fastify": "^11.1.14",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",

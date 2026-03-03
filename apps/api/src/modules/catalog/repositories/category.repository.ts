@@ -38,6 +38,11 @@ export class CategoryRepository {
     return this.getClient().category.findMany({
       where: { parentId: null },
       orderBy: { sortOrder: 'asc' },
+      include: {
+        children: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
     });
   }
 
@@ -45,6 +50,11 @@ export class CategoryRepository {
     return this.getClient().category.findMany({
       where: { parentId },
       orderBy: { sortOrder: 'asc' },
+      include: {
+        children: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
     });
   }
 

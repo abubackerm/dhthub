@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 export type PrismaDelegate<T> = {
   findMany: (args?: any) => Promise<T[]>;
@@ -13,7 +13,18 @@ export type PrismaDelegate<T> = {
   count: (args?: any) => Promise<number>;
 };
 
-export type TransactionClient = Prisma.TransactionClient;
+// Type for models accessible in transactions
+export type TransactionClient = Omit<
+  PrismaClient,
+  | '$connect'
+  | '$disconnect'
+  | '$on'
+  | '$transaction'
+  | '$use'
+  | '$extends'
+  | '$queryRaw'
+  | '$executeRaw'
+>;
 
 @Injectable()
 export class DatabaseProvider {

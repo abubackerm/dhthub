@@ -6,9 +6,11 @@ import { ProductRepository } from './repositories/product.repository';
 import { ProductVariantRepository } from './repositories/product-variant.repository';
 import { CategoryRepository } from './repositories/category.repository';
 import { ProductImageRepository } from './repositories/product-image.repository';
+import { CategoriesController } from './controllers/categories.controller';
 
 @Module({
   imports: [EventEmitterModule],
+  controllers: [CategoriesController],
   providers: [
     // Services
     ProductService,

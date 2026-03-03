@@ -30,8 +30,14 @@ export function ThemeProvider({
   const [theme, setTheme] = React.useState<Theme>(
     () => (typeof window !== "undefined" && localStorage.getItem(storageKey) as Theme) || defaultTheme
   )
+  const [mounted, setMounted] = React.useState(false)
 
-  const resolvedTheme = getResolvedTheme(theme)
+  // Only set mounted to true after the first client render
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const resolvedTheme = mounted ? getResolvedTheme(theme) : "light"
 
   // Clean up: remove dark/light from <html> if it was previously set
   React.useEffect(() => {

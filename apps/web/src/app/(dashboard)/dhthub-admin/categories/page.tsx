@@ -42,18 +42,23 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Info } from "lucide-react"
+import { Info, Loader2 } from "lucide-react"
+import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
 import {
-  mockCategories,
-  type Category,
-} from "@/lib/mock-data"
+  useCategoryTree,
+  useCreateCategory,
+  useUpdateCategory,
+  useDeleteCategory,
+  type CategoryTreeNode,
+  type CreateCategoryInput,
+  type UpdateCategoryInput,
+} from "@/lib/api/catalog"
 
 interface CategoryFormData {
   name: string
   slug: string
   parentId: string
-  type: "BRANCH" | "LEAF"
   description: string
   sortOrder: number
 }
@@ -62,7 +67,6 @@ const initialFormData: CategoryFormData = {
   name: "",
   slug: "",
   parentId: "none",
-  type: "BRANCH",
   description: "",
   sortOrder: 0,
 }
@@ -70,14 +74,18 @@ const initialFormData: CategoryFormData = {
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+    || 'category' // Fallback if empty
 }
 
-function getAllCategoriesFlat(categories: Category[]): { id: string; name: string; path: string }[] {
+function getAllCategoriesFlat(categories: CategoryTreeNode[]): { id: string; name: string; path: string }[] {
   const result: { id: string; name: string; path: string }[] = []
 
-  function traverse(items: Category[], parentPath: string = "") {
+  function traverse(items: CategoryTreeNode[], parentPath: string = "") {
     for (const item of items) {
       const path = parentPath ? `${parentPath} > ${item.name}` : item.name
       result.push({ id: item.id, name: item.name, path })
@@ -91,14 +99,25 @@ function getAllCategoriesFlat(categories: Category[]): { id: string; name: strin
   return result
 }
 
+function getCategoryType(category: CategoryTreeNode): "BRANCH" | "LEAF" {
+  return category.children.length === 0 ? "LEAF" : "BRANCH"
+}
+
+function getDisplayCounts(category: CategoryTreeNode): { productCount: number; childCount: number } {
+  const childCount = category.children.length
+  const productCount = childCount === 0 ? 0 : category.children.reduce((sum, child) => sum + getDisplayCounts(child).productCount, 0)
+  return { productCount, childCount }
+}
+
 interface CategoryTreeItemProps {
-  category: Category
+  category: CategoryTreeNode
   depth: number
   expandedIds: Set<string>
   onToggle: (id: string) => void
-  onEdit: (category: Category) => void
+  onEdit: (category: CategoryTreeNode) => void
   onAddChild: (parentId: string) => void
-  onManageSchema: (category: Category) => void
+  onManageSchema: (category: CategoryTreeNode) => void
+  onDelete: (category: CategoryTreeNode) => void
 }
 
 function CategoryTreeItem({
@@ -109,10 +128,12 @@ function CategoryTreeItem({
   onEdit,
   onAddChild,
   onManageSchema,
+  onDelete,
 }: CategoryTreeItemProps) {
   const hasChildren = category.children.length > 0
   const isExpanded = expandedIds.has(category.id)
-  const isLeaf = category.type === "LEAF"
+  const isLeaf = getCategoryType(category) === "LEAF"
+  const { productCount, childCount } = getDisplayCounts(category)
 
   return (
     <div className="select-none">
@@ -136,11 +157,6 @@ function CategoryTreeItem({
           )}
         </button>
 
-        {/* Connecting lines */}
-        {depth > 0 && (
-          <div className="absolute left-0 w-px bg-border" style={{ height: "100%" }} />
-        )}
-
         {/* Icon */}
         {isLeaf ? (
           <Tag className="h-4 w-4 text-blue-500" />
@@ -155,14 +171,14 @@ function CategoryTreeItem({
 
         {/* Type badge */}
         <Badge variant={isLeaf ? "default" : "secondary"} className="text-xs">
-          {category.type}
+          {isLeaf ? "LEAF" : "BRANCH"}
         </Badge>
 
         {/* Count info */}
         <span className="text-xs text-muted-foreground min-w-20 text-right">
           {isLeaf
-            ? `${category.productCount} products`
-            : `${category.childCount} subcategories`}
+            ? `${productCount} products`
+            : `${childCount} subcategories`}
         </span>
 
         {/* Status dot */}
@@ -189,12 +205,10 @@ function CategoryTreeItem({
               <Pencil className="h-4 w-4 mr-2" />
               Edit
             </DropdownMenuItem>
-            {!isLeaf && (
-              <DropdownMenuItem onClick={() => onAddChild(category.id)}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Child
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onClick={() => onAddChild(category.id)}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add Child
+            </DropdownMenuItem>
             {isLeaf && (
               <>
                 <DropdownMenuSeparator />
@@ -204,6 +218,13 @@ function CategoryTreeItem({
                 </DropdownMenuItem>
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={() => onDelete(category)}
+              className="text-destructive focus:text-destructive"
+            >
+              Delete Category
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -221,6 +242,7 @@ function CategoryTreeItem({
               onEdit={onEdit}
               onAddChild={onAddChild}
               onManageSchema={onManageSchema}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -230,25 +252,18 @@ function CategoryTreeItem({
 }
 
 export default function CategoriesPage() {
-  const [categories] = useState<Category[]>(mockCategories)
+  const { data: categories = [], isLoading, error } = useCategoryTree()
+  const createMutation = useCreateCategory()
+  const updateMutation = useUpdateCategory()
+  const deleteMutation = useDeleteCategory()
+  const { confirm } = useConfirmDialog()
+
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    const ids = new Set<string>()
-    function addBranchIds(items: Category[]) {
-      for (const item of items) {
-        if (item.type === "BRANCH") {
-          ids.add(item.id)
-          if (item.children.length > 0) {
-            addBranchIds(item.children)
-          }
-        }
-      }
-    }
-    addBranchIds(mockCategories)
-    return ids
+    return new Set<string>()
   })
 
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editingCategory, setEditingCategory] = useState<CategoryTreeNode | null>(null)
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData)
   const [isAddingChild, setIsAddingChild] = useState(false)
 
@@ -273,15 +288,14 @@ export default function CategoriesPage() {
     setSheetOpen(true)
   }
 
-  const handleEditCategory = (category: Category) => {
+  const handleEditCategory = (category: CategoryTreeNode) => {
     setEditingCategory(category)
     setFormData({
       name: category.name,
       slug: category.slug,
       parentId: category.parentId || "none",
-      type: category.type,
-      description: "",
-      sortOrder: 0,
+      description: category.description || "",
+      sortOrder: category.sortOrder,
     })
     setIsAddingChild(false)
     setSheetOpen(true)
@@ -297,8 +311,29 @@ export default function CategoriesPage() {
     setSheetOpen(true)
   }
 
-  const handleManageSchema = (category: Category) => {
+  const handleManageSchema = (category: CategoryTreeNode) => {
     toast.info(`Manage schema for "${category.name}" - Navigate to Attributes page`)
+  }
+
+  const handleDeleteCategory = async (category: CategoryTreeNode) => {
+    const children = category.children || [];  // Safety fallback
+    if (children.length > 0) {
+      toast.error(`Cannot delete "${category.name}" because it has ${children.length} subcategories. Delete or move subcategories first.`)
+      return
+    }
+
+    const confirmed = await confirm({
+      title: "Delete Category",
+      description: `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
+      variant: "destructive",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+    })
+
+    if (confirmed) {
+      console.log('Deleting category:', { id: category.id, name: category.name })
+      deleteMutation.mutate(category.id)
+    }
   }
 
   const handleNameChange = (name: string) => {
@@ -317,10 +352,40 @@ export default function CategoriesPage() {
       return
     }
 
+    // Validate slug matches API requirements: lowercase letters, numbers, and hyphens only
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+    if (!slugPattern.test(formData.slug)) {
+      toast.error("Slug must contain only lowercase letters, numbers, and hyphens")
+      return
+    }
+
+    // Build category data, only including defined values
+    const categoryData: Record<string, unknown> = {
+      name: formData.name,
+      slug: formData.slug,
+    }
+
+    // For description, only include if not empty
+    if (formData.description.trim()) {
+      categoryData.description = formData.description
+    }
+
+    // Note: parentId can only be set on create, not update
+    // To change a category's parent, you would need to use a move operation
+    if (!editingCategory && formData.parentId !== "none") {
+      categoryData.parentId = formData.parentId
+    }
+
+    categoryData.sortOrder = formData.sortOrder
+    categoryData.isActive = true
+
     if (editingCategory) {
-      toast.success(`Category "${formData.name}" updated successfully`)
+      updateMutation.mutate({
+        id: editingCategory.id,
+        data: categoryData as UpdateCategoryInput,
+      })
     } else {
-      toast.success(`Category "${formData.name}" created successfully`)
+      createMutation.mutate(categoryData as CreateCategoryInput)
     }
 
     setSheetOpen(false)
@@ -334,6 +399,57 @@ export default function CategoriesPage() {
     setFormData(initialFormData)
     setEditingCategory(null)
     setIsAddingChild(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
+            <p className="text-muted-foreground">
+              Build your catalog structure. Branches group items, Leaves hold products.
+            </p>
+          </div>
+          <Button onClick={handleOpenSheet} disabled>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Categories</h1>
+            <p className="text-muted-foreground">
+              Build your catalog structure. Branches group items, Leaves hold products.
+            </p>
+          </div>
+          <Button onClick={handleOpenSheet}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <p className="text-destructive font-semibold mb-2">Failed to load categories</p>
+              <p className="text-muted-foreground text-sm">{(error as Error).message}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -360,18 +476,25 @@ export default function CategoriesPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
-            {categories.map((category) => (
-              <CategoryTreeItem
-                key={category.id}
-                category={category}
-                depth={0}
-                expandedIds={expandedIds}
-                onToggle={handleToggle}
-                onEdit={handleEditCategory}
-                onAddChild={handleAddChild}
-                onManageSchema={handleManageSchema}
-              />
-            ))}
+            {categories.length === 0 ? (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground">No categories yet. Create your first category to get started.</p>
+              </div>
+            ) : (
+              categories.map((category) => (
+                <CategoryTreeItem
+                  key={category.id}
+                  category={category}
+                  depth={0}
+                  expandedIds={expandedIds}
+                  onToggle={handleToggle}
+                  onEdit={handleEditCategory}
+                  onAddChild={handleAddChild}
+                  onManageSchema={handleManageSchema}
+                  onDelete={handleDeleteCategory}
+                />
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -385,8 +508,8 @@ export default function CategoriesPage() {
             </SheetTitle>
             <SheetDescription>
               {editingCategory
-                ? "Update the category details below."
-                : "Fill in the details to create a new category."}
+                ? "Update category details below."
+                : "Fill in details to create a new category."}
             </SheetDescription>
           </SheetHeader>
 
@@ -400,6 +523,7 @@ export default function CategoriesPage() {
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="e.g., Hex Bolts"
+                disabled={createMutation.isPending || updateMutation.isPending}
               />
             </div>
 
@@ -413,9 +537,10 @@ export default function CategoriesPage() {
                 }
                 placeholder="e.g., hex-bolts"
                 className="font-mono text-sm"
+                disabled={createMutation.isPending || updateMutation.isPending}
               />
               <p className="text-xs text-muted-foreground">
-                Auto-generated from name. You can customize it.
+                Auto-generated from name. Must contain only lowercase letters, numbers, and hyphens.
               </p>
             </div>
 
@@ -445,41 +570,6 @@ export default function CategoriesPage() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Type</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={formData.type === "BRANCH" ? "default" : "outline"}
-                  onClick={() =>
-                    setFormData((prev) => ({ ...prev, type: "BRANCH" }))
-                  }
-                  className="flex-1"
-                >
-                  <Folder className="h-4 w-4 mr-2" />
-                  BRANCH
-                </Button>
-                <Button
-                  type="button"
-                  variant={formData.type === "LEAF" ? "default" : "outline"}
-                  onClick={() => setFormData((prev) => ({ ...prev, type: "LEAF" }))}
-                  className="flex-1"
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  LEAF
-                </Button>
-              </div>
-            </div>
-
-            {formData.type === "LEAF" && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  This category will hold products. You&apos;ll need to set up its attribute schema before uploading products.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
@@ -489,6 +579,7 @@ export default function CategoriesPage() {
                 }
                 placeholder="Optional description for this category"
                 rows={3}
+                disabled={createMutation.isPending || updateMutation.isPending}
               />
             </div>
 
@@ -505,6 +596,7 @@ export default function CategoriesPage() {
                   }))
                 }
                 placeholder="0"
+                disabled={createMutation.isPending || updateMutation.isPending}
               />
               <p className="text-xs text-muted-foreground">
                 Lower numbers appear first
@@ -513,10 +605,20 @@ export default function CategoriesPage() {
           </div>
 
           <SheetFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={handleCancel}>
+            <Button 
+              variant="outline" 
+              onClick={handleCancel}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button 
+              onClick={handleSave}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {createMutation.isPending || updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
               {editingCategory ? "Update Category" : "Save Category"}
             </Button>
           </SheetFooter>

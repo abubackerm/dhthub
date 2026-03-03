@@ -6,6 +6,7 @@ import {
   CategoryNotFoundError,
   CategorySlugAlreadyExistsError,
   CategoryCircularReferenceError,
+  CategoryHasChildrenError,
 } from '@shared/domain/errors';
 import { CategoryRepository } from '../repositories/category.repository';
 import { CategoryEntity } from '../entities/category.entity';
@@ -203,7 +204,7 @@ export class CategoryService extends BaseService {
 
     const children = await this.categoryRepo.findChildren(id);
     if (children.length > 0) {
-      throw new Error('Cannot delete category with children. Move or delete children first.');
+      throw new CategoryHasChildrenError(category.name, children.length);
     }
 
     await this.categoryRepo.delete(id);
@@ -216,10 +217,10 @@ export class CategoryService extends BaseService {
 
   private async buildTree(categories: CategoryEntity[]): Promise<CategoryEntity[]> {
     for (const category of categories) {
-      const children = await this.categoryRepo.findChildren(category.id);
-      if (children.length > 0) {
-        (category as any).children = await this.buildTree(children);
-      }
+      const children = (category as any).children || await this.categoryRepo.findChildren(category.id);
+      (category as any).children = children.length > 0
+        ? await this.buildTree(children)
+        : [];  // Always set empty array for leaf categories
     }
     return categories;
   }
