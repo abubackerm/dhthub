@@ -1,0 +1,51 @@
+# DHT Hub - Docker Compose Configuration
+# PostgreSQL 18.3 & Redis 8.6.0
+
+services:
+  dht-postgres:
+    image: postgres:18.3
+    container_name: dht-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - dht-postgres-data:/var/lib/postgresql
+    networks:
+      - dht-hub-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-redis:
+    image: redis:8.6.0
+    container_name: dht-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - dht-redis-data:/data
+    networks:
+      - dht-hub-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  dht-hub-network:
+    driver: bridge
+    name: dht-hub-network
+
+volumes:
+  dht-postgres-data:
+    name: dht-postgres-data
+  dht-redis-data:
+    name: dht-redis-data
