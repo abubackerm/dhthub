@@ -43,3 +43,4 @@ apps/api/prisma/*.db-journal
 # Cache
 .turbo
 .cache
+_example

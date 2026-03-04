@@ -39,12 +39,13 @@ export function ThemeProvider({
 
   const resolvedTheme = mounted ? getResolvedTheme(theme) : "light"
 
-  // Clean up: remove dark/light from <html> if it was previously set
+  // Apply resolved theme class to documentElement so theme customizer inline styles apply correctly in dark mode
   React.useEffect(() => {
     if (typeof window === "undefined") return
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
-  }, [])
+    root.classList.add(resolvedTheme)
+  }, [resolvedTheme])
 
   // Listen for system theme changes when theme is "system"
   React.useEffect(() => {
@@ -67,10 +68,8 @@ export function ThemeProvider({
   }
 
   return (
-    <div className={resolvedTheme} style={{ display: "contents" }}>
-      <ThemeProviderContext.Provider {...props} value={value}>
-        {children}
-      </ThemeProviderContext.Provider>
-    </div>
+    <ThemeProviderContext.Provider {...props} value={value}>
+      {children}
+    </ThemeProviderContext.Provider>
   )
 }

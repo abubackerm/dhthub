@@ -21,6 +21,7 @@ export class ProductVariantRepository {
   async findByProductId(productId: string): Promise<ProductVariantEntity[]> {
     return this.getClient().productVariant.findMany({
       where: { productId },
+      orderBy: { sortOrder: 'asc' },
     });
   }
 

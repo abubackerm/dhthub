@@ -197,6 +197,9 @@ html {
 
 /* Tab Bar */
 .catalog-tab-bar {
+  position: sticky;
+  top: 80px;
+  z-index: 45;
   background: #f8f8f8;
   border-bottom: 2px solid var(--dht-green);
   padding: 0.625rem 1.5rem;
@@ -215,17 +218,22 @@ html {
 .catalog-layout {
   display: flex;
   flex: 1;
-  min-height: 0;
+  position: relative;
 }
 
 /* Sidebar */
 .catalog-sidebar {
+  position: fixed;
+  top: calc(80px + 42px);
+  left: 0;
   width: 220px;
   min-width: 220px;
+  height: calc(100vh - 122px);
   border-right: 1px solid #e0e0e0;
   background: #fff;
   padding: 0.75rem 0;
   overflow-y: auto;
+  z-index: 40;
 }
 
 .catalog-sidebar__list {
@@ -261,6 +269,7 @@ html {
 .catalog-content {
   flex: 1;
   min-width: 0;
+  margin-left: 220px;
   background: #fff;
   overflow-y: auto;
 }
@@ -381,6 +390,10 @@ html {
     display: none;
   }
 
+  .catalog-content {
+    margin-left: 0;
+  }
+
   .catalog-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -427,4 +440,276 @@ html {
   .catalog-grid__label {
     font-size: 0.75rem;
   }
+}
+
+/* ========================================
+   About Page Scroll Animations
+   ======================================== */
+
+/* Base scroll animation class - smoother, slower, more visible */
+.scroll-animate {
+  transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Fade Up Animation - larger distance for more visible effect */
+.scroll-animate-fade-up.animate-out {
+  opacity: 0;
+  transform: translateY(80px);
+}
+
+.scroll-animate-fade-up.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Fade Left Animation - larger distance */
+.scroll-animate-fade-left.animate-out {
+  opacity: 0;
+  transform: translateX(-60px);
+}
+
+.scroll-animate-fade-left.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Fade Right Animation - larger distance */
+.scroll-animate-fade-right.animate-out {
+  opacity: 0;
+  transform: translateX(60px);
+}
+
+.scroll-animate-fade-right.animate-in {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Scale Up Animation - more dramatic */
+.scroll-animate-scale-up.animate-out {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.scroll-animate-scale-up.animate-in {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Stagger Up Animation - for children with more visible movement */
+.scroll-animate-stagger-up > * {
+  opacity: 0;
+  transform: translateY(60px);
+  transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 150ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 300ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(4) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 450ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(5) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 600ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(6) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 750ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(7) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 900ms;
+}
+
+.scroll-animate-stagger-up.animate-in > *:nth-child(8) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 1050ms;
+}
+
+/* Scroll trigger for elements that should animate on scroll */
+.scroll-trigger {
+  opacity: 0;
+  transform: translateY(60px);
+  transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-trigger.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Letter Reveal Animation - more dramatic */
+@keyframes letter-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(100%) rotateX(-90deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0);
+  }
+}
+
+.letter-reveal span {
+  display: inline-block;
+  opacity: 0;
+  animation: letter-reveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-style: preserve-3d;
+}
+
+.letter-reveal.animate-in span:nth-child(1) { animation-delay: 0ms; }
+.letter-reveal.animate-in span:nth-child(2) { animation-delay: 50ms; }
+.letter-reveal.animate-in span:nth-child(3) { animation-delay: 100ms; }
+.letter-reveal.animate-in span:nth-child(4) { animation-delay: 150ms; }
+.letter-reveal.animate-in span:nth-child(5) { animation-delay: 200ms; }
+.letter-reveal.animate-in span:nth-child(6) { animation-delay: 250ms; }
+.letter-reveal.animate-in span:nth-child(7) { animation-delay: 300ms; }
+.letter-reveal.animate-in span:nth-child(8) { animation-delay: 350ms; }
+.letter-reveal.animate-in span:nth-child(9) { animation-delay: 400ms; }
+.letter-reveal.animate-in span:nth-child(10) { animation-delay: 450ms; }
+.letter-reveal.animate-in span:nth-child(11) { animation-delay: 500ms; }
+.letter-reveal.animate-in span:nth-child(12) { animation-delay: 550ms; }
+.letter-reveal.animate-in span:nth-child(13) { animation-delay: 600ms; }
+.letter-reveal.animate-in span:nth-child(14) { animation-delay: 650ms; }
+.letter-reveal.animate-in span:nth-child(15) { animation-delay: 700ms; }
+.letter-reveal.animate-in span:nth-child(16) { animation-delay: 750ms; }
+.letter-reveal.animate-in span:nth-child(17) { animation-delay: 800ms; }
+.letter-reveal.animate-in span:nth-child(18) { animation-delay: 850ms; }
+.letter-reveal.animate-in span:nth-child(19) { animation-delay: 900ms; }
+.letter-reveal.animate-in span:nth-child(20) { animation-delay: 950ms; }
+.letter-reveal.animate-in span:nth-child(21) { animation-delay: 1000ms; }
+.letter-reveal.animate-in span:nth-child(22) { animation-delay: 1050ms; }
+.letter-reveal.animate-in span:nth-child(23) { animation-delay: 1100ms; }
+.letter-reveal.animate-in span:nth-child(24) { animation-delay: 1150ms; }
+.letter-reveal.animate-in span:nth-child(25) { animation-delay: 1200ms; }
+.letter-reveal.animate-in span:nth-child(26) { animation-delay: 1250ms; }
+.letter-reveal.animate-in span:nth-child(27) { animation-delay: 1300ms; }
+.letter-reveal.animate-in span:nth-child(28) { animation-delay: 1350ms; }
+.letter-reveal.animate-in span:nth-child(29) { animation-delay: 1400ms; }
+.letter-reveal.animate-in span:nth-child(30) { animation-delay: 1450ms; }
+.letter-reveal.animate-in span:nth-child(31) { animation-delay: 1500ms; }
+.letter-reveal.animate-in span:nth-child(32) { animation-delay: 1550ms; }
+.letter-reveal.animate-in span:nth-child(33) { animation-delay: 1600ms; }
+.letter-reveal.animate-in span:nth-child(34) { animation-delay: 1650ms; }
+.letter-reveal.animate-in span:nth-child(35) { animation-delay: 1700ms; }
+.letter-reveal.animate-in span:nth-child(36) { animation-delay: 1750ms; }
+
+/* Pulse Animation */
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(220, 0, 0, 0);
+  }
+}
+
+.pulse-red {
+  animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Float Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-delay-1 { animation-delay: 0s; }
+.animate-float-delay-2 { animation-delay: 0.5s; }
+.animate-float-delay-3 { animation-delay: 1s; }
+.animate-float-delay-4 { animation-delay: 1.5s; }
+
+/* Gradient Animation */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Scroll Indicator */
+@keyframes bounce-down {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+.animate-bounce-down {
+  animation: bounce-down 1.5s ease-in-out infinite;
+}
+
+/* Line Draw Animation */
+@keyframes draw-line {
+  from {
+    height: 0;
+  }
+  to {
+    height: 100%;
+  }
+}
+
+.animate-draw-line {
+  animation: draw-line 1.5s ease-out forwards;
+}
+
+/* Geometric Pattern Background */
+.geometric-pattern {
+  background-image:
+    linear-gradient(30deg, var(--dht-red) 12%, transparent 12.5%, transparent 87%, var(--dht-red) 87.5%, var(--dht-red)),
+    linear-gradient(150deg, var(--dht-red) 12%, transparent 12.5%, transparent 87%, var(--dht-red) 87.5%, var(--dht-red)),
+    linear-gradient(30deg, var(--dht-red) 12%, transparent 12.5%, transparent 87%, var(--dht-red) 87.5%, var(--dht-red)),
+    linear-gradient(150deg, var(--dht-red) 12%, transparent 12.5%, transparent 87%, var(--dht-red) 87.5%, var(--dht-red)),
+    linear-gradient(60deg, var(--dht-red) 25%, transparent 25.5%, transparent 75%, var(--dht-red) 75%, var(--dht-red)),
+    linear-gradient(60deg, var(--dht-red) 25%, transparent 25.5%, transparent 75%, var(--dht-red) 75%, var(--dht-red));
+  background-size: 80px 140px;
+  background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
+  opacity: 0.03;
 }

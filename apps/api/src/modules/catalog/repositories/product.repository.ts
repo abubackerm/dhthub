@@ -23,9 +23,11 @@ export class ProductRepository {
   }
 
   async findBySku(sku: string): Promise<ProductEntity | null> {
-    return this.getClient().product.findUnique({
+    const variant = await this.getClient().productVariant.findUnique({
       where: { sku },
+      include: { product: true },
     });
+    return variant?.product ?? null;
   }
 
   async findBySlug(slug: string): Promise<ProductEntity | null> {
@@ -121,5 +123,48 @@ export class ProductRepository {
 
   async count(where?: Record<string, unknown>): Promise<number> {
     return this.getClient().product.count({ where });
+  }
+
+  async findAllWithSearch(options: {
+    search?: string;
+    categoryId?: string;
+    status?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ products: ProductEntity[]; total: number }> {
+    const where: any = {};
+
+    if (options.search) {
+      where.OR = [
+        { name: { contains: options.search, mode: 'insensitive' } },
+        {
+          variants: {
+            some: {
+              sku: { contains: options.search, mode: 'insensitive' },
+            },
+          },
+        },
+      ];
+    }
+
+    if (options.categoryId) {
+      where.categoryId = options.categoryId;
+    }
+
+    if (options.status) {
+      where.status = options.status;
+    }
+
+    const [products, total] = await Promise.all([
+      this.getClient().product.findMany({
+        where,
+        take: options.limit,
+        skip: options.offset,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.getClient().product.count({ where }),
+    ]);
+
+    return { products, total };
   }
 }

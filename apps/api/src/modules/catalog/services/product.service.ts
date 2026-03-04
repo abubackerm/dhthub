@@ -293,6 +293,19 @@ export class ProductService extends BaseService {
       throw new ProductSkuAlreadyExistsError(data.sku);
     }
 
+    // Check existing variants to determine default status
+    const existingVariants = await this.variantRepo.findByProductId(productId);
+    const isFirstVariant = existingVariants.length === 0;
+    const shouldBeDefault = data.isDefault ?? isFirstVariant;
+
+    // If this variant should be default, unset any existing default
+    if (shouldBeDefault && !isFirstVariant) {
+      const currentDefault = await this.variantRepo.findDefaultVariant(productId);
+      if (currentDefault) {
+        await this.variantRepo.update(currentDefault.id, { isDefault: false });
+      }
+    }
+
     const variant = await this.variantRepo.create({
       productId,
       sku: data.sku,
@@ -302,7 +315,7 @@ export class ProductService extends BaseService {
       costPrice: data.costPrice ?? null,
       quantity: data.quantity ?? 1,
       attributes: data.attributes,
-      isDefault: data.isDefault ?? false,
+      isDefault: shouldBeDefault,
       createdBy: data.createdBy,
     });
 
@@ -354,5 +367,43 @@ export class ProductService extends BaseService {
     }
 
     await this.productRepo.delete(id);
+  }
+
+  async findAllPaginated(options: {
+    search?: string;
+    categoryId?: string;
+    status?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ products: ProductEntity[]; total: number }> {
+    return this.productRepo.findAllWithSearch(options);
+  }
+
+  async getVariants(productId: string): Promise<ProductVariantEntity[]> {
+    return this.variantRepo.findByProductId(productId);
+  }
+
+  async findVariantBySku(sku: string): Promise<ProductVariantEntity | null> {
+    return this.variantRepo.findBySku(sku);
+  }
+
+  async generateUniqueSlug(name: string): Promise<string> {
+    const baseSlug = this.slugify(name);
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await this.productRepo.findBySlug(slug)) {
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+    return slug;
+  }
+
+  private slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 }

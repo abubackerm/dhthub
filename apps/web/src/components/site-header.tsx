@@ -6,9 +6,12 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { CommandSearch, SearchTrigger } from "@/components/command-search"
 import { ModeToggle } from "@/components/mode-toggle"
+import { ThemeCustomizer } from "@/components/theme-customizer"
+import { Settings } from "lucide-react"
 
 export function SiteHeader() {
   const [searchOpen, setSearchOpen] = React.useState(false)
+  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false)
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -55,21 +58,21 @@ export function SiteHeader() {
                 Landing Page
               </a>
             </Button>
-            <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-              <a
-                href="https://github.com/silicondeck/shadcn-dashboard-landing-template"
-                rel="noopener noreferrer"
-                target="_blank"
-                className="dark:text-foreground"
-              >
-                GitHub
-              </a>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setThemeCustomizerOpen(true)}
+              className="cursor-pointer"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="sr-only">Open theme customizer</span>
             </Button>
             <ModeToggle />
           </div>
         </div>
       </header>
       <CommandSearch open={searchOpen} onOpenChange={setSearchOpen} />
+      <ThemeCustomizer open={themeCustomizerOpen} onOpenChange={setThemeCustomizerOpen} />
     </>
   )
 }

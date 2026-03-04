@@ -131,6 +131,7 @@ model Product {
   @@index([categoryId])
   @@index([sku])
   @@index([slug])
+  @@index([createdAt])
   @@map("products")
 }
 
@@ -148,6 +149,7 @@ model ProductVariant {
   // TRANSITIONAL: Will be replaced by AttributeDefinition system
   attributes    Json
   isDefault     Boolean  @default(false) @map("is_default")
+  sortOrder     Int      @default(0) @map("sort_order")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   createdBy     String?  @map("created_by")
