@@ -46,8 +46,8 @@ export async function updateProduct(
   return apiClient.patch<ProductView>(`/v1/catalog/products/${id}`, data);
 }
 
-export async function deleteProduct(id: string): Promise<void> {
-  return apiClient.delete<void>(`/v1/catalog/products/${id}`);
+export async function hardDeleteProduct(id: string): Promise<void> {
+  return apiClient.delete<void>(`/v1/catalog/products/${id}/hard`);
 }
 
 export async function addVariant(

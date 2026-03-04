@@ -125,6 +125,12 @@ export class ProductsController {
     await this.productService.changeStatus(id, 'archived' as any);
   }
 
+  @Delete(':id/hard')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async hardDelete(@Param('id') id: string): Promise<void> {
+    await this.productService.delete(id);
+  }
+
   @Post(':productId/variants')
   @HttpCode(HttpStatus.CREATED)
   async addVariant(

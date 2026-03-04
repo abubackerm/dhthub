@@ -2,7 +2,6 @@ import {
   IsOptional,
   IsInt,
   IsString,
-  IsUUID,
   IsEnum,
   Min,
   Max,
@@ -34,7 +33,7 @@ export class ProductQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()

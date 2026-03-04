@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsInt,
   IsBoolean,
-  IsUUID,
   Min,
   MinLength,
   MaxLength,
@@ -35,7 +34,7 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()

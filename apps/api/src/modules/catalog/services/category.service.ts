@@ -211,17 +211,31 @@ export class CategoryService extends BaseService {
   }
 
   async getTree(): Promise<CategoryEntity[]> {
-    const rootCategories = await this.categoryRepo.findRootCategories();
-    return this.buildTree(rootCategories);
-  }
+    // Fetch all categories with product counts in a single query
+    const allCategories = await this.categoryRepo.findAllWithProductCount();
+    
+    // Build the tree in memory
+    const categoryMap = new Map<string, any>();
+    const rootCategories: any[] = [];
 
-  private async buildTree(categories: CategoryEntity[]): Promise<CategoryEntity[]> {
-    for (const category of categories) {
-      const children = (category as any).children || await this.categoryRepo.findChildren(category.id);
-      (category as any).children = children.length > 0
-        ? await this.buildTree(children)
-        : [];  // Always set empty array for leaf categories
+    // First pass: create map of all categories
+    for (const category of allCategories) {
+      categoryMap.set(category.id, { ...category, children: [] });
     }
-    return categories;
+
+    // Second pass: build tree structure
+    for (const category of allCategories) {
+      const node = categoryMap.get(category.id)!;
+      if (category.parentId) {
+        const parent = categoryMap.get(category.parentId);
+        if (parent) {
+          parent.children.push(node);
+        }
+      } else {
+        rootCategories.push(node);
+      }
+    }
+
+    return rootCategories;
   }
 }

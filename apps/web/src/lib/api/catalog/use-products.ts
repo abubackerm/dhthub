@@ -12,7 +12,7 @@ import {
   getProductById,
   createProduct,
   updateProduct,
-  deleteProduct,
+  hardDeleteProduct,
   addVariant,
   type ProductView,
   type CreateProductInput,
@@ -92,7 +92,7 @@ export function useDeleteProduct(): UseMutationResult<void, Error, string> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: deleteProduct,
+    mutationFn: hardDeleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
       toast.success('Product deleted successfully');

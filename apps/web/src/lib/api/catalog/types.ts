@@ -15,6 +15,7 @@ export interface Category {
 export interface CategoryTreeNode extends Category {
   children: CategoryTreeNode[];
   depth: number;
+  productCount: number;
 }
 
 export interface CreateCategoryInput {

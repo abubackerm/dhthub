@@ -35,27 +35,47 @@ export class CategoryRepository {
   }
 
   async findRootCategories(): Promise<CategoryEntity[]> {
-    return this.getClient().category.findMany({
+    const client = this.getClient();
+    return client.category.findMany({
       where: { parentId: null },
       orderBy: { sortOrder: 'asc' },
       include: {
         children: {
           orderBy: { sortOrder: 'asc' },
         },
+        _count: {
+          select: { products: true },
+        },
       },
-    });
+    }) as any;
+  }
+
+  async findAllWithProductCount(): Promise<CategoryEntity[]> {
+    const client = this.getClient();
+    return client.category.findMany({
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        _count: {
+          select: { products: true },
+        },
+      },
+    }) as any;
   }
 
   async findChildren(parentId: string): Promise<CategoryEntity[]> {
-    return this.getClient().category.findMany({
+    const client = this.getClient();
+    return client.category.findMany({
       where: { parentId },
       orderBy: { sortOrder: 'asc' },
       include: {
         children: {
           orderBy: { sortOrder: 'asc' },
         },
+        _count: {
+          select: { products: true },
+        },
       },
-    });
+    }) as any;
   }
 
   async findByParentPath(parentPath: string): Promise<CategoryEntity[]> {

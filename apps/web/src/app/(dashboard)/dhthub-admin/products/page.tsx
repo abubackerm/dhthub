@@ -13,6 +13,8 @@ import {
   ChevronRight,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -54,6 +56,7 @@ import {
   type CategoryTreeNode,
   type CreateVariantInput,
 } from "@/lib/api/catalog"
+import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
 function StatusBadge({ status }: { status: ProductStatus }) {
   const styles: Record<ProductStatus, { bg: string; label: string }> = {
@@ -132,6 +135,7 @@ function flattenCategories(
 }
 
 export default function ProductsPage() {
+  const { confirm } = useConfirmDialog()
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -203,8 +207,16 @@ export default function ProductsPage() {
     setDetailSheetOpen(true)
   }
 
-  const handleDeleteProduct = (product: ProductView) => {
-    if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
+  const handleDeleteProduct = async (product: ProductView) => {
+    const confirmed = await confirm({
+      title: "Delete Product",
+      description: `Are you sure you want to delete "${product.name}"? This will archive the product.`,
+      variant: "destructive",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+    })
+
+    if (confirmed) {
       deleteProduct.mutate(product.id)
     }
   }
@@ -282,7 +294,7 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => alert("Bulk upload coming soon")}>
+          <Button variant="outline" onClick={() => toast.info("Bulk upload coming soon")}>
             <Upload className="h-4 w-4 mr-2" />
             Bulk Upload
           </Button>

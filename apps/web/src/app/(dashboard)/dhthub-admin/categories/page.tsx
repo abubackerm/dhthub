@@ -103,12 +103,6 @@ function getCategoryType(category: CategoryTreeNode): "BRANCH" | "LEAF" {
   return category.children.length === 0 ? "LEAF" : "BRANCH"
 }
 
-function getDisplayCounts(category: CategoryTreeNode): { productCount: number; childCount: number } {
-  const childCount = category.children.length
-  const productCount = childCount === 0 ? 0 : category.children.reduce((sum, child) => sum + getDisplayCounts(child).productCount, 0)
-  return { productCount, childCount }
-}
-
 interface CategoryTreeItemProps {
   category: CategoryTreeNode
   depth: number
@@ -133,7 +127,7 @@ function CategoryTreeItem({
   const hasChildren = category.children.length > 0
   const isExpanded = expandedIds.has(category.id)
   const isLeaf = getCategoryType(category) === "LEAF"
-  const { productCount, childCount } = getDisplayCounts(category)
+  const childCount = category.children.length
 
   return (
     <div className="select-none">
@@ -177,7 +171,7 @@ function CategoryTreeItem({
         {/* Count info */}
         <span className="text-xs text-muted-foreground min-w-20 text-right">
           {isLeaf
-            ? `${productCount} products`
+            ? `${category.productCount} products`
             : `${childCount} subcategories`}
         </span>
 
