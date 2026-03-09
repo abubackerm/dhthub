@@ -9,10 +9,10 @@ export function DHTHero() {
             <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                 style={{
-                    backgroundImage: "url('/images/hero-industrial.jpg')",
+                    backgroundImage: "url('/images/595188.jpg')",
                 }}
             >
-                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-transparent" />
             </div>
 
             {/* Content */}
@@ -28,7 +28,7 @@ export function DHTHero() {
                     </p>
                     <Link
                         href="/contact"
-                        className="inline-block bg-[var(--dht-red)] hover:bg-[var(--dht-red-hover)] text-white font-semibold px-8 py-3 rounded transition-colors uppercase text-xs tracking-wide"
+                        className="inline-block bg-(--dht-red) hover:bg-(--dht-red-hover) text-white font-semibold px-8 py-3 rounded transition-colors uppercase text-xs tracking-wide"
                     >
                         Contact Us
                     </Link>

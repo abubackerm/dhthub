@@ -219,21 +219,23 @@ html {
   display: flex;
   flex: 1;
   position: relative;
+  min-height: calc(100vh - 112px);
 }
 
 /* Sidebar */
 .catalog-sidebar {
-  position: fixed;
-  top: calc(80px + 42px);
-  left: 0;
+  position: sticky;
+  top: 123px;  /* Adjusted based on actual header + tab bar height */
+  height: calc(100vh - 123px);
+  max-height: calc(100vh - 123px);
   width: 220px;
   min-width: 220px;
-  height: calc(100vh - 122px);
+  flex-shrink: 0;
   border-right: 1px solid #e0e0e0;
   background: #fff;
   padding: 0.75rem 0;
   overflow-y: auto;
-  z-index: 40;
+  align-self: flex-start;  /* Important for sticky to work */
 }
 
 .catalog-sidebar__list {
@@ -269,9 +271,7 @@ html {
 .catalog-content {
   flex: 1;
   min-width: 0;
-  margin-left: 220px;
   background: #fff;
-  overflow-y: auto;
 }
 
 /* Catalog Page (inside content) */

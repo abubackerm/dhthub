@@ -38,7 +38,7 @@ export function DHTFooter() {
     };
 
     return (
-        <footer className="bg-[var(--dht-darker)]">
+        <footer className="bg-(--dht-darker)">
             {/* Supplying Infrastructure Banner */}
             <div className="relative py-16">
                 <div
@@ -47,7 +47,7 @@ export function DHTFooter() {
                         backgroundImage: "url('/images/footer-industrial.jpg')",
                     }}
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--dht-red)] to-[var(--dht-red)]/80" />
+                    <div className="absolute inset-0 bg-linear-to-r from-(--dht-red) to-(--dht-red)/80" />
                 </div>
                 <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <h2 className="text-2xl md:text-3xl font-bold text-white">
@@ -77,12 +77,12 @@ export function DHTFooter() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="Enter your email"
-                                className="flex-1 md:w-80 px-4 py-3 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-[var(--dht-red)]"
+                                className="flex-1 md:w-80 px-4 py-3 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-(--dht-red)"
                                 required
                             />
                             <button
                                 type="submit"
-                                className="px-6 py-3 bg-[var(--dht-red)] hover:bg-[var(--dht-red-hover)] text-white rounded transition-colors flex items-center gap-2"
+                                className="px-6 py-3 bg-(--dht-red) hover:bg-(--dht-red-hover) text-white rounded transition-colors flex items-center gap-2"
                             >
                                 <Send className="w-4 h-4" />
                                 <span className="hidden sm:inline">Subscribe</span>
@@ -99,7 +99,7 @@ export function DHTFooter() {
                         {/* Logo & Description */}
                         <div className="lg:col-span-1">
                             <Link href="/" className="flex items-center gap-2 mb-6">
-                                <div className="w-10 h-10 bg-[var(--dht-red)] rounded flex items-center justify-center">
+                                <div className="w-10 h-10 bg-(--dht-red) rounded flex items-center justify-center">
                                     <span className="text-white font-bold text-lg">DH</span>
                                 </div>
                                 <span className="text-white font-bold text-xl tracking-tight">
@@ -115,7 +115,7 @@ export function DHTFooter() {
                                     <a
                                         key={index}
                                         href={social.href}
-                                        className="w-10 h-10 bg-white/10 hover:bg-[var(--dht-red)] rounded-full flex items-center justify-center transition-colors"
+                                        className="w-10 h-10 bg-white/10 hover:bg-(--dht-red) rounded-full flex items-center justify-center transition-colors"
                                         aria-label={social.label}
                                     >
                                         <social.icon className="w-5 h-5 text-white" />
@@ -132,7 +132,7 @@ export function DHTFooter() {
                                     <li key={index}>
                                         <Link
                                             href={link.href}
-                                            className="text-gray-400 hover:text-[var(--dht-red)] transition-colors"
+                                            className="text-gray-400 hover:text-(--dht-red) transition-colors"
                                         >
                                             {link.label}
                                         </Link>
@@ -149,7 +149,7 @@ export function DHTFooter() {
                                     <li key={index}>
                                         <Link
                                             href={link.href}
-                                            className="text-gray-400 hover:text-[var(--dht-red)] transition-colors"
+                                            className="text-gray-400 hover:text-(--dht-red) transition-colors"
                                         >
                                             {link.label}
                                         </Link>
@@ -166,7 +166,7 @@ export function DHTFooter() {
                                 <li>
                                     <a
                                         href="mailto:info@dynamichub.com"
-                                        className="hover:text-[var(--dht-red)] transition-colors"
+                                        className="hover:text-(--dht-red) transition-colors"
                                     >
                                         info@dynamichub.com
                                     </a>
@@ -174,7 +174,7 @@ export function DHTFooter() {
                                 <li>
                                     <a
                                         href="tel:+966123456789"
-                                        className="hover:text-[var(--dht-red)] transition-colors"
+                                        className="hover:text-(--dht-red) transition-colors"
                                     >
                                         +966 12 345 6789
                                     </a>
