@@ -125,6 +125,10 @@ export class ProductRepository {
     return this.getClient().product.count({ where });
   }
 
+  async countAll(): Promise<number> {
+    return this.getClient().product.count();
+  }
+
   async findAllWithSearch(options: {
     search?: string;
     categoryId?: string;

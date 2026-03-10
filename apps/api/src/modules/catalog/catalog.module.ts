@@ -28,6 +28,7 @@ import { ProductsController } from './controllers/products.controller';
     CategoryService,
     // Repositories (read-only for queries)
     ProductRepository,
+    ProductVariantRepository,
     CategoryRepository,
   ],
 })

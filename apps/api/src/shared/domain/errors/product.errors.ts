@@ -32,3 +32,12 @@ export class ProductVersionConflictError extends InvalidOperationError {
     );
   }
 }
+
+export class CatalogProductLimitReachedError extends InvalidOperationError {
+  constructor(limit: number) {
+    super(
+      `Product limit of ${limit} reached. Upgrade plan to add more products.`,
+      'CATALOG_PRODUCT_LIMIT_REACHED',
+    );
+  }
+}

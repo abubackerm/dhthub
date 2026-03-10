@@ -18,10 +18,47 @@ export class ProductVariantRepository {
     });
   }
 
+  async findByIdWithAttributes(id: string): Promise<ProductVariantEntity | null> {
+    return this.getClient().productVariant.findUnique({
+      where: { id },
+      include: {
+        attributeValues: {
+          include: {
+            attribute: {
+              include: {
+                unit: true,
+              },
+            },
+            option: true,
+          },
+        },
+      },
+    });
+  }
+
   async findByProductId(productId: string): Promise<ProductVariantEntity[]> {
     return this.getClient().productVariant.findMany({
       where: { productId },
       orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  async findByProductIdWithAttributes(productId: string): Promise<ProductVariantEntity[]> {
+    return this.getClient().productVariant.findMany({
+      where: { productId },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        attributeValues: {
+          include: {
+            attribute: {
+              include: {
+                unit: true,
+              },
+            },
+            option: true,
+          },
+        },
+      },
     });
   }
 
@@ -34,6 +71,24 @@ export class ProductVariantRepository {
   async findBySku(sku: string): Promise<ProductVariantEntity | null> {
     return this.getClient().productVariant.findUnique({
       where: { sku },
+    });
+  }
+
+  async findBySkuWithAttributes(sku: string): Promise<ProductVariantEntity | null> {
+    return this.getClient().productVariant.findUnique({
+      where: { sku },
+      include: {
+        attributeValues: {
+          include: {
+            attribute: {
+              include: {
+                unit: true,
+              },
+            },
+            option: true,
+          },
+        },
+      },
     });
   }
 

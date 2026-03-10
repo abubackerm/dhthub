@@ -11,6 +11,7 @@ export type PrismaDelegate<T> = {
   delete: (args: any) => Promise<T>;
   deleteMany: (args: any) => Promise<{ count: number }>;
   count: (args?: any) => Promise<number>;
+  createMany: (args: any) => Promise<{ count: number }>;
 };
 
 // Type for models accessible in transactions
@@ -60,6 +61,26 @@ export class DatabaseProvider {
 
   get productImage(): PrismaDelegate<any> {
     return this.prisma.productImage;
+  }
+
+  get attributeDefinition(): PrismaDelegate<any> {
+    return this.prisma.attributeDefinition;
+  }
+
+  get attributeOption(): PrismaDelegate<any> {
+    return this.prisma.attributeOption;
+  }
+
+  get categoryAttribute(): PrismaDelegate<any> {
+    return this.prisma.categoryAttribute;
+  }
+
+  get unitDefinition(): PrismaDelegate<any> {
+    return this.prisma.unitDefinition;
+  }
+
+  get variantAttributeValue(): PrismaDelegate<any> {
+    return this.prisma.variantAttributeValue;
   }
 
   /**

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseService } from '@shared/domain';
 import { CATALOG_EVENTS } from '@shared/events';
@@ -10,6 +11,7 @@ import {
   ProductVariantNotFoundError,
   InvalidProductOperationError,
   ProductVersionConflictError,
+  CatalogProductLimitReachedError,
 } from '@shared/domain/errors';
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductVariantRepository } from '../repositories/product-variant.repository';
@@ -23,6 +25,14 @@ import {
   ProductStatusChangedEvent,
   ProductVariantCreatedEvent,
 } from '../events';
+import { VariantAttributeService } from '@modules/catalog-attributes/services/variant-attribute.service';
+
+interface AttributeValue {
+  attributeId: string;
+  numberValue?: number | null;
+  textValue?: string | null;
+  optionId?: string | null;
+}
 
 @Injectable()
 export class ProductService extends BaseService {
@@ -32,6 +42,8 @@ export class ProductService extends BaseService {
     private readonly variantRepo: ProductVariantRepository,
     private readonly categoryRepo: CategoryRepository,
     private readonly imageRepo: ProductImageRepository,
+    private readonly configService: ConfigService,
+    @Optional() private readonly variantAttributeService?: VariantAttributeService,
   ) {
     super(eventEmitter);
   }
@@ -52,6 +64,14 @@ export class ProductService extends BaseService {
     metadata?: Record<string, unknown> | null,
     createdBy?: string,
   ): Promise<ProductEntity> {
+    // Check product limit before creating
+    const productLimit = this.configService.get<number>('catalog.productLimit', 25000);
+    const totalProducts = await this.productRepo.countAll();
+
+    if (totalProducts >= productLimit) {
+      throw new CatalogProductLimitReachedError(productLimit);
+    }
+
     if (sku) {
       const existingSku = await this.productRepo.findBySku(sku);
       if (existingSku) {
@@ -271,7 +291,7 @@ export class ProductService extends BaseService {
       compareAtPrice?: number | null;
       costPrice?: number | null;
       quantity?: number;
-      attributes: Record<string, string>;
+      attributes?: Record<string, string> | AttributeValue[];
       isDefault?: boolean;
       createdBy?: string;
     },
@@ -314,10 +334,21 @@ export class ProductService extends BaseService {
       compareAtPrice: data.compareAtPrice ?? null,
       costPrice: data.costPrice ?? null,
       quantity: data.quantity ?? 1,
-      attributes: data.attributes,
+      attributes: data.attributes as Record<string, string> ?? {},
       isDefault: shouldBeDefault,
       createdBy: data.createdBy,
     });
+
+    // Assign structured attributes if provided and VariantAttributeService is available
+    if (data.attributes && Array.isArray(data.attributes) && this.variantAttributeService) {
+      try {
+        await this.variantAttributeService.assignAttributes(variant.id, data.attributes);
+      } catch (error) {
+        // Rollback variant creation if attribute assignment fails
+        await this.variantRepo.delete(variant.id);
+        throw error;
+      }
+    }
 
     this.emit(
       CATALOG_EVENTS.PRODUCT_VARIANT_CREATED,
