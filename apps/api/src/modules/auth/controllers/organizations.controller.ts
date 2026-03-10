@@ -15,7 +15,7 @@ import {
 } from '../dto';
 import { PaginatedResponseDto } from '@shared/dto';
 
-@Controller('v1/auth/organizations')
+@Controller('auth/organizations')
 export class OrganizationsController {
   constructor(private readonly organizationService: OrganizationService) {}
 

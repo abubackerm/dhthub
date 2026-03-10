@@ -83,6 +83,18 @@ export class DatabaseProvider {
     return this.prisma.variantAttributeValue;
   }
 
+  get currency(): PrismaDelegate<any> {
+    return this.prisma.currency;
+  }
+
+  get price(): PrismaDelegate<any> {
+    return this.prisma.price;
+  }
+
+  get priceTier(): PrismaDelegate<any> {
+    return this.prisma.priceTier;
+  }
+
   /**
    * Execute a callback within a database transaction.
    * Used for atomic operations like order creation + inventory reservation + payment record.

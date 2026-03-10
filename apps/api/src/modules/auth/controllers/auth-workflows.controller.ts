@@ -13,7 +13,7 @@ import { Controller } from '@nestjs/common';
  * Business workflows go to this controller.
  * Never mix them.
  */
-@Controller('v1/auth/workflows')
+@Controller('auth/workflows')
 export class AuthWorkflowsController {
   // Future workflow endpoints will be implemented here
 }

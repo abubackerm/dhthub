@@ -15,7 +15,7 @@ import {
 } from '../dto';
 import { PaginatedResponseDto } from '@shared/dto';
 
-@Controller('v1/auth/memberships')
+@Controller('auth/memberships')
 export class MembershipsController {
   constructor(private readonly membershipService: MembershipService) {}
 

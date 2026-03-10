@@ -12,7 +12,7 @@ import { RoleService } from '../services';
 import { CreateRoleDto, UpdateRoleDto, RoleView } from '../dto';
 import { PaginatedResponseDto } from '@shared/dto';
 
-@Controller('v1/auth/roles')
+@Controller('auth/roles')
 export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 

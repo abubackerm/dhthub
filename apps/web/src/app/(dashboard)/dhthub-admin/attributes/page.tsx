@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Plus,
   Pencil,
@@ -177,16 +177,29 @@ function SortableAttributeRow({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  // Only render the drag handle on client side to avoid hydration mismatch
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   return (
     <TableRow ref={setNodeRef} style={style}>
       <TableCell className="w-10">
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </button>
+        {isClient ? (
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+        ) : (
+          <div className="w-8 h-8 flex items-center justify-center">
+            <GripVertical className="h-4 w-4 text-muted-foreground opacity-50" />
+          </div>
+        )}
       </TableCell>
       <TableCell className="w-12 text-center text-muted-foreground">
         {attribute.sortOrder}

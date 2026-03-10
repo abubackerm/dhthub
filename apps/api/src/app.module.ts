@@ -4,6 +4,7 @@ import { CoreModule } from './core/core.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CatalogAttributesModule } from './modules/catalog-attributes/catalog-attributes.module';
+import { PricingModule } from './modules/pricing/pricing.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CatalogAttributesModule } from './modules/catalog-attributes/catalog-at
     AuthModule,
     CatalogModule,
     CatalogAttributesModule,
+    PricingModule,
   ],
 })
 export class AppModule {}
