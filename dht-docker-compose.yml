@@ -1,5 +1,5 @@
 # DHT Hub - Docker Compose Configuration
-# PostgreSQL 18.3, Redis 8.6.0, Meilisearch 1.8
+# PostgreSQL 18.3, Redis 8.6.0, Meilisearch 1.8, SeaweedFS 4.16
 # Uses existing dht-hub network and volumes
 
 services:
@@ -54,32 +54,151 @@ services:
     networks:
       - dht-hub-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Minio - Skipped for now
-  # dht-minio:
-  #   image: minio/minio:RELEASE.2025-10-15T17-29-55Z
-  #   container_name: dht-minio
-  #   restart: unless-stopped
-  #   command: server /data --console-address ":9001"
-  #   environment:
-  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-  #   ports:
-  #     - "${MINIO_API_PORT}:9000"
-  #     - "${MINIO_CONSOLE_PORT}:9001"
-  #   volumes:
-  #     - dht-minio-data:/data
-  #   networks:
-  #     - dht-hub-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # SeaweedFS - Distributed Object Storage with S3 Compatibility
+  dht-seaweedfs-master:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-master
+    restart: unless-stopped
+    command: master -ip=dht-seaweedfs-master -ip.bind=0.0.0.0 -metricsPort=9324
+    ports:
+      - "${SEAWEDFS_MASTER_PORT}:9333"
+      - "19333:19333"
+      - "9324:9324"
+    volumes:
+      - dht-seaweedfs-master-data:/data
+    networks:
+      - dht-hub-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-seaweedfs-volume-1:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-volume-1
+    restart: unless-stopped
+    command: volume -mserver="dht-seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8080 -metricsPort=9325
+    ports:
+      - "8080:8080"
+      - "18080:18080"
+      - "9325:9325"
+    volumes:
+      - dht-seaweedfs-volume-1-data:/data
+    networks:
+      - dht-hub-network
+    depends_on:
+      dht-seaweedfs-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-seaweedfs-volume-2:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-volume-2
+    restart: unless-stopped
+    command: volume -mserver="dht-seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8081 -metricsPort=9326
+    ports:
+      - "8081:8081"
+      - "18081:18081"
+      - "9326:9326"
+    volumes:
+      - dht-seaweedfs-volume-2-data:/data
+    networks:
+      - dht-hub-network
+    depends_on:
+      dht-seaweedfs-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-seaweedfs-volume-3:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-volume-3
+    restart: unless-stopped
+    command: volume -mserver="dht-seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8082 -metricsPort=9327
+    ports:
+      - "8082:8082"
+      - "18082:18082"
+      - "9327:9327"
+    volumes:
+      - dht-seaweedfs-volume-3-data:/data
+    networks:
+      - dht-hub-network
+    depends_on:
+      dht-seaweedfs-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-seaweedfs-filer:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-filer
+    restart: unless-stopped
+    command: filer -master="dht-seaweedfs-master:9333" -ip=dht-seaweedfs-filer -ip.bind=0.0.0.0 -port=8888 -metricsPort=9328
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+      - "9328:9328"
+    volumes:
+      - dht-seaweedfs-filer-data:/data
+    networks:
+      - dht-hub-network
+    depends_on:
+      dht-seaweedfs-master:
+        condition: service_healthy
+      dht-seaweedfs-volume-1:
+        condition: service_healthy
+      dht-seaweedfs-volume-2:
+        condition: service_healthy
+      dht-seaweedfs-volume-3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dht-seaweedfs-s3:
+    image: chrislusf/seaweedfs:4.16_large_disk
+    container_name: dht-seaweedfs-s3
+    restart: unless-stopped
+    command: >
+      s3
+      -filer="dht-seaweedfs-filer:8888"
+      -ip.bind=0.0.0.0
+      -port=8333
+      -metricsPort=9329
+    ports:
+      - "${SEAWEDFS_S3_PORT}:8333"
+      - "9329:9329"
+    environment:
+      AWS_ACCESS_KEY_ID: ${SEAWEDFS_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEDFS_S3_SECRET_KEY}
+    networks:
+      - dht-hub-network
+    depends_on:
+      dht-seaweedfs-filer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   dht-hub-network:
@@ -92,3 +211,13 @@ volumes:
     external: true
   dht-meilisearch-data:
     name: dht-meilisearch-data
+  dht-seaweedfs-master-data:
+    name: dht-seaweedfs-master-data
+  dht-seaweedfs-volume-1-data:
+    name: dht-seaweedfs-volume-1-data
+  dht-seaweedfs-volume-2-data:
+    name: dht-seaweedfs-volume-2-data
+  dht-seaweedfs-volume-3-data:
+    name: dht-seaweedfs-volume-3-data
+  dht-seaweedfs-filer-data:
+    name: dht-seaweedfs-filer-data
