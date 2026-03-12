@@ -120,8 +120,12 @@ export class PriceRepository {
   }
 
   async findCurrencyByCode(code: string): Promise<any | null> {
-    return this.getClient().currency.findUnique({
-      where: { code },
-    });
+    const client = this.getClient();
+    if ('currency' in client) {
+      return client.currency.findUnique({
+        where: { code },
+      });
+    }
+    return null;
   }
 }

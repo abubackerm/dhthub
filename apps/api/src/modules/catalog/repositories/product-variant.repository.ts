@@ -163,4 +163,8 @@ export class ProductVariantRepository {
   async count(where?: Record<string, unknown>): Promise<number> {
     return this.getClient().productVariant.count({ where });
   }
+
+  async findAll(where?: Record<string, unknown>): Promise<ProductVariantEntity[]> {
+    return this.getClient().productVariant.findMany({ where });
+  }
 }

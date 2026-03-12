@@ -7,6 +7,7 @@ import { CatalogAttributesModule } from './modules/catalog-attributes/catalog-at
 import { PricingModule } from './modules/pricing/pricing.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { SearchModule } from './modules/search/search.module';
+import { ImportModule } from './modules/import/import.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SearchModule } from './modules/search/search.module';
     PricingModule,
     InventoryModule,
     SearchModule,
+    ImportModule,
   ],
 })
 export class AppModule {}

@@ -51,4 +51,8 @@ export class CategoryAttributeRepository {
   async count(where?: Record<string, unknown>): Promise<number> {
     return this.getClient().categoryAttribute.count({ where });
   }
+
+  async findAll(): Promise<CategoryAttributeEntity[]> {
+    return this.getClient().categoryAttribute.findMany();
+  }
 }

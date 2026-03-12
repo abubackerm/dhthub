@@ -83,16 +83,16 @@ export class DatabaseProvider {
     return this.prisma.variantAttributeValue;
   }
 
-  get currency(): PrismaDelegate<any> {
-    return this.prisma.currency;
-  }
-
   get price(): PrismaDelegate<any> {
     return this.prisma.price;
   }
 
   get priceTier(): PrismaDelegate<any> {
     return this.prisma.priceTier;
+  }
+
+  get currency(): PrismaDelegate<any> {
+    return this.prisma.currency;
   }
 
   get warehouse(): PrismaDelegate<any> {
@@ -109,6 +109,14 @@ export class DatabaseProvider {
 
   get inventoryReservation(): PrismaDelegate<any> {
     return this.prisma.inventoryReservation;
+  }
+
+  get importJob(): PrismaDelegate<any> {
+    return this.prisma.importJob;
+  }
+
+  get importError(): PrismaDelegate<any> {
+    return this.prisma.importError;
   }
 
   /**

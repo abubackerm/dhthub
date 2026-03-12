@@ -47,7 +47,10 @@ import { VariantAttributesController } from './controllers/variant-attributes.co
     CategoryAttributeService,
     // Repositories (read-only for queries)
     AttributeDefinitionRepository,
+    AttributeOptionRepository,
+    CategoryAttributeRepository,
     VariantAttributeValueRepository,
+    UnitDefinitionRepository,
   ],
 })
 export class CatalogAttributesModule {}

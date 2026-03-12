@@ -461,3 +461,62 @@ model InventoryMovement {
   @@index([inventoryId])
   @@map("inventory_movements")
 }
+
+// ============================================
+// IMPORT MODULE - Bulk Product Import Management
+// ============================================
+
+enum ImportFileType {
+  CSV
+  XLSX
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ImportJob {
+  id               String           @id @default(uuid())
+  fileUrl          String           @map("file_url")
+  fileName         String?          @map("file_name")
+  fileSize         Int?             @map("file_size")
+  type             ImportFileType
+  status           ImportJobStatus  @default(PENDING)
+  totalRows        Int?             @map("total_rows")
+  processedRows    Int              @default(0) @map("processed_rows")
+  successRows      Int              @default(0) @map("success_rows")
+  failedRows       Int              @default(0) @map("failed_rows")
+  lastProcessedRow Int              @default(0) @map("last_processed_row")
+  lockedAt         DateTime?        @map("locked_at")
+  lockedBy         String?          @map("locked_by")
+  createdBy        String?          @map("created_by")
+  startedAt        DateTime?        @map("started_at")
+  finishedAt       DateTime?        @map("finished_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  errors           ImportError[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([lockedAt])
+  @@map("import_jobs")
+}
+
+model ImportError {
+  id        String   @id @default(uuid())
+  jobId     String   @map("job_id")
+  rowNumber Int      @map("row_number")
+  sku       String?
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("import_errors")
+}

@@ -101,13 +101,13 @@ export class IndexerService {
     try {
       await this.ensureIndex();
 
-      const prisma = this.documentBuilder['prisma'];
+      const db = this.documentBuilder['db'];
       const variantsToIndex = variantIds
-        ? await prisma.productVariant.findMany({
+        ? await db.productVariant.findMany({
             where: { id: { in: variantIds } },
             select: { id: true },
           })
-        : await prisma.productVariant.findMany({
+        : await db.productVariant.findMany({
             select: { id: true },
           });
 
@@ -117,10 +117,10 @@ export class IndexerService {
       for (let i = 0; i < totalVariants; i += this.BATCH_SIZE) {
         const batch = variantsToIndex.slice(i, i + this.BATCH_SIZE);
         const documents = await Promise.all(
-          batch.map((v) => this.documentBuilder.buildDocument(v.id)),
+          batch.map((v: { id: string }) => this.documentBuilder.buildDocument(v.id)),
         );
 
-        const validDocuments = documents.filter((doc) => doc !== null);
+        const validDocuments: Record<string, unknown>[] = documents.filter((doc): doc is Record<string, unknown> => doc !== null);
 
         if (validDocuments.length > 0) {
           await this.meiliClient.index(this.ALIAS_NAME).addDocuments(validDocuments);

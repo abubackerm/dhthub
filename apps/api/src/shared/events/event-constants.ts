@@ -31,3 +31,11 @@ export const SEARCH_EVENTS = {
   INDEX_BULK_UPDATED: 'search.index.bulk_updated',
   INDEX_CLEARED: 'search.index.cleared',
 } as const;
+
+export const IMPORT_EVENTS = {
+  JOB_CREATED: 'import.job.created',
+  JOB_STARTED: 'import.job.started',
+  JOB_COMPLETED: 'import.job.completed',
+  JOB_FAILED: 'import.job.failed',
+  BATCH_PROCESSED: 'import.batch.processed',
+} as const;

@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
-import { PrismaService } from '@core/database';
+import { DatabaseProvider } from '@core/database/database.provider';
 
 @Injectable()
 export class VariantDocumentBuilder {
   private readonly logger = new Logger(VariantDocumentBuilder.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly db: DatabaseProvider,
   ) {}
 
   async buildDocument(variantId: string): Promise<Record<string, unknown> | null> {
-    const variant = await this.prisma.productVariant.findUnique({
+    const variant = await this.db.productVariant.findUnique({
       where: { id: variantId },
       include: {
         product: {
@@ -55,7 +55,7 @@ export class VariantDocumentBuilder {
   }
 
   private async getVariantAttributes(variantId: string) {
-    const values = await this.prisma.variantAttributeValue.findMany({
+    const values = await this.db.variantAttributeValue.findMany({
       where: { variantId },
       include: {
         attribute: true,
@@ -67,7 +67,7 @@ export class VariantDocumentBuilder {
   }
 
   private async getVariantPricing(variantId: string) {
-    const price = await this.prisma.price.findFirst({
+    const price = await this.db.price.findFirst({
       where: { variantId },
       include: {
         currency: true,
@@ -85,12 +85,12 @@ export class VariantDocumentBuilder {
   }
 
   private async getVariantInventory(variantId: string) {
-    const inventoryLevels = await this.prisma.inventoryLevel.findMany({
+    const inventoryLevels = await this.db.inventoryLevel.findMany({
       where: { variantId },
     });
 
     const stock = inventoryLevels.reduce(
-      (sum, level) => sum + (level.availableQty ?? 0),
+      (sum: number, level: any) => sum + (level.availableQty ?? 0),
       0,
     );
 
