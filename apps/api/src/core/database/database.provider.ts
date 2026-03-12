@@ -95,6 +95,22 @@ export class DatabaseProvider {
     return this.prisma.priceTier;
   }
 
+  get warehouse(): PrismaDelegate<any> {
+    return this.prisma.warehouse;
+  }
+
+  get inventoryLevel(): PrismaDelegate<any> {
+    return this.prisma.inventoryLevel;
+  }
+
+  get inventoryMovement(): PrismaDelegate<any> {
+    return this.prisma.inventoryMovement;
+  }
+
+  get inventoryReservation(): PrismaDelegate<any> {
+    return this.prisma.inventoryReservation;
+  }
+
   /**
    * Execute a callback within a database transaction.
    * Used for atomic operations like order creation + inventory reservation + payment record.

@@ -14,6 +14,6 @@ import { PrismaTransactionalExecutor } from './prisma-transactional.executor';
       useExisting: PrismaTransactionalExecutor,
     },
   ],
-  exports: [DatabaseProvider, 'TransactionalExecutor'],
+  exports: [PrismaService, DatabaseProvider, 'TransactionalExecutor'],
 })
 export class DatabaseModule {}

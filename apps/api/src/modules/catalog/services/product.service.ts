@@ -24,6 +24,8 @@ import {
   ProductUpdatedEvent,
   ProductStatusChangedEvent,
   ProductVariantCreatedEvent,
+  ProductVariantUpdatedEvent,
+  ProductVariantDeletedEvent,
 } from '../events';
 import { VariantAttributeService } from '@modules/catalog-attributes/services/variant-attribute.service';
 
@@ -363,6 +365,111 @@ export class ProductService extends BaseService {
     return variant;
   }
 
+  async updateVariant(
+    productId: string,
+    variantId: string,
+    data: {
+      sku?: string;
+      name?: string;
+      price?: number | null;
+      compareAtPrice?: number | null;
+      costPrice?: number | null;
+      quantity?: number;
+      attributes?: Record<string, string> | AttributeValue[];
+      isDefault?: boolean;
+      updatedBy?: string;
+    },
+  ): Promise<ProductVariantEntity> {
+    const product = await this.productRepo.findById(productId);
+    if (!product) {
+      throw new ProductNotFoundError(productId);
+    }
+
+    const variant = await this.variantRepo.findById(variantId);
+    if (!variant) {
+      throw new ProductVariantNotFoundError(variantId);
+    }
+
+    if (variant.productId !== productId) {
+      throw new InvalidProductOperationError(
+        'Variant does not belong to this product',
+        'VARIANT_PRODUCT_MISMATCH',
+      );
+    }
+
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+    if (data.sku !== undefined && data.sku !== variant.sku) {
+      const existingVariant = await this.variantRepo.findBySku(data.sku);
+      if (existingVariant && existingVariant.id !== variantId) {
+        throw new ProductSkuAlreadyExistsError(data.sku);
+      }
+      changes.sku = { from: variant.sku, to: data.sku };
+    }
+
+    if (data.name !== undefined && data.name !== variant.name) {
+      changes.name = { from: variant.name, to: data.name };
+    }
+
+    if (data.price !== undefined) {
+      changes.price = { from: variant.price, to: data.price };
+    }
+
+    if (data.compareAtPrice !== undefined) {
+      changes.compareAtPrice = { from: variant.compareAtPrice, to: data.compareAtPrice };
+    }
+
+    if (data.costPrice !== undefined) {
+      changes.costPrice = { from: variant.costPrice, to: data.costPrice };
+    }
+
+    if (data.quantity !== undefined) {
+      changes.quantity = { from: variant.quantity, to: data.quantity };
+    }
+
+    if (data.isDefault !== undefined && data.isDefault !== variant.isDefault) {
+      if (data.isDefault) {
+        const currentDefault = await this.variantRepo.findDefaultVariant(productId);
+        if (currentDefault && currentDefault.id !== variantId) {
+          await this.variantRepo.update(currentDefault.id, { isDefault: false });
+        }
+      }
+      changes.isDefault = { from: variant.isDefault, to: data.isDefault };
+    }
+
+    const updateData: Partial<{
+      sku: string;
+      name: string;
+      price: number | null;
+      compareAtPrice: number | null;
+      costPrice: number | null;
+      quantity: number;
+      attributes: Record<string, string>;
+      isDefault: boolean;
+      updatedBy: string;
+    }> = {};
+
+    if (data.sku !== undefined) updateData.sku = data.sku;
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.compareAtPrice !== undefined) updateData.compareAtPrice = data.compareAtPrice;
+    if (data.costPrice !== undefined) updateData.costPrice = data.costPrice;
+    if (data.quantity !== undefined) updateData.quantity = data.quantity;
+    if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
+    if (data.updatedBy !== undefined) updateData.updatedBy = data.updatedBy;
+
+    const updatedVariant = await this.variantRepo.update(variantId, updateData);
+
+    if (Object.keys(changes).length > 0) {
+      this.emit(
+        CATALOG_EVENTS.PRODUCT_VARIANT_UPDATED,
+        new ProductVariantUpdatedEvent(variant.id, variant.productId, changes),
+      );
+    }
+
+    return updatedVariant;
+  }
+
   async removeVariant(productId: string, variantId: string): Promise<void> {
     const product = await this.productRepo.findById(productId);
     if (!product) {
@@ -382,6 +489,11 @@ export class ProductService extends BaseService {
     }
 
     await this.variantRepo.delete(variantId);
+
+    this.emit(
+      CATALOG_EVENTS.PRODUCT_VARIANT_DELETED,
+      new ProductVariantDeletedEvent(variant.id, variant.productId),
+    );
   }
 
   async delete(id: string): Promise<void> {

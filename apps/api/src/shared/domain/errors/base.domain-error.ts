@@ -22,7 +22,7 @@ export abstract class NotFoundError extends DomainError {
   }
 }
 
-export abstract class AlreadyExistsError extends DomainError {
+export class AlreadyExistsError extends DomainError {
   constructor(entity: string, field: string, value: string) {
     super(
       `${entity} with this ${field} already exists: ${value}`,

@@ -160,6 +160,7 @@ model ProductVariant {
   images          ProductImage[]
   attributeValues VariantAttributeValue[]
   prices          Price[]
+  inventoryLevels InventoryLevel[]
 
   @@index([productId])
   @@index([sku])
@@ -376,4 +377,87 @@ model PriceTier {
   @@index([priceId, minQty])
   @@unique([priceId, minQty])
   @@map("price_tiers")
+}
+
+// ============================================
+// INVENTORY MODULE - Stock Management & Reservations
+// ============================================
+
+model Warehouse {
+  id        String @id @default(cuid())
+  name      String
+  code      String @unique
+  location  String?
+
+  inventoryLevels InventoryLevel[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("warehouses")
+}
+
+model InventoryLevel {
+  id           String @id @default(cuid())
+
+  variantId    String @map("variant_id")
+  warehouseId  String @map("warehouse_id")
+
+  availableQty Int @default(0) @map("available_qty")
+  reservedQty  Int @default(0) @map("reserved_qty")
+  safetyStock  Int @default(0) @map("safety_stock")
+
+  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+
+  movements    InventoryMovement[]
+  reservations InventoryReservation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([variantId, warehouseId])
+  @@index([variantId])
+  @@index([warehouseId])
+  @@map("inventory_levels")
+}
+
+model InventoryReservation {
+  id            String @id @default(cuid())
+
+  inventoryId   String @map("inventory_id")
+  quantity      Int
+
+  referenceId   String @map("reference_id")
+  referenceType String @map("reference_type")
+  status        String @default("ACTIVE") // ACTIVE, COMMITTED, RELEASED, EXPIRED
+
+  expiresAt DateTime? @map("expires_at")
+
+  inventory InventoryLevel @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([referenceId])
+  @@index([referenceId, referenceType])
+  @@map("inventory_reservations")
+}
+
+model InventoryMovement {
+  id          String @id @default(cuid())
+
+  inventoryId String @map("inventory_id")
+
+  type        String // STOCK_IN, STOCK_OUT, ADJUSTMENT, RESERVATION, RELEASE
+  quantity    Int
+  reason      String? // MANUAL_ADJUSTMENT, IMPORT, RETURN, DAMAGED, WAREHOUSE_TRANSFER
+
+  referenceId String? @map("reference_id")
+
+  inventory InventoryLevel @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([inventoryId])
+  @@map("inventory_movements")
 }

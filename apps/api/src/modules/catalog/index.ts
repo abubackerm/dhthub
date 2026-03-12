@@ -14,6 +14,9 @@
 //
 // DO NOT inject ProductVariantRepository or ProductImageRepository directly!
 
+// Module
+export { CatalogModule } from './catalog.module';
+
 // Services
 export { ProductService } from './services/product.service';
 export { CategoryService } from './services/category.service';
@@ -33,5 +36,7 @@ export * from './events/product-created.event';
 export * from './events/product-updated.event';
 export * from './events/product-status-changed.event';
 export * from './events/product-variant-created.event';
+export * from './events/product-variant-updated.event';
+export * from './events/product-variant-deleted.event';
 export * from './events/category-created.event';
 export * from './events/category-updated.event';

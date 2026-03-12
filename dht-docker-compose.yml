@@ -1,5 +1,6 @@
 # DHT Hub - Docker Compose Configuration
-# PostgreSQL 18.3 & Redis 8.6.0
+# PostgreSQL 18.3, Redis 8.6.0, Meilisearch 1.8
+# Uses existing dht-hub network and volumes
 
 services:
   dht-postgres:
@@ -39,13 +40,55 @@ services:
       timeout: 5s
       retries: 5
 
+  dht-meilisearch:
+    image: getmeili/meilisearch:v1.8
+    container_name: dht-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY}
+      MEILI_ENV: development
+    ports:
+      - "${MEILISEARCH_PORT}:7700"
+    volumes:
+      - dht-meilisearch-data:/meili_data
+    networks:
+      - dht-hub-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Minio - Skipped for now
+  # dht-minio:
+  #   image: minio/minio:RELEASE.2025-10-15T17-29-55Z
+  #   container_name: dht-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   ports:
+  #     - "${MINIO_API_PORT}:9000"
+  #     - "${MINIO_CONSOLE_PORT}:9001"
+  #   volumes:
+  #     - dht-minio-data:/data
+  #   networks:
+  #     - dht-hub-network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
 networks:
   dht-hub-network:
-    driver: bridge
-    name: dht-hub-network
+    external: true
 
 volumes:
   dht-postgres-data:
-    name: dht-postgres-data
+    external: true
   dht-redis-data:
-    name: dht-redis-data
+    external: true
+  dht-meilisearch-data:
+    name: dht-meilisearch-data

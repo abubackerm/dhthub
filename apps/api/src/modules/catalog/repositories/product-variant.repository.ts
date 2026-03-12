@@ -134,12 +134,23 @@ export class ProductVariantRepository {
       updatedBy: string;
     }>,
   ): Promise<ProductVariantEntity> {
+    const updateData: Record<string, unknown> = {};
+    
+    if (data.sku !== undefined) updateData.sku = data.sku;
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.compareAtPrice !== undefined) updateData.compareAtPrice = data.compareAtPrice;
+    if (data.costPrice !== undefined) updateData.costPrice = data.costPrice;
+    if (data.quantity !== undefined) updateData.quantity = data.quantity;
+    if (data.attributes !== undefined) updateData.attributes = data.attributes;
+    if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
+    if (data.updatedBy !== undefined) updateData.updatedBy = data.updatedBy;
+    
+    updateData.version = { increment: 1 };
+
     return this.getClient().productVariant.update({
       where: { id },
-      data: {
-        ...data,
-        version: { increment: 1 },
-      },
+      data: updateData,
     });
   }
 
