@@ -22,6 +22,13 @@ export class ProductRepository {
     });
   }
 
+  async findByIds(ids: string[]): Promise<ProductEntity[]> {
+    if (ids.length === 0) return [];
+    return this.getClient().product.findMany({
+      where: { id: { in: ids } },
+    });
+  }
+
   async findBySku(sku: string): Promise<ProductEntity | null> {
     const variant = await this.getClient().productVariant.findUnique({
       where: { sku },

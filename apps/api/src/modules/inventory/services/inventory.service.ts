@@ -96,7 +96,7 @@ export class InventoryService extends BaseService {
     referenceId: string,
     referenceType: string,
     expiresAt?: Date,
-  ): Promise<any> {
+  ): Promise<{ id: string }> {
     const warehouse = await this.warehouseRepo.findById(warehouseId);
     if (!warehouse) {
       throw new WarehouseNotFoundError(warehouseId);
@@ -115,7 +115,7 @@ export class InventoryService extends BaseService {
       throw new OutOfStockError(variantId, inventory.availableQty, quantity);
     }
 
-    await this.inventoryRepo.reserveStock({
+    const reservation = await this.inventoryRepo.reserveStock({
       inventoryId: inventory.id,
       quantity,
       referenceId,
@@ -135,7 +135,7 @@ export class InventoryService extends BaseService {
       ),
     );
 
-    return this.inventoryRepo.findInventoryLevel(variantId, warehouseId);
+    return reservation;
   }
 
   async releaseReservation(

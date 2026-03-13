@@ -119,6 +119,22 @@ export class DatabaseProvider {
     return this.prisma.importError;
   }
 
+  get cart(): PrismaDelegate<any> {
+    return this.prisma.cart;
+  }
+
+  get cartItem(): PrismaDelegate<any> {
+    return this.prisma.cartItem;
+  }
+
+  get enquiry(): PrismaDelegate<any> {
+    return this.prisma.enquiry;
+  }
+
+  get enquiryItem(): PrismaDelegate<any> {
+    return this.prisma.enquiryItem;
+  }
+
   /**
    * Execute a callback within a database transaction.
    * Used for atomic operations like order creation + inventory reservation + payment record.

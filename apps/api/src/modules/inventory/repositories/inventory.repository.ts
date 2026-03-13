@@ -143,7 +143,7 @@ export class InventoryRepository {
     referenceId: string;
     referenceType: string;
     expiresAt?: Date | null;
-  }): Promise<void> {
+  }): Promise<{ id: string }> {
     await this.getClient().inventoryLevel.update({
       where: { id: data.inventoryId },
       data: {
@@ -152,7 +152,7 @@ export class InventoryRepository {
       },
     });
 
-    await this.getClient().inventoryReservation.create({
+    const reservation = await this.getClient().inventoryReservation.create({
       data: {
         inventoryId: data.inventoryId,
         quantity: data.quantity,
@@ -171,6 +171,8 @@ export class InventoryRepository {
         referenceId: data.referenceId,
       },
     });
+
+    return { id: reservation.id };
   }
 
   async releaseReservation(reservationId: string): Promise<any> {

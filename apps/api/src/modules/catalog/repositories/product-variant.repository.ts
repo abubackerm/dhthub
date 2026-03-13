@@ -167,4 +167,10 @@ export class ProductVariantRepository {
   async findAll(where?: Record<string, unknown>): Promise<ProductVariantEntity[]> {
     return this.getClient().productVariant.findMany({ where });
   }
+
+  async findByIds(ids: string[]): Promise<ProductVariantEntity[]> {
+    return this.getClient().productVariant.findMany({
+      where: { id: { in: ids } },
+    });
+  }
 }

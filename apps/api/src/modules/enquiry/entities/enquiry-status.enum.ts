@@ -1,0 +1,6 @@
+export enum EnquiryStatus {
+  SUBMITTED = 'SUBMITTED',
+  UNDER_REVIEW = 'UNDER_REVIEW',
+  RESPONDED = 'RESPONDED',
+  CLOSED = 'CLOSED',
+}

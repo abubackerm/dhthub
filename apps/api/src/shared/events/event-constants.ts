@@ -39,3 +39,17 @@ export const IMPORT_EVENTS = {
   JOB_FAILED: 'import.job.failed',
   BATCH_PROCESSED: 'import.batch.processed',
 } as const;
+
+export const CART_EVENTS = {
+  CART_CREATED: 'cart.created',
+  CART_CLEARED: 'cart.cleared',
+  CART_SUBMITTED: 'cart.submitted',
+  CART_ITEM_ADDED: 'cart.item.added',
+  CART_ITEM_UPDATED: 'cart.item.updated',
+  CART_ITEM_REMOVED: 'cart.item.removed',
+} as const;
+
+export const ENQUIRY_EVENTS = {
+  ENQUIRY_CREATED: 'enquiry.created',
+  ENQUIRY_STATUS_UPDATED: 'enquiry.status.updated',
+} as const;

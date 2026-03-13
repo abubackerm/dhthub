@@ -1,0 +1,56 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { EnquiryService } from '../services';
+import { CreateEnquiryDto, UpdateEnquiryStatusDto } from '../dto';
+import { EnquiryView } from '../dto/views';
+import { EnquiryStatus } from '../entities';
+
+@Controller('enquiries')
+export class EnquiryController {
+  constructor(private readonly enquiryService: EnquiryService) {}
+
+  @Post('from-cart')
+  async createFromCart(
+    @Req() req: any,
+    @Body() dto: CreateEnquiryDto,
+  ): Promise<EnquiryView> {
+    const userId = req.user?.id || 'default-user';
+    return this.enquiryService.createFromCart(userId, dto);
+  }
+
+  @Get()
+  async findEnquiries(
+    @Req() req: any,
+    @Query('status') status?: EnquiryStatus,
+  ): Promise<EnquiryView[]> {
+    if (status) {
+      return this.enquiryService.findByStatus(status);
+    }
+    const userId = req.user?.id || 'default-user';
+    return this.enquiryService.findByUser(userId);
+  }
+
+  @Get(':id')
+  async findById(@Req() req: any, @Param('id') id: string): Promise<EnquiryView> {
+    const userId = req.user?.id || 'default-user';
+    return this.enquiryService.findById(id, userId);
+  }
+
+  @Patch(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateEnquiryStatusDto,
+    @Req() req: any,
+  ): Promise<EnquiryView> {
+    const updatedBy = req.user?.id;
+    return this.enquiryService.updateStatus(id, dto, updatedBy);
+  }
+}

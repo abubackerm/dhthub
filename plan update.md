@@ -1,61 +1,120 @@
-Completed Implementation
-1. Prisma Schema
-Added three new models with enterprise-grade features:
+This error is a standard NestJS dependency injection issue. The message is telling you exactly what is wrong:
 
-Currency: Static currency configuration (USD, EUR, INR, AED)
-Price: Variant pricing with future-proof customer/region pricing fields
-PriceTier: Quantity tiers with explicit min/max ranges
-2. Database Features
-maxQty field for explicit quantity ranges (1-9, 10-49, 50-null)
-Composite index @@index([priceId, minQty]) for optimized quantity lookups
-Index @@index([variantId]) for fast variant pricing queries
-Future-proof nullable fields: customerGroupId, regionId
-3. Module Structure
-Created complete Pricing module with clean architecture:
+Nest can't resolve dependencies of EnquiryService
+Missing dependency: CartRepository
 
-pricing/
-├── controllers/ (PricingController)
-├── services/ (PricingService)
-├── repositories/ (PriceRepository)
-├── entities/ (Currency, Price, PriceTier)
-├── dto/ (Input and View DTOs)
-├── events/ (PricingCreatedEvent, PricingUpdatedEvent)
-├── domain/errors/ (6 custom domain errors)
-└── index.ts (Public API)
-4. Business Logic
-Tier validation: sorted, starts at 1, no duplicates, no overlaps
-Unit price validation: must be positive
-Range validation: explicit maxQty prevents overlaps
-Quantity lookup algorithm: SELECT highest minQty <= quantity
-Cache invalidation hook: placeholder for Phase 10
-5. REST API Endpoints
-POST /v1/pricing/variants/:variantId - Create pricing
-PUT /v1/pricing/variants/:variantId - Replace pricing
-GET /v1/pricing/variants/:variantId - Get pricing configuration
-GET /v1/pricing/variants/:variantId/price?qty=25&currency=USD - Calculate price
-6. Currency Seed Script
-Static currency seeding for USD, EUR, INR, AED.
+Meaning:
 
-7. Unit Tests
-Comprehensive test coverage:
+Your EnquiryService constructor has:
 
-Tier ordering validation
-Starting at 1 validation
-Duplicate minQty detection
-Overlapping range detection
-Unit price positivity validation
-Repository operations
-Controller endpoints
-Quantity calculations
-8. Module Registration
-PricingModule created and registered in AppModule
-Public API exports: PricingService, PriceRepository
-Key Design Decisions Implemented
-maxQty Support: Explicit ranges for easier validation and future pricing engines
-Dual Index Strategy: Optimized for both variant lookups and quantity searches
-Decimal Precision: @db.Decimal(12,4) for McMaster-Carr style pricing
-Transaction Support: Tier replacement uses transactions for data consistency
-Module Boundaries: Follows aggregate boundary pattern
-Future-Proof: Customer and regional pricing fields ready for Phase 10
-Static Currencies: Seed-based currency management
-Performance: Optimized for 1M+ variants and 5M+ price tiers
+constructor(
+  private eventEmitter: EventEmitter2,
+  private enquiryRepository: EnquiryRepository,
+  private enquiryItemRepository: EnquiryItemRepository,
+  private cartRepository: CartRepository,   // <- PROBLEM
+  private variantRepository: ProductVariantRepository,
+  private productRepository: ProductRepository,
+)
+
+But NestJS cannot find CartRepository inside EnquiryModule.
+
+Fix (Most Likely)
+
+You must export CartRepository from CartModule.
+
+apps/api/src/modules/cart/cart.module.ts
+@Module({
+  imports: [
+    EventEmitterModule,
+    forwardRef(() => CatalogModule),
+  ],
+  controllers: [CartController],
+  providers: [
+    CartService,
+    CartRepository,
+    CartItemRepository,
+  ],
+  exports: [
+    CartService,
+    CartRepository,   // ✅ ADD THIS
+  ],
+})
+export class CartModule {}
+Then Import CartModule in EnquiryModule
+apps/api/src/modules/enquiry/enquiry.module.ts
+@Module({
+  imports: [
+    forwardRef(() => CartModule),   // ✅ IMPORTANT
+    CatalogModule,
+    EventEmitterModule,
+  ],
+  controllers: [EnquiryController],
+  providers: [
+    EnquiryService,
+    EnquiryRepository,
+    EnquiryItemRepository,
+  ],
+})
+export class EnquiryModule {}
+Why forwardRef()?
+
+Because later your system may have:
+
+Cart → Enquiry
+Enquiry → Cart
+
+Which creates a circular dependency.
+
+forwardRef() prevents NestJS from crashing.
+
+If You Still Get Error
+
+Then ensure CartRepository is not missing from providers.
+
+Check:
+
+cart.module.ts
+providers: [
+  CartService,
+  CartRepository,
+  CartItemRepository
+]
+After Fix
+
+Restart server:
+
+pnpm dev
+
+or
+
+pnpm start:dev
+Expected Dependency Graph
+
+After fix:
+
+CartModule
+   └ CartRepository
+        ↓ exported
+
+EnquiryModule
+   └ imports CartModule
+        ↓
+   EnquiryService can use CartRepository
+Small Architecture Tip
+
+Your current dependency:
+
+EnquiryService
+   ├ CartRepository
+   ├ ProductVariantRepository
+   └ ProductRepository
+
+is perfectly fine for:
+
+createFromCart()
+
+because the service must:
+
+load cart
+copy cart items
+create enquiry
