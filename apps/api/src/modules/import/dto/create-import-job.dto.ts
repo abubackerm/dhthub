@@ -6,7 +6,7 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
-import { ImportFileType } from '../entities';
+import { ImportFileType, ImportMode } from '../entities';
 
 export class CreateImportJobDto {
   @IsString()
@@ -33,4 +33,12 @@ export class CreateImportJobDto {
   @IsOptional()
   @IsString()
   createdBy?: string;
+
+  @IsOptional()
+  @IsEnum(ImportMode)
+  mode?: ImportMode;
+
+  @IsOptional()
+  @IsString()
+  warehouseId?: string;
 }

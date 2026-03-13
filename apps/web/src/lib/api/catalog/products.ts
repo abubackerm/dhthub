@@ -1,5 +1,7 @@
 import { apiClient } from '../client';
 import type {
+  BulkUpdateProductInput,
+  BulkUpdateResult,
   CreateProductInput,
   CreateVariantInput,
   PaginatedResponse,
@@ -57,6 +59,15 @@ export async function addVariant(
   return apiClient.post<VariantView>(
     `/v1/catalog/products/${productId}/variants`,
     data,
+  );
+}
+
+export async function bulkUpdateProducts(
+  input: BulkUpdateProductInput,
+): Promise<BulkUpdateResult> {
+  return apiClient.patch<BulkUpdateResult>(
+    '/v1/catalog/products/bulk',
+    input,
   );
 }
 

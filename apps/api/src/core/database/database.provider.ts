@@ -8,8 +8,10 @@ export type PrismaDelegate<T> = {
   findFirst: (args?: any) => Promise<T | null>;
   create: (args: any) => Promise<T>;
   update: (args: any) => Promise<T>;
+  upsert: (args: any) => Promise<T>;
   delete: (args: any) => Promise<T>;
   deleteMany: (args: any) => Promise<{ count: number }>;
+  updateMany: (args: any) => Promise<{ count: number }>;
   count: (args?: any) => Promise<number>;
   createMany: (args: any) => Promise<{ count: number }>;
 };

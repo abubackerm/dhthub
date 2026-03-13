@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseProvider, TransactionClient } from '@core/database/database.provider';
 import { transactionContext } from '@core/database/transaction-context.store';
-import { ImportJobEntity, ImportJobStatus, ImportFileType } from '../entities';
+import { ImportJobEntity, ImportJobStatus, ImportFileType, ImportMode } from '../entities';
 
 @Injectable()
 export class ImportJobRepository {
@@ -49,6 +49,9 @@ export class ImportJobRepository {
     type: ImportFileType;
     totalRows?: number | null;
     createdBy?: string | null;
+    mode?: ImportMode | null;
+    warehouseId?: string | null;
+    originalFilePath?: string | null;
   }): Promise<ImportJobEntity> {
     return this.getClient().importJob.create({
       data: {
@@ -63,6 +66,9 @@ export class ImportJobRepository {
         lastProcessedRow: 0,
         status: ImportJobStatus.PENDING,
         createdBy: data.createdBy ?? null,
+        mode: data.mode ?? null,
+        warehouseId: data.warehouseId ?? null,
+        originalFilePath: data.originalFilePath ?? null,
       },
     });
   }

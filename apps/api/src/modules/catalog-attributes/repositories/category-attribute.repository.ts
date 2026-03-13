@@ -21,8 +21,19 @@ export class CategoryAttributeRepository {
   async findByCategoryId(categoryId: string): Promise<CategoryAttributeEntity[]> {
     return this.getClient().categoryAttribute.findMany({
       where: { categoryId },
+      orderBy: {
+        attribute: {
+          sortOrder: 'asc',
+        },
+      },
       include: {
-        attribute: true,
+        attribute: {
+          include: {
+            options: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
       },
     });
   }

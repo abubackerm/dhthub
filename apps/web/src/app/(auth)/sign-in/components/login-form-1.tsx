@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { authClient } from "@/lib/auth-client"
 
 const loginFormSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -41,6 +43,31 @@ export function LoginForm1({
     },
   })
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onSubmit(values: LoginFormValues) {
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (signInError) {
+        setError(signInError.message ?? "Unable to sign in. Please try again.")
+        return
+      }
+
+      window.location.href = "/dhthub-admin"
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -52,7 +79,7 @@ export function LoginForm1({
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form action="/">
+            <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
                 <div className="grid gap-4">
                   <FormField
@@ -80,7 +107,7 @@ export function LoginForm1({
                         <div className="flex items-center">
                           <FormLabel>Password</FormLabel>
                           <a
-                            href="/auth/forgot-password"
+                            href="/forgot-password"
                             className="ml-auto text-sm underline-offset-4 hover:underline"
                           >
                             Forgot your password?
@@ -93,8 +120,15 @@ export function LoginForm1({
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full cursor-pointer">
-                    Login
+                  {error && (
+                    <p className="text-sm text-destructive">{error}</p>
+                  )}
+                  <Button
+                    type="submit"
+                    className="w-full cursor-pointer"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Logging in..." : "Login"}
                   </Button>
 
                   <Button variant="outline" className="w-full cursor-pointer" type="button">
@@ -109,7 +143,7 @@ export function LoginForm1({
                 </div>
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
-                  <a href="/auth/sign-up" className="underline underline-offset-4">
+                  <a href="/sign-up" className="underline underline-offset-4">
                     Sign up
                   </a>
                 </div>

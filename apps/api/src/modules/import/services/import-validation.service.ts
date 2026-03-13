@@ -119,7 +119,7 @@ export class ImportValidationService {
     rowNumber: number,
     row: CsvRow,
     context: ValidationContext,
-    _validateOnly = false,
+    validateOnly = false,
   ): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
@@ -267,17 +267,42 @@ export class ImportValidationService {
         }
       }
 
-      // Validate ENUM attributes
+      // Validate ENUM attributes — auto-create missing options during real import
       if (attribute.dataType === AttributeDataType.ENUM && value) {
-        const optionKey = `${attribute.slug}:${value}`;
+        const slug = this.toSlug(value);
+        const optionKey = `${attribute.slug}:${slug}`;
         if (!context.attributeOptionMap.has(optionKey)) {
-          errors.push({
-            rowNumber,
-            sku,
-            field: key,
-            message: `Invalid value for ${key}. Valid options are not preloaded or value is invalid: ${value}`,
-            severity: 'error',
-          });
+          if (validateOnly) {
+            errors.push({
+              rowNumber,
+              sku,
+              field: key,
+              message: `New option "${value}" will be created for ${key} on import`,
+              severity: 'warning',
+            });
+          } else {
+            try {
+              const label = this.toLabel(value);
+              const created = await this.attributeOptionRepository.upsertByValue({
+                attributeId: attribute.id,
+                label,
+                value: slug,
+              });
+              context.attributeOptionMap.set(optionKey, created.id);
+              this.logger.log(
+                `Auto-created attribute option "${label}" (${slug}) for ${attribute.slug}`,
+              );
+            } catch (error) {
+              const msg = error instanceof Error ? error.message : String(error);
+              errors.push({
+                rowNumber,
+                sku,
+                field: key,
+                message: `Failed to auto-create option for ${key}: ${msg}`,
+                severity: 'error',
+              });
+            }
+          }
         }
       }
     }
@@ -329,6 +354,30 @@ export class ImportValidationService {
       totalErrors,
       totalWarnings,
     };
+  }
+
+  /**
+   * Convert a raw CSV value to a URL-safe slug.
+   * "Stainless Steel" → "stainless-steel", "Grade 10.9" → "grade-10-9"
+   */
+  private toSlug(raw: string): string {
+    return raw
+      .trim()
+      .toLowerCase()
+      .replace(/[.]+/g, '-')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  /**
+   * Convert a raw CSV value to a human-readable label.
+   * "stainless-steel" → "Stainless Steel", "grade-10-9" → "Grade 10 9"
+   */
+  private toLabel(raw: string): string {
+    return raw
+      .trim()
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   /**

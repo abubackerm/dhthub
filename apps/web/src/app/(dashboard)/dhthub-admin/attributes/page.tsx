@@ -1,38 +1,24 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  GripVertical,
-  Eye,
-  EyeOff,
-  Check,
-  Minus,
-} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Check, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
@@ -41,18 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
 import {
   Table,
   TableBody,
@@ -61,732 +36,971 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ScrollArea } from "@/components/ui/scroll-area"
-
+import { ApiError } from "@/lib/api/client"
 import {
-  mockCategories,
-  mockAttributes,
-  getLeafCategories,
-  type Category,
-  type Attribute,
-} from "@/lib/mock-data"
+  assignAttributeToCategory,
+  createAttribute,
+  createAttributeOption,
+  deleteAttributeOption,
+  getCategoryAttributes,
+  removeAttributeFromCategory,
+  updateAttribute,
+  updateAttributeOption,
+  useCategoryTree,
+  type AttributeDataType,
+  type AttributeFilterType,
+  type CategoryAttributeView,
+  type CategoryTreeNode,
+} from "@/lib/api/catalog"
+import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
-type DataType = "NUMBER" | "SELECT" | "MULTI_SELECT" | "BOOLEAN" | "TEXT"
-type FilterType = "RANGE" | "CHECKBOX_LIST" | "TOGGLE" | "NOT_FILTERABLE"
+type SheetMode = "create" | "edit" | "view"
+type FilterTypeValue = Exclude<AttributeFilterType, null> | "NONE"
+
+interface AttributeOptionDraft {
+  id?: string
+  label: string
+  value: string
+}
 
 interface AttributeFormData {
   name: string
   slug: string
-  helpText: string
-  dataType: DataType
-  unit: string
-  filterType: FilterType
+  dataType: AttributeDataType
+  group: string
+  sortOrder: number
+  filterType: FilterTypeValue
+  isFilterable: boolean
   isRequired: boolean
-  isVisibleInTable: boolean
-  showInSpecSheet: boolean
-  allowedValues: string[]
+  options: AttributeOptionDraft[]
 }
 
 const initialFormData: AttributeFormData = {
   name: "",
   slug: "",
-  helpText: "",
-  dataType: "TEXT",
-  unit: "",
-  filterType: "NOT_FILTERABLE",
+  dataType: "text",
+  group: "",
+  sortOrder: 1,
+  filterType: "NONE",
+  isFilterable: false,
   isRequired: false,
-  isVisibleInTable: true,
-  showInSpecSheet: true,
-  allowedValues: [],
+  options: [],
 }
 
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/(^_|_$)/g, "")
-}
-
-function getCategoryPath(category: Category, categories: Category[]): string {
-  const parts: string[] = [category.name]
-  let current = category
-
-  while (current.parentId) {
-    const parent = findCategoryById(categories, current.parentId)
-    if (parent) {
-      parts.unshift(parent.name)
-      current = parent
-    } else {
-      break
-    }
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.getErrorMessage()
   }
 
-  return parts.join(" > ")
-}
-
-function findCategoryById(categories: Category[], id: string): Category | undefined {
-  for (const cat of categories) {
-    if (cat.id === id) return cat
-    const found = findCategoryById(cat.children, id)
-    if (found) return found
-  }
-  return undefined
-}
-
-function DataTypeBadge({ type }: { type: DataType }) {
-  const colors: Record<DataType, string> = {
-    NUMBER: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-    SELECT: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    MULTI_SELECT: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
-    BOOLEAN: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    TEXT: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  if (error instanceof Error) {
+    return error.message
   }
 
+  return fallback
+}
+
+function generateSlug(value: string): string {
   return (
-    <Badge variant="secondary" className={colors[type]}>
-      {type}
-    </Badge>
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || "attribute"
   )
 }
 
-interface SortableAttributeRowProps {
-  attribute: Attribute
-  onEdit: (attr: Attribute) => void
-  onDelete: (attr: Attribute) => void
-  onToggleVisibility: (attr: Attribute) => void
+function getDefaultFilterType(dataType: AttributeDataType): FilterTypeValue {
+  switch (dataType) {
+    case "number":
+      return "RANGE"
+    case "enum":
+      return "CHECKBOX"
+    case "boolean":
+      return "SELECT"
+    default:
+      return "NONE"
+  }
 }
 
-function SortableAttributeRow({
-  attribute,
-  onEdit,
-  onDelete,
-  onToggleVisibility,
-}: SortableAttributeRowProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: attribute.id })
+function getDataTypeLabel(dataType: AttributeDataType): string {
+  switch (dataType) {
+    case "number":
+      return "Number"
+    case "text":
+      return "Text"
+    case "enum":
+      return "Enum"
+    case "boolean":
+      return "Boolean"
+  }
+}
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+function getFilterLabel(filterType: AttributeFilterType): string {
+  if (!filterType) {
+    return "None"
   }
 
-  // Only render the drag handle on client side to avoid hydration mismatch
-  const [isClient, setIsClient] = useState(false)
+  switch (filterType) {
+    case "RANGE":
+      return "Range"
+    case "CHECKBOX":
+      return "Checkbox"
+    case "SELECT":
+      return "Select"
+  }
+}
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+function flattenLeafCategories(categories: CategoryTreeNode[]) {
+  const result: Array<{
+    id: string
+    name: string
+    path: string
+    productCount: number
+  }> = []
 
+  const walk = (items: CategoryTreeNode[], parentPath = "") => {
+    for (const item of items) {
+      const path = parentPath ? `${parentPath} > ${item.name}` : item.name
+
+      if (item.children.length === 0) {
+        result.push({
+          id: item.id,
+          name: item.name,
+          path,
+          productCount: item.productCount,
+        })
+        continue
+      }
+
+      walk(item.children, path)
+    }
+  }
+
+  walk(categories)
+  return result
+}
+
+function formDataFromAttribute(record: CategoryAttributeView): AttributeFormData {
+  return {
+    name: record.attribute.name,
+    slug: record.attribute.slug,
+    dataType: record.attribute.dataType,
+    group: record.attribute.group ?? "",
+    sortOrder: record.attribute.sortOrder,
+    filterType: record.attribute.filterType ?? "NONE",
+    isFilterable: record.attribute.isFilterable,
+    isRequired: record.attribute.isRequired,
+    options: record.options.map((option) => ({
+      id: option.id,
+      label: option.label,
+      value: option.value,
+    })),
+  }
+}
+
+function AttributeDetails({
+  record,
+}: {
+  record: CategoryAttributeView
+}) {
   return (
-    <TableRow ref={setNodeRef} style={style}>
-      <TableCell className="w-10">
-        {isClient ? (
-          <button
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
-        ) : (
-          <div className="w-8 h-8 flex items-center justify-center">
-            <GripVertical className="h-4 w-4 text-muted-foreground opacity-50" />
-          </div>
-        )}
-      </TableCell>
-      <TableCell className="w-12 text-center text-muted-foreground">
-        {attribute.sortOrder}
-      </TableCell>
-      <TableCell className="font-medium">{attribute.name}</TableCell>
-      <TableCell className="font-mono text-xs text-muted-foreground">
-        {attribute.slug}
-      </TableCell>
-      <TableCell>
-        <DataTypeBadge type={attribute.dataType} />
-      </TableCell>
-      <TableCell className="text-muted-foreground">
-        {attribute.unit || "-"}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-xs">
-        {attribute.filterType.replace("_", " ")}
-      </TableCell>
-      <TableCell className="w-16 text-center">
-        {attribute.isRequired ? (
-          <Check className="h-4 w-4 text-green-500 mx-auto" />
-        ) : (
-          <Minus className="h-4 w-4 text-muted-foreground mx-auto" />
-        )}
-      </TableCell>
-      <TableCell className="w-16 text-center">
-        <button
-          onClick={() => onToggleVisibility(attribute)}
-          className="hover:bg-muted p-1 rounded transition-colors"
-        >
-          {attribute.isVisibleInTable ? (
-            <Eye className="h-4 w-4 text-green-500" />
-          ) : (
-            <EyeOff className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-      </TableCell>
-      <TableCell className="w-24">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onEdit(attribute)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={() => onDelete(attribute)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+    <div className="rounded-md border p-4">
+      <div className="grid gap-4 text-sm">
+        <div className="grid gap-1">
+          <span className="text-muted-foreground">Slug</span>
+          <span className="font-mono">{record.attribute.slug}</span>
         </div>
-      </TableCell>
-    </TableRow>
+        <div className="grid gap-1">
+          <span className="text-muted-foreground">Type</span>
+          <span>{getDataTypeLabel(record.attribute.dataType)}</span>
+        </div>
+        <div className="grid gap-1">
+          <span className="text-muted-foreground">Group</span>
+          <span>{record.attribute.group || "-"}</span>
+        </div>
+        <div className="grid gap-1">
+          <span className="text-muted-foreground">Filter</span>
+          <span>{getFilterLabel(record.attribute.filterType)}</span>
+        </div>
+        <div className="grid gap-1">
+          <span className="text-muted-foreground">Required</span>
+          <span>{record.attribute.isRequired ? "Yes" : "No"}</span>
+        </div>
+      </div>
+
+      {record.options.length > 0 && (
+        <>
+          <Separator className="my-4" />
+          <div className="grid gap-3">
+            <div className="text-sm font-medium">Options</div>
+            <div className="grid gap-2">
+              {record.options.map((option) => (
+                <div
+                  key={option.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                >
+                  <span>{option.label}</span>
+                  <span className="font-mono text-muted-foreground">{option.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
 export default function AttributesPage() {
-  const leafCategories = useMemo(() => getLeafCategories(mockCategories), [])
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
-    leafCategories[0]?.id || ""
+  const queryClient = useQueryClient()
+  const { confirm } = useConfirmDialog()
+  const {
+    data: categoryTree = [],
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useCategoryTree()
+
+  const leafCategories = useMemo(
+    () => flattenLeafCategories(categoryTree),
+    [categoryTree],
   )
 
-  const [attributes, setAttributes] = useState<Attribute[]>(mockAttributes)
+  const [selectedCategoryId, setSelectedCategoryId] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null)
+  const [sheetMode, setSheetMode] = useState<SheetMode>("create")
+  const [activeAttribute, setActiveAttribute] = useState<CategoryAttributeView | null>(null)
   const [formData, setFormData] = useState<AttributeFormData>(initialFormData)
-  const [newAllowedValue, setNewAllowedValue] = useState("")
 
-  const selectedCategory = useMemo(() => {
-    return findCategoryById(mockCategories, selectedCategoryId)
-  }, [selectedCategoryId])
+  useEffect(() => {
+    if (!selectedCategoryId && leafCategories.length > 0) {
+      setSelectedCategoryId(leafCategories[0].id)
+    }
+  }, [leafCategories, selectedCategoryId])
 
-  const selectedCategoryPath = useMemo(() => {
-    if (!selectedCategory) return ""
-    return getCategoryPath(selectedCategory, mockCategories)
-  }, [selectedCategory])
-
-  const categoryAttributes = useMemo(() => {
-    return attributes
-      .filter((attr) => attr.categoryId === selectedCategoryId)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [attributes, selectedCategoryId])
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+  const selectedCategory = useMemo(
+    () => leafCategories.find((category) => category.id === selectedCategoryId) ?? null,
+    [leafCategories, selectedCategoryId],
   )
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
+  const {
+    data: categoryAttributes = [],
+    isLoading: attributesLoading,
+    error: attributesError,
+  } = useQuery({
+    queryKey: ["category-attributes", selectedCategoryId],
+    queryFn: () => getCategoryAttributes(selectedCategoryId),
+    enabled: Boolean(selectedCategoryId),
+  })
 
-    if (over && active.id !== over.id) {
-      const oldIndex = categoryAttributes.findIndex((attr) => attr.id === active.id)
-      const newIndex = categoryAttributes.findIndex((attr) => attr.id === over.id)
-
-      const reordered = arrayMove(categoryAttributes, oldIndex, newIndex).map(
-        (attr, index) => ({
-          ...attr,
-          sortOrder: index + 1,
-        })
-      )
-
-      setAttributes((prev) => {
-        const other = prev.filter((attr) => attr.categoryId !== selectedCategoryId)
-        return [...other, ...reordered]
+  const createMutation = useMutation({
+    mutationFn: async (payload: { categoryId: string; formData: AttributeFormData }) => {
+      const attribute = await createAttribute({
+        name: payload.formData.name.trim(),
+        slug: payload.formData.slug,
+        dataType: payload.formData.dataType,
+        group: payload.formData.group.trim() || undefined,
+        sortOrder: payload.formData.sortOrder,
+        filterType:
+          payload.formData.isFilterable && payload.formData.filterType !== "NONE"
+            ? payload.formData.filterType
+            : undefined,
+        isFilterable: payload.formData.isFilterable,
+        isRequired: payload.formData.isRequired,
       })
 
-      toast.success("Attribute order updated")
-    }
-  }
+      await assignAttributeToCategory(payload.categoryId, {
+        attributeId: attribute.id,
+      })
 
-  const handleOpenSheet = () => {
-    setEditingAttribute(null)
-    setFormData(initialFormData)
-    setNewAllowedValue("")
-    setSheetOpen(true)
-  }
+      if (payload.formData.dataType === "enum") {
+        for (const [index, option] of payload.formData.options.entries()) {
+          await createAttributeOption(attribute.id, {
+            label: option.label.trim(),
+            value: option.value.trim(),
+            sortOrder: index + 1,
+          })
+        }
+      }
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["category-attributes", variables.categoryId],
+      })
+      toast.success("Attribute created successfully")
+      handleCloseSheet()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to create attribute"))
+    },
+  })
 
-  const handleEditAttribute = (attr: Attribute) => {
-    setEditingAttribute(attr)
-    setFormData({
-      name: attr.name,
-      slug: attr.slug,
-      helpText: attr.helpText || "",
-      dataType: attr.dataType,
-      unit: attr.unit || "",
-      filterType: attr.filterType,
-      isRequired: attr.isRequired,
-      isVisibleInTable: attr.isVisibleInTable,
-      showInSpecSheet: attr.showInSpecSheet ?? true,
-      allowedValues: attr.allowedValues,
-    })
-    setNewAllowedValue("")
-    setSheetOpen(true)
-  }
+  const updateMutation = useMutation({
+    mutationFn: async (payload: {
+      categoryId: string
+      record: CategoryAttributeView
+      formData: AttributeFormData
+    }) => {
+      await updateAttribute(payload.record.attribute.id, {
+        name: payload.formData.name.trim(),
+        dataType: payload.formData.dataType,
+        group: payload.formData.group.trim() || undefined,
+        sortOrder: payload.formData.sortOrder,
+        filterType:
+          payload.formData.isFilterable && payload.formData.filterType !== "NONE"
+            ? payload.formData.filterType
+            : undefined,
+        isFilterable: payload.formData.isFilterable,
+        isRequired: payload.formData.isRequired,
+      })
 
-  const handleDeleteAttribute = (attr: Attribute) => {
-    setAttributes((prev) => prev.filter((a) => a.id !== attr.id))
-    toast.success(`Attribute "${attr.name}" deleted`)
-  }
-
-  const handleToggleVisibility = (attr: Attribute) => {
-    setAttributes((prev) =>
-      prev.map((a) =>
-        a.id === attr.id ? { ...a, isVisibleInTable: !a.isVisibleInTable } : a
+      const existingOptionIds = new Set(payload.record.options.map((option) => option.id))
+      const nextOptionIds = new Set(
+        payload.formData.options
+          .map((option) => option.id)
+          .filter((optionId): optionId is string => Boolean(optionId)),
       )
-    )
-    toast.success(
-      `Attribute "${attr.name}" ${attr.isVisibleInTable ? "hidden from" : "shown in"} table`
-    )
+
+      for (const option of payload.record.options) {
+        if (!nextOptionIds.has(option.id)) {
+          await deleteAttributeOption(payload.record.attribute.id, option.id)
+        }
+      }
+
+      if (payload.formData.dataType === "enum") {
+        for (const [index, option] of payload.formData.options.entries()) {
+          const optionPayload = {
+            label: option.label.trim(),
+            value: option.value.trim(),
+            sortOrder: index + 1,
+          }
+
+          if (option.id && existingOptionIds.has(option.id)) {
+            await updateAttributeOption(
+              payload.record.attribute.id,
+              option.id,
+              optionPayload,
+            )
+          } else {
+            await createAttributeOption(payload.record.attribute.id, optionPayload)
+          }
+        }
+      }
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["category-attributes", variables.categoryId],
+      })
+      toast.success("Attribute updated successfully")
+      handleCloseSheet()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to update attribute"))
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (payload: { categoryId: string; assignmentId: string }) =>
+      removeAttributeFromCategory(payload.categoryId, payload.assignmentId),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["category-attributes", variables.categoryId],
+      })
+      toast.success("Attribute removed from category")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to delete attribute"))
+    },
+  })
+
+  function handleCloseSheet() {
+    setSheetOpen(false)
+    setSheetMode("create")
+    setActiveAttribute(null)
+    setFormData(initialFormData)
   }
 
-  const handleNameChange = (name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      name,
-      slug: prev.slug === "" || prev.slug === generateSlug(prev.name)
-        ? generateSlug(name)
-        : prev.slug,
-    }))
+  function openCreateSheet() {
+    setSheetMode("create")
+    setActiveAttribute(null)
+    setFormData({
+      ...initialFormData,
+      sortOrder: categoryAttributes.length + 1,
+    })
+    setSheetOpen(true)
   }
 
-  const handleAddAllowedValue = () => {
-    if (newAllowedValue.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        allowedValues: [...prev.allowedValues, newAllowedValue.trim()],
-      }))
-      setNewAllowedValue("")
-    }
+  function openEditSheet(record: CategoryAttributeView) {
+    setSheetMode("edit")
+    setActiveAttribute(record)
+    setFormData(formDataFromAttribute(record))
+    setSheetOpen(true)
   }
 
-  const handleRemoveAllowedValue = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      allowedValues: prev.allowedValues.filter((_, i) => i !== index),
-    }))
+  function openViewSheet(record: CategoryAttributeView) {
+    setSheetMode("view")
+    setActiveAttribute(record)
+    setFormData(formDataFromAttribute(record))
+    setSheetOpen(true)
   }
 
-  const handleSave = () => {
-    if (!formData.name.trim()) {
-      toast.error("Attribute name is required")
+  async function handleDelete(record: CategoryAttributeView) {
+    if (!selectedCategoryId) {
       return
     }
 
-    if (editingAttribute) {
-      setAttributes((prev) =>
-        prev.map((a) =>
-          a.id === editingAttribute.id
-            ? {
-                ...a,
-                name: formData.name,
-                slug: formData.slug,
-                dataType: formData.dataType,
-                filterType: formData.filterType,
-                unit: formData.unit || null,
-                isRequired: formData.isRequired,
-                isVisibleInTable: formData.isVisibleInTable,
-                showInSpecSheet: formData.showInSpecSheet,
-                allowedValues: formData.allowedValues,
-                helpText: formData.helpText,
-              }
-            : a
-        )
-      )
-      toast.success(`Attribute "${formData.name}" updated`)
-    } else {
-      const newAttr: Attribute = {
-        id: `a${Date.now()}`,
-        categoryId: selectedCategoryId,
-        name: formData.name,
-        slug: formData.slug,
-        dataType: formData.dataType,
-        filterType: formData.filterType,
-        unit: formData.unit || null,
-        isRequired: formData.isRequired,
-        isFilterable: formData.filterType !== "NOT_FILTERABLE",
-        isVisibleInTable: formData.isVisibleInTable,
-        showInSpecSheet: formData.showInSpecSheet,
-        sortOrder: categoryAttributes.length + 1,
-        allowedValues: formData.allowedValues,
-        helpText: formData.helpText,
+    const confirmed = await confirm({
+      title: "Delete attribute?",
+      description: `Remove "${record.attribute.name}" from this category schema?`,
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      variant: "destructive",
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    deleteMutation.mutate({
+      categoryId: selectedCategoryId,
+      assignmentId: record.assignmentId,
+    })
+  }
+
+  function handleNameChange(name: string) {
+    setFormData((prev) => ({
+      ...prev,
+      name,
+      slug:
+        prev.slug === "" || prev.slug === generateSlug(prev.name)
+          ? generateSlug(name)
+          : prev.slug,
+    }))
+  }
+
+  function handleDataTypeChange(dataType: AttributeDataType) {
+    setFormData((prev) => ({
+      ...prev,
+      dataType,
+      isFilterable: dataType !== "text" ? prev.isFilterable : false,
+      filterType:
+        dataType === "text"
+          ? "NONE"
+          : prev.filterType === "NONE"
+            ? getDefaultFilterType(dataType)
+            : prev.filterType,
+      options: dataType === "enum" ? prev.options : [],
+    }))
+  }
+
+  function handleAddOption() {
+    setFormData((prev) => ({
+      ...prev,
+      options: [...prev.options, { label: "", value: "" }],
+    }))
+  }
+
+  function handleOptionChange(
+    index: number,
+    field: keyof AttributeOptionDraft,
+    value: string,
+  ) {
+    setFormData((prev) => {
+      const options = [...prev.options]
+      const current = options[index]
+
+      if (!current) {
+        return prev
       }
-      setAttributes((prev) => [...prev, newAttr])
-      toast.success(`Attribute "${formData.name}" created`)
+
+      if (field === "label") {
+        options[index] = {
+          ...current,
+          label: value,
+          value:
+            current.value === "" || current.value === generateSlug(current.label)
+              ? generateSlug(value)
+              : current.value,
+        }
+      } else {
+        options[index] = {
+          ...current,
+          [field]: value,
+        }
+      }
+
+      return {
+        ...prev,
+        options,
+      }
+    })
+  }
+
+  function handleRemoveOption(index: number) {
+    setFormData((prev) => ({
+      ...prev,
+      options: prev.options.filter((_, optionIndex) => optionIndex !== index),
+    }))
+  }
+
+  function validateForm(): string | null {
+    if (!formData.name.trim()) {
+      return "Attribute name is required"
     }
 
-    setSheetOpen(false)
-    setFormData(initialFormData)
-    setEditingAttribute(null)
+    if (!formData.slug.trim()) {
+      return "Attribute slug is required"
+    }
+
+    if (formData.dataType === "enum" && formData.options.length === 0) {
+      return "Enum attributes require at least one option"
+    }
+
+    for (const option of formData.options) {
+      if (!option.label.trim() || !option.value.trim()) {
+        return "Each option requires both a label and a value"
+      }
+    }
+
+    return null
   }
 
-  const handleCancel = () => {
-    setSheetOpen(false)
-    setFormData(initialFormData)
-    setEditingAttribute(null)
-  }
+  function handleSave() {
+    const validationError = validateForm()
 
-  const getDefaultFilterType = (dataType: DataType): FilterType => {
-    switch (dataType) {
-      case "NUMBER":
-        return "RANGE"
-      case "SELECT":
-        return "CHECKBOX_LIST"
-      case "MULTI_SELECT":
-        return "CHECKBOX_LIST"
-      case "BOOLEAN":
-        return "TOGGLE"
-      default:
-        return "NOT_FILTERABLE"
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
+    if (!selectedCategoryId) {
+      toast.error("Select a category first")
+      return
+    }
+
+    if (sheetMode === "create") {
+      createMutation.mutate({
+        categoryId: selectedCategoryId,
+        formData,
+      })
+      return
+    }
+
+    if (sheetMode === "edit" && activeAttribute) {
+      updateMutation.mutate({
+        categoryId: selectedCategoryId,
+        record: activeAttribute,
+        formData,
+      })
     }
   }
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
+  const isReadOnly = sheetMode === "view"
 
   return (
-    <div className="flex flex-col gap-6 p-6 h-full">
+    <div className="flex h-full flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Attributes</h1>
           <p className="text-muted-foreground">
-            Manage attribute schemas for each leaf category.
+            Manage the live attribute schema for each leaf category.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
-        {/* Left Column - Leaf Categories */}
+      <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg">Leaf Categories</CardTitle>
-            <CardDescription>
-              Select a category to manage its attributes
-            </CardDescription>
+            <CardDescription>Select a category to manage its attributes.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
-              <div className="divide-y">
-                {leafCategories.map((category) => {
-                  const path = getCategoryPath(category, mockCategories)
-                  const isSelected = category.id === selectedCategoryId
+            <ScrollArea className="h-[560px]">
+              {categoriesLoading ? (
+                <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading categories...
+                </div>
+              ) : categoriesError ? (
+                <div className="p-4 text-sm text-destructive">
+                  {getErrorMessage(categoriesError, "Failed to load categories")}
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {leafCategories.map((category) => {
+                    const isSelected = category.id === selectedCategoryId
 
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedCategoryId(category.id)}
-                      className={`w-full text-left p-4 transition-colors ${
-                        isSelected
-                          ? "bg-primary/5 border-l-2 border-l-primary"
-                          : "hover:bg-muted/50"
-                      }`}
-                    >
-                      <div className="font-medium">{category.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {path}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {category.productCount} products
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => setSelectedCategoryId(category.id)}
+                        className={`w-full p-4 text-left transition-colors ${
+                          isSelected
+                            ? "border-l-2 border-l-primary bg-primary/5"
+                            : "hover:bg-muted/50"
+                        }`}
+                      >
+                        <div className="font-medium">{category.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{category.path}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {category.productCount} products
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>
 
-        {/* Right Column - Attribute Schema */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-lg">
-                {selectedCategory?.name || "Select a Category"}
+                {selectedCategory?.name ?? "Select a category"}
               </CardTitle>
-              <CardDescription>{selectedCategoryPath}</CardDescription>
+              <CardDescription>{selectedCategory?.path ?? "No category selected"}</CardDescription>
             </div>
-            <Button onClick={handleOpenSheet} disabled={!selectedCategory}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={openCreateSheet} disabled={!selectedCategory}>
+              <Plus className="mr-2 h-4 w-4" />
               Add Attribute
             </Button>
           </CardHeader>
           <CardContent>
-            {categoryAttributes.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>No attributes yet.</p>
-                <p className="text-sm mt-1">
-                  Add your first attribute to define what columns products in this
-                  category will have.
-                </p>
+            {attributesLoading ? (
+              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading attributes...
+              </div>
+            ) : attributesError ? (
+              <div className="py-4 text-sm text-destructive">
+                {getErrorMessage(attributesError, "Failed to load attributes")}
+              </div>
+            ) : categoryAttributes.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                <p>No attributes found for this category.</p>
+                <p className="mt-1 text-sm">Create the first attribute to start defining its schema.</p>
               </div>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead className="w-12">Order</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Slug</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Filter</TableHead>
-                      <TableHead className="w-16 text-center">Req</TableHead>
-                      <TableHead className="w-16 text-center">In Table</TableHead>
-                      <TableHead className="w-24">Actions</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Filter</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Options</TableHead>
+                    <TableHead className="w-[140px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categoryAttributes.map((record) => (
+                    <TableRow key={record.assignmentId}>
+                      <TableCell className="font-medium">{record.attribute.name}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {record.attribute.slug}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {getDataTypeLabel(record.attribute.dataType)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getFilterLabel(record.attribute.filterType)}</TableCell>
+                      <TableCell>
+                        {record.attribute.isRequired ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <span className="text-muted-foreground">No</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{record.options.length}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openViewSheet(record)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEditSheet(record)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(record)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <SortableContext
-                      items={categoryAttributes.map((a) => a.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {categoryAttributes.map((attr) => (
-                        <SortableAttributeRow
-                          key={attr.id}
-                          attribute={attr}
-                          onEdit={handleEditAttribute}
-                          onDelete={handleDeleteAttribute}
-                          onToggleVisibility={handleToggleVisibility}
-                        />
-                      ))}
-                    </SortableContext>
-                  </TableBody>
-                </Table>
-              </DndContext>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Add/Edit Attribute Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <Sheet open={sheetOpen} onOpenChange={(open) => (open ? setSheetOpen(true) : handleCloseSheet())}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
             <SheetTitle>
-              {editingAttribute ? "Edit Attribute" : "Add Attribute"}
+              {sheetMode === "create"
+                ? "Create Attribute"
+                : sheetMode === "edit"
+                  ? "Edit Attribute"
+                  : "View Attribute"}
             </SheetTitle>
             <SheetDescription>
-              Define the attribute properties for products in this category.
+              {selectedCategory
+                ? `Category: ${selectedCategory.path}`
+                : "Select a category to manage attributes."}
             </SheetDescription>
           </SheetHeader>
 
           <div className="grid gap-4 py-6">
-            <div className="grid gap-2">
-              <Label htmlFor="name">
-                Attribute Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g., Thread Size"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="slug">Slug</Label>
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, slug: e.target.value }))
-                }
-                placeholder="e.g., thread_size"
-                className="font-mono text-sm bg-muted/50"
-                readOnly
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-generated from name
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="helpText">Help Text</Label>
-              <Textarea
-                id="helpText"
-                value={formData.helpText}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, helpText: e.target.value }))
-                }
-                placeholder="Enter help text shown to data entry users"
-                rows={2}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Data Type</Label>
-              <Select
-                value={formData.dataType}
-                onValueChange={(value: DataType) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    dataType: value,
-                    filterType: getDefaultFilterType(value),
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select data type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NUMBER">Number</SelectItem>
-                  <SelectItem value="SELECT">Select</SelectItem>
-                  <SelectItem value="MULTI_SELECT">Multi-Select</SelectItem>
-                  <SelectItem value="BOOLEAN">Boolean</SelectItem>
-                  <SelectItem value="TEXT">Text</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.dataType === "NUMBER" && (
-              <div className="grid gap-2">
-                <Label htmlFor="unit">Unit (e.g., in, mm, PSI)</Label>
-                <Input
-                  id="unit"
-                  value={formData.unit}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, unit: e.target.value }))
-                  }
-                  placeholder="e.g., in"
-                />
-              </div>
-            )}
-
-            <div className="grid gap-2">
-              <Label>Filter Display</Label>
-              <Select
-                value={formData.filterType}
-                onValueChange={(value: FilterType) =>
-                  setFormData((prev) => ({ ...prev, filterType: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select filter type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RANGE">Range Slider</SelectItem>
-                  <SelectItem value="CHECKBOX_LIST">Checkbox List</SelectItem>
-                  <SelectItem value="TOGGLE">Toggle</SelectItem>
-                  <SelectItem value="NOT_FILTERABLE">Not Filterable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="required">Required</Label>
-              <Switch
-                id="required"
-                checked={formData.isRequired}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({ ...prev, isRequired: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="inTable">Show in Product Table</Label>
-              <Switch
-                id="inTable"
-                checked={formData.isVisibleInTable}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({ ...prev, isVisibleInTable: checked }))
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="inSpec">Show in Product Spec Sheet</Label>
-              <Switch
-                id="inSpec"
-                checked={formData.showInSpecSheet}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({ ...prev, showInSpecSheet: checked }))
-                }
-              />
-            </div>
-
-            {(formData.dataType === "SELECT" ||
-              formData.dataType === "MULTI_SELECT") && (
+            {sheetMode === "view" && activeAttribute ? (
+              <AttributeDetails record={activeAttribute} />
+            ) : (
               <>
-                <Separator />
                 <div className="grid gap-2">
-                  <Label>Allowed Values</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Define the exact values data entry people can choose from
-                  </p>
+                  <Label htmlFor="attribute-name">
+                    Attribute Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="attribute-name"
+                    value={formData.name}
+                    onChange={(event) => handleNameChange(event.target.value)}
+                    placeholder="e.g. Thread Size"
+                    disabled={isReadOnly}
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    {formData.allowedValues.map((value, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-2 bg-muted rounded-md"
-                      >
-                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                        <span className="flex-1 text-sm">{value}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleRemoveAllowedValue(index)}
-                        >
-                          <Trash2 className="h-3 w-3" />
+                <div className="grid gap-2">
+                  <Label htmlFor="attribute-slug">Slug</Label>
+                  <Input
+                    id="attribute-slug"
+                    value={formData.slug}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, slug: event.target.value }))
+                    }
+                    className="font-mono text-sm"
+                    disabled
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Data Type</Label>
+                  <Select
+                    value={formData.dataType}
+                    onValueChange={(value: AttributeDataType) => handleDataTypeChange(value)}
+                    disabled={isReadOnly}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a data type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Text</SelectItem>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="enum">Enum</SelectItem>
+                      <SelectItem value="boolean">Boolean</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="attribute-group">Group</Label>
+                  <Input
+                    id="attribute-group"
+                    value={formData.group}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, group: event.target.value }))
+                    }
+                    placeholder="e.g. Technical Specs"
+                    disabled={isReadOnly}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="attribute-order">Sort Order</Label>
+                  <Input
+                    id="attribute-order"
+                    type="number"
+                    min={0}
+                    value={formData.sortOrder}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        sortOrder: Number(event.target.value) || 0,
+                      }))
+                    }
+                    disabled={isReadOnly}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-md border px-3 py-3">
+                  <div className="grid gap-1">
+                    <Label htmlFor="attribute-required">Required</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Mark this attribute as mandatory for products.
+                    </p>
+                  </div>
+                  <Switch
+                    id="attribute-required"
+                    checked={formData.isRequired}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, isRequired: checked }))
+                    }
+                    disabled={isReadOnly}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-md border px-3 py-3">
+                  <div className="grid gap-1">
+                    <Label htmlFor="attribute-filterable">Filterable</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Enable filtering for this attribute on listing pages.
+                    </p>
+                  </div>
+                  <Switch
+                    id="attribute-filterable"
+                    checked={formData.isFilterable}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        isFilterable: checked,
+                        filterType: checked
+                          ? prev.filterType === "NONE"
+                            ? getDefaultFilterType(prev.dataType)
+                            : prev.filterType
+                          : "NONE",
+                      }))
+                    }
+                    disabled={isReadOnly || formData.dataType === "text"}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Filter Type</Label>
+                  <Select
+                    value={formData.filterType}
+                    onValueChange={(value: FilterTypeValue) =>
+                      setFormData((prev) => ({ ...prev, filterType: value }))
+                    }
+                    disabled={isReadOnly || !formData.isFilterable}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a filter type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">None</SelectItem>
+                      <SelectItem value="RANGE">Range</SelectItem>
+                      <SelectItem value="CHECKBOX">Checkbox</SelectItem>
+                      <SelectItem value="SELECT">Select</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.dataType === "enum" && (
+                  <>
+                    <Separator />
+                    <div className="grid gap-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Allowed Options</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Define the choices users can select.
+                          </p>
+                        </div>
+                        <Button type="button" variant="secondary" size="sm" onClick={handleAddOption}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Option
                         </Button>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="flex gap-2">
-                    <Input
-                      value={newAllowedValue}
-                      onChange={(e) => setNewAllowedValue(e.target.value)}
-                      placeholder="Add new value"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          handleAddAllowedValue()
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleAddAllowedValue}
-                    >
-                      Add Value
-                    </Button>
-                  </div>
-                </div>
+                      {formData.options.length === 0 ? (
+                        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                          No options added yet.
+                        </div>
+                      ) : (
+                        <div className="grid gap-3">
+                          {formData.options.map((option, index) => (
+                            <div key={option.id ?? `new-${index}`} className="rounded-md border p-3">
+                              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                                <div className="grid gap-2">
+                                  <Label htmlFor={`option-label-${index}`}>Label</Label>
+                                  <Input
+                                    id={`option-label-${index}`}
+                                    value={option.label}
+                                    onChange={(event) =>
+                                      handleOptionChange(index, "label", event.target.value)
+                                    }
+                                    placeholder="e.g. Zinc Plated"
+                                    disabled={isReadOnly}
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor={`option-value-${index}`}>Value</Label>
+                                  <Input
+                                    id={`option-value-${index}`}
+                                    value={option.value}
+                                    onChange={(event) =>
+                                      handleOptionChange(index, "value", event.target.value)
+                                    }
+                                    placeholder="e.g. zinc-plated"
+                                    className="font-mono text-sm"
+                                    disabled={isReadOnly}
+                                  />
+                                </div>
+                                <div className="flex items-end">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleRemoveOption(index)}
+                                    disabled={isReadOnly}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
 
           <SheetFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={handleCancel}>
-              Cancel
+            <Button variant="outline" onClick={handleCloseSheet}>
+              {sheetMode === "view" ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={handleSave}>
-              {editingAttribute ? "Update Attribute" : "Save Attribute"}
-            </Button>
+            {!isReadOnly && (
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {sheetMode === "create" ? "Create Attribute" : "Update Attribute"}
+              </Button>
+            )}
           </SheetFooter>
         </SheetContent>
       </Sheet>

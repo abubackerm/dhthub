@@ -4,7 +4,7 @@ import { useScrollAnimation, useParallax } from "@/hooks/use-scroll-animation";
 import { ChevronDown } from "lucide-react";
 
 export function AboutHero() {
-  const { ref: titleRef, isVisible: titleVisible, getAnimationClass: getTitleClass } = useScrollAnimation({
+  const { ref: titleRef, isVisible: titleVisible } = useScrollAnimation({
     threshold: 0.2,
   });
 

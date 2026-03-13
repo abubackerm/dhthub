@@ -9,6 +9,7 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  NotFoundException,
 } from '@nestjs/common';
 import { AttributeDefinitionService } from '../services';
 import { AttributeOptionService } from '../services/attribute-option.service';
@@ -16,6 +17,7 @@ import {
   CreateAttributeDto,
   UpdateAttributeDto,
   AttributeDataTypeDto,
+  UpdateAttributeOptionDto,
 } from '../dto';
 import { CreateAttributeOptionDto } from '../dto/create-attribute-option.dto';
 import { AttributeView } from '../dto/views/attribute.view';
@@ -111,9 +113,43 @@ export class AttributesController {
     return AttributeOptionView.fromEntity(option);
   }
 
+  @Patch(':id/options/:optionId')
+  async updateOption(
+    @Param('id') attributeId: string,
+    @Param('optionId') optionId: string,
+    @Body() dto: UpdateAttributeOptionDto,
+  ): Promise<AttributeOptionView> {
+    const option = await this.optionService.findById(optionId);
+    if (option.attributeId !== attributeId) {
+      throw new NotFoundException('Attribute option not found');
+    }
+
+    const updated = await this.optionService.update(optionId, {
+      label: dto.label,
+      value: dto.value,
+      sortOrder: dto.sortOrder,
+    });
+
+    return AttributeOptionView.fromEntity(updated);
+  }
+
   @Get(':id/options')
   async getOptions(@Param('id') attributeId: string): Promise<AttributeOptionView[]> {
     const options = await this.optionService.findByAttributeId(attributeId);
     return AttributeOptionView.fromEntities(options);
+  }
+
+  @Delete(':id/options/:optionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteOption(
+    @Param('id') attributeId: string,
+    @Param('optionId') optionId: string,
+  ): Promise<void> {
+    const option = await this.optionService.findById(optionId);
+    if (option.attributeId !== attributeId) {
+      throw new NotFoundException('Attribute option not found');
+    }
+
+    await this.optionService.delete(optionId);
   }
 }

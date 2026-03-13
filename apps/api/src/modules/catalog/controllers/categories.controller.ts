@@ -9,6 +9,7 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
 import { CategoryEntity } from '../entities/category.entity';
@@ -62,6 +63,23 @@ export class CategoriesController {
     }
 
     return treeViews;
+  }
+
+  @Get('search')
+  async search(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('leafOnly') leafOnly?: string,
+  ): Promise<CategoryView[]> {
+    const query = (q ?? '').trim();
+    if (!query) {
+      return [];
+    }
+
+    const categories = await this.categoryService.search(query, limit ?? 20, {
+      leafOnly: leafOnly === 'true',
+    });
+    return CategoryView.fromEntities(categories);
   }
 
   @Get(':id')

@@ -19,6 +19,7 @@ interface BaseLayoutProps {
 
 export function BaseLayout({ children, title, description }: BaseLayoutProps) {
   const { config } = useSidebarConfig()
+  const [themeCustomizerOpen, setThemeCustomizerOpen] = React.useState(false)
 
   return (
     <SidebarProvider

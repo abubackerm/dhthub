@@ -5,12 +5,13 @@ import {
   Plus,
   Search,
   Eye,
-  Pencil,
   Trash2,
   Upload,
   Package,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  X,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -35,6 +37,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -50,11 +60,11 @@ import {
   useUpdateProduct,
   useDeleteProduct,
   useAddVariant,
+  useBulkUpdateProducts,
   useCategoryTree,
   type ProductView,
   type ProductStatus,
   type CategoryTreeNode,
-  type CreateVariantInput,
 } from "@/lib/api/catalog"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
@@ -143,6 +153,17 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkFields, setBulkFields] = useState<{
+    status?: ProductStatus
+    categoryId?: string
+    price?: number
+    quantity?: number
+    isFeatured?: boolean
+  }>({})
+  const [enabledBulkFields, setEnabledBulkFields] = useState<Set<string>>(new Set())
+
   const [detailSheetOpen, setDetailSheetOpen] = useState(false)
   const [addSheetOpen, setAddSheetOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<ProductView | null>(null)
@@ -173,6 +194,7 @@ export default function ProductsPage() {
   const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
   const addVariant = useAddVariant()
+  const bulkUpdate = useBulkUpdateProducts()
 
   const flatCategories = useMemo(() => {
     if (!categoryTree) return []
@@ -284,6 +306,91 @@ export default function ProductsPage() {
     return product.variants.find(v => v.isDefault) || product.variants[0]
   }
 
+  const currentPageIds = useMemo(
+    () => productsData?.data.map((p) => p.id) ?? [],
+    [productsData],
+  )
+
+  const allOnPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id))
+
+  const someOnPageSelected =
+    currentPageIds.some((id) => selectedIds.has(id)) && !allOnPageSelected
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allOnPageSelected) {
+        currentPageIds.forEach((id) => next.delete(id))
+      } else {
+        currentPageIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const openBulkDialog = () => {
+    setBulkFields({})
+    setEnabledBulkFields(new Set())
+    setBulkDialogOpen(true)
+  }
+
+  const toggleBulkField = (field: string) => {
+    setEnabledBulkFields((prev) => {
+      const next = new Set(prev)
+      if (next.has(field)) {
+        next.delete(field)
+        setBulkFields((f) => {
+          const copy = { ...f }
+          delete copy[field as keyof typeof f]
+          return copy
+        })
+      } else {
+        next.add(field)
+      }
+      return next
+    })
+  }
+
+  const handleBulkUpdate = () => {
+    const data: Record<string, unknown> = {}
+    for (const field of enabledBulkFields) {
+      const value = bulkFields[field as keyof typeof bulkFields]
+      if (value !== undefined) {
+        data[field] = value
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      toast.error("Select at least one field to update")
+      return
+    }
+
+    bulkUpdate.mutate(
+      { ids: Array.from(selectedIds), data: data as any },
+      {
+        onSuccess: () => {
+          setBulkDialogOpen(false)
+          clearSelection()
+        },
+      },
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
@@ -341,6 +448,23 @@ export default function ProductsPage() {
         </Tabs>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-4 py-3">
+          <span className="text-sm font-medium">
+            {selectedIds.size} product{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+          <Separator orientation="vertical" className="h-5" />
+          <Button size="sm" variant="outline" onClick={openBulkDialog}>
+            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+            Bulk Update
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            <X className="h-3.5 w-3.5 mr-1.5" />
+            Clear
+          </Button>
+        </div>
+      )}
+
       <div className="border rounded-lg">
         {isLoading ? (
           <div className="p-8 text-center text-muted-foreground">Loading products...</div>
@@ -350,6 +474,13 @@ export default function ProductsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10 px-3">
+                  <Checkbox
+                    checked={allOnPageSelected ? true : someOnPageSelected ? "indeterminate" : false}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead className="w-32">Default SKU</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
@@ -364,7 +495,7 @@ export default function ProductsPage() {
             <TableBody>
               {!productsData?.data.length ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-12 w-12 text-muted-foreground" />
                       <p className="text-muted-foreground">No products yet</p>
@@ -378,12 +509,20 @@ export default function ProductsPage() {
               ) : (
                 productsData.data.map((product) => {
                   const defaultVariant = getDefaultVariant(product)
+                  const isSelected = selectedIds.has(product.id)
                   return (
                     <TableRow
                       key={product.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-muted/40" : ""}`}
                       onClick={() => handleViewProduct(product)}
                     >
+                      <TableCell className="px-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelect(product.id)}
+                          aria-label={`Select ${product.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {defaultVariant?.sku || "-"}
                       </TableCell>
@@ -778,6 +917,151 @@ export default function ProductsPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Bulk Update {selectedIds.size} Product{selectedIds.size > 1 ? "s" : ""}</DialogTitle>
+            <DialogDescription>
+              Toggle the fields you want to change. Only enabled fields will be updated.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="bulk-status"
+                checked={enabledBulkFields.has("status")}
+                onCheckedChange={() => toggleBulkField("status")}
+                className="mt-2.5"
+              />
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="bulk-status">Status</Label>
+                <Select
+                  value={bulkFields.status ?? ""}
+                  onValueChange={(v) => setBulkFields((f) => ({ ...f, status: v as ProductStatus }))}
+                  disabled={!enabledBulkFields.has("status")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="bulk-category"
+                checked={enabledBulkFields.has("categoryId")}
+                onCheckedChange={() => toggleBulkField("categoryId")}
+                className="mt-2.5"
+              />
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="bulk-category">Category</Label>
+                <Select
+                  value={bulkFields.categoryId ?? ""}
+                  onValueChange={(v) => setBulkFields((f) => ({ ...f, categoryId: v }))}
+                  disabled={!enabledBulkFields.has("categoryId")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {flatCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.path}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="bulk-price"
+                checked={enabledBulkFields.has("price")}
+                onCheckedChange={() => toggleBulkField("price")}
+                className="mt-2.5"
+              />
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="bulk-price">Price</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={bulkFields.price ?? ""}
+                  onChange={(e) => setBulkFields((f) => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
+                  disabled={!enabledBulkFields.has("price")}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="bulk-quantity"
+                checked={enabledBulkFields.has("quantity")}
+                onCheckedChange={() => toggleBulkField("quantity")}
+                className="mt-2.5"
+              />
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="bulk-quantity">Quantity</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={bulkFields.quantity ?? ""}
+                  onChange={(e) => setBulkFields((f) => ({ ...f, quantity: parseInt(e.target.value) || 0 }))}
+                  disabled={!enabledBulkFields.has("quantity")}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="bulk-featured"
+                checked={enabledBulkFields.has("isFeatured")}
+                onCheckedChange={() => toggleBulkField("isFeatured")}
+              />
+              <div className="flex items-center gap-2">
+                <Label htmlFor="bulk-featured">Featured</Label>
+                {enabledBulkFields.has("isFeatured") && (
+                  <Select
+                    value={bulkFields.isFeatured === true ? "true" : bulkFields.isFeatured === false ? "false" : ""}
+                    onValueChange={(v) => setBulkFields((f) => ({ ...f, isFeatured: v === "true" }))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue placeholder="..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkUpdate}
+              disabled={enabledBulkFields.size === 0 || bulkUpdate.isPending}
+            >
+              {bulkUpdate.isPending ? "Updating..." : `Update ${selectedIds.size} Product${selectedIds.size > 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

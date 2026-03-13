@@ -9,7 +9,7 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { CategoryAttributeService } from '../services';
-import { AttributeView } from '../dto/views/attribute.view';
+import { CategoryAttributeView } from '../dto/views/category-attribute.view';
 
 export class AssignAttributeToCategoryDto {
   attributeId: string;
@@ -38,14 +38,12 @@ export class CategoryAttributesController {
   @Get()
   async getAttributes(
     @Param('categoryId') categoryId: string,
-  ): Promise<AttributeView[]> {
+  ): Promise<CategoryAttributeView[]> {
     const categoryAttributes = await this.categoryAttributeService.getCategoryAttributes(
       categoryId,
     );
 
-    return categoryAttributes.map((ca) =>
-      AttributeView.fromEntity(ca.attribute as any),
-    );
+    return CategoryAttributeView.fromEntities(categoryAttributes);
   }
 
   @Delete(':id')

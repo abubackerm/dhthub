@@ -86,6 +86,38 @@ export class CategoryRepository {
     });
   }
 
+  async searchByQuery(
+    query: string,
+    limit: number,
+    options?: { leafOnly?: boolean },
+  ): Promise<CategoryEntity[]> {
+    const client = this.getClient();
+    const normalizedQuery = query.trim();
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const where: any = {
+      isActive: true,
+      OR: [
+        { name: { contains: normalizedQuery, mode: 'insensitive' } },
+        { slug: { contains: normalizedQuery, mode: 'insensitive' } },
+        { path: { contains: normalizedQuery.toLowerCase() } },
+      ],
+    };
+
+    if (options?.leafOnly) {
+      where.children = { none: {} };
+    }
+
+    return client.category.findMany({
+      where,
+      orderBy: { sortOrder: 'asc' },
+      take: limit,
+    });
+  }
+
   async create(data: {
     name: string;
     slug: string;

@@ -7,12 +7,18 @@ import {
   Body,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { RoleService } from '../services';
 import { CreateRoleDto, UpdateRoleDto, RoleView } from '../dto';
 import { PaginatedResponseDto } from '@shared/dto';
+import { AuthGuard } from '../auth.guard';
+import { RolesGuard } from '../roles.guard';
+import { Roles } from '../roles.decorator';
 
 @Controller('auth/roles')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('admin', 'super_admin')
 export class RolesController {
   constructor(private readonly roleService: RoleService) {}
 

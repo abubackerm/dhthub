@@ -6,6 +6,7 @@ import { ImportJobService } from './services/import-job.service';
 import { CsvParserService } from './services/csv-parser.service';
 import { ImportValidationService } from './services/import-validation.service';
 import { ImportProgressService } from './services/import-progress.service';
+import { ImportProcessorService } from './services/import-processor.service';
 import { ImportJobRepository } from './repositories/import-job.repository';
 import { ImportErrorRepository } from './repositories/import-error.repository';
 import { CoreModule } from '@core/core.module';
@@ -32,6 +33,7 @@ import { InventoryModule } from '../inventory/inventory.module';
     // Services
     ImportService,
     ImportJobService,
+    ImportProcessorService,
     CsvParserService,
     ImportValidationService,
     ImportProgressService,

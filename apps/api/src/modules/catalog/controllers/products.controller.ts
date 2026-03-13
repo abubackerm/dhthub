@@ -18,6 +18,7 @@ import {
   CreateProductDto,
   CreateVariantDto,
   UpdateProductDto,
+  BulkUpdateProductDto,
   ProductQueryDto,
 } from '../dto';
 import { ProductView } from '../dto/views/product.view';
@@ -76,6 +77,19 @@ export class ProductsController {
       data: ProductView.fromEntities(products),
       meta: { total, limit: pageSize, offset },
     };
+  }
+
+  @Patch('bulk')
+  async bulkUpdate(
+    @Body() dto: BulkUpdateProductDto,
+  ): Promise<{ updatedCount: number }> {
+    return this.productService.bulkUpdate(dto.ids, {
+      status: dto.data.status as any,
+      price: dto.data.price,
+      quantity: dto.data.quantity,
+      categoryId: dto.data.categoryId,
+      isFeatured: dto.data.isFeatured,
+    });
   }
 
   @Get('by-sku/:sku')

@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Checkbox } from "@/components/ui/checkbox"
+import { authClient } from "@/lib/auth-client"
 
 const signupFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -53,9 +55,32 @@ export function SignupForm1({
     },
   })
 
-  function onSubmit(data: SignupFormValues) {
-    console.log("Signup attempt:", data)
-    // Here you would typically handle the signup
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function onSubmit(data: SignupFormValues) {
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const fullName =
+        `${data.firstName} ${data.lastName}`.trim() || data.email.split("@")[0] || "User"
+      const { error: signUpError } = await authClient.signUp.email({
+        email: data.email,
+        password: data.password,
+        name: fullName,
+      })
+
+      if (signUpError) {
+        setError(signUpError.message ?? "Unable to create account. Please try again.")
+        return
+      }
+
+      window.location.href = "/dhthub-admin"
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -161,8 +186,15 @@ export function SignupForm1({
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full cursor-pointer">
-                    Create Account
+                  {error && (
+                    <p className="text-sm text-destructive">{error}</p>
+                  )}
+                  <Button
+                    type="submit"
+                    className="w-full cursor-pointer"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Creating account..." : "Create Account"}
                   </Button>
 
                   <Button variant="outline" className="w-full cursor-pointer" type="button">
@@ -177,7 +209,7 @@ export function SignupForm1({
                 </div>
                 <div className="text-center text-sm">
                   Already have an account?{" "}
-                  <a href="/auth/sign-in" className="underline underline-offset-4">
+                  <a href="/sign-in" className="underline underline-offset-4">
                     Sign in
                   </a>
                 </div>

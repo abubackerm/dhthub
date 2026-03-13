@@ -9,6 +9,7 @@ import {
   HttpStatus,
   HttpCode,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { PricingService } from '../services/pricing.service';
 import { CreateVariantPricingDto } from '../dto/create-variant-pricing.dto';
@@ -16,6 +17,9 @@ import { ReplaceVariantPricingDto } from '../dto/replace-variant-pricing.dto';
 import { PriceCalculationQueryDto } from '../dto/price-calculation-query.dto';
 import { PriceView } from '../dto/views/price.view';
 import { PriceCalculationView } from '../dto/views/price-calculation.view';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('pricing/variants')
 export class PricingController {
@@ -23,6 +27,8 @@ export class PricingController {
 
   @Post(':variantId')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'super_admin')
   async createVariantPricing(
     @Param('variantId') variantId: string,
     @Body() dto: CreateVariantPricingDto,
@@ -37,6 +43,8 @@ export class PricingController {
   }
 
   @Put(':variantId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'super_admin')
   async replaceVariantPricing(
     @Param('variantId') variantId: string,
     @Body() dto: ReplaceVariantPricingDto,

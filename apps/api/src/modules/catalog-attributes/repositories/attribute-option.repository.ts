@@ -73,4 +73,36 @@ export class AttributeOptionRepository {
       where: { id: { in: ids } },
     });
   }
+
+  async findByAttributeIdAndValue(
+    attributeId: string,
+    value: string,
+  ): Promise<AttributeOptionEntity | null> {
+    return this.getClient().attributeOption.findUnique({
+      where: { attributeId_value: { attributeId, value } },
+    });
+  }
+
+  async upsertByValue(data: {
+    attributeId: string;
+    label: string;
+    value: string;
+    sortOrder?: number;
+  }): Promise<AttributeOptionEntity> {
+    return this.getClient().attributeOption.upsert({
+      where: {
+        attributeId_value: {
+          attributeId: data.attributeId,
+          value: data.value,
+        },
+      },
+      update: {},
+      create: {
+        attributeId: data.attributeId,
+        label: data.label,
+        value: data.value,
+        sortOrder: data.sortOrder ?? 0,
+      },
+    });
+  }
 }

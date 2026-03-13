@@ -102,6 +102,14 @@ export class CategoryService extends BaseService {
     return this.categoryRepo.findByParentPath(parentPath);
   }
 
+  async search(
+    query: string,
+    limit: number = 20,
+    options?: { leafOnly?: boolean },
+  ): Promise<CategoryEntity[]> {
+    return this.categoryRepo.searchByQuery(query, limit, options);
+  }
+
   async update(
     id: string,
     data: Partial<{

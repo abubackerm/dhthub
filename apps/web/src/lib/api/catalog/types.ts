@@ -38,6 +38,81 @@ export interface UpdateCategoryInput {
   isActive?: boolean;
 }
 
+export type AttributeDataType = 'number' | 'text' | 'enum' | 'boolean';
+
+export type AttributeFilterType = 'RANGE' | 'CHECKBOX' | 'SELECT' | null;
+
+export interface AttributeOptionView {
+  id: string;
+  attributeId: string;
+  label: string;
+  value: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface AttributeView {
+  id: string;
+  name: string;
+  slug: string;
+  dataType: AttributeDataType;
+  group: string | null;
+  sortOrder: number;
+  filterType: AttributeFilterType;
+  unitId: string | null;
+  isFilterable: boolean;
+  isRequired: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryAttributeView {
+  assignmentId: string;
+  categoryId: string;
+  createdAt: string;
+  attribute: AttributeView;
+  options: AttributeOptionView[];
+}
+
+export interface CreateAttributeInput {
+  name: string;
+  slug: string;
+  dataType: Exclude<AttributeDataType, null>;
+  group?: string;
+  sortOrder?: number;
+  filterType?: Exclude<AttributeFilterType, null>;
+  unitId?: string;
+  isFilterable?: boolean;
+  isRequired?: boolean;
+}
+
+export interface UpdateAttributeInput {
+  name?: string;
+  dataType?: Exclude<AttributeDataType, null>;
+  group?: string;
+  sortOrder?: number;
+  filterType?: Exclude<AttributeFilterType, null>;
+  unitId?: string;
+  isFilterable?: boolean;
+  isRequired?: boolean;
+}
+
+export interface AssignAttributeToCategoryInput {
+  attributeId: string;
+}
+
+export interface CreateAttributeOptionInput {
+  label: string;
+  value: string;
+  sortOrder?: number;
+}
+
+export interface UpdateAttributeOptionInput {
+  label?: string;
+  value?: string;
+  sortOrder?: number;
+}
+
 export interface ListResponseMeta {
   total: number;
   limit: number;
@@ -117,4 +192,13 @@ export interface ProductsQueryParams {
   search?: string;
   categoryId?: string;
   status?: ProductStatus;
+}
+
+export interface BulkUpdateProductInput {
+  ids: string[];
+  data: Partial<Pick<UpdateProductInput, 'status' | 'categoryId' | 'price' | 'quantity' | 'isFeatured'>>;
+}
+
+export interface BulkUpdateResult {
+  updatedCount: number;
 }

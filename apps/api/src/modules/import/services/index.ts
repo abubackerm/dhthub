@@ -7,3 +7,4 @@ export type { ParsedRow, CsvRow } from './csv-parser.service';
 export { ImportValidationService } from './import-validation.service';
 export type { ValidationContext, ValidationResult, ValidationError } from './import-validation.service';
 export { ImportProgressService } from './import-progress.service';
+export { ImportProcessorService } from './import-processor.service';

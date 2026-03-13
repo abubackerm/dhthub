@@ -53,7 +53,7 @@ export function AboutTeam() {
         {/* Team Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 scroll-trigger">
           {teamMembers.map((member, index) => (
-            <TeamMemberCard key={index} member={member} index={index} />
+            <TeamMemberCard key={index} member={member} />
           ))}
         </div>
 
@@ -75,7 +75,7 @@ export function AboutTeam() {
   );
 }
 
-function TeamMemberCard({ member, index }: { member: (typeof teamMembers)[0]; index: number }) {
+function TeamMemberCard({ member }: { member: (typeof teamMembers)[0] }) {
   return (
     <div className={`scroll-trigger bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 group`}>
       {/* Image Container */}

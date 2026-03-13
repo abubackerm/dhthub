@@ -6,6 +6,12 @@ export enum ImportFileType {
   JSON = 'JSON',
 }
 
+export enum ImportMode {
+  CREATE_ONLY = 'CREATE_ONLY',
+  UPSERT = 'UPSERT',
+  UPDATE_ONLY = 'UPDATE_ONLY',
+}
+
 export class ImportJobEntity extends BaseEntity {
   fileUrl: string;
   fileName: string | null;
@@ -21,4 +27,7 @@ export class ImportJobEntity extends BaseEntity {
   lockedBy: string | null;
   startedAt: Date | null;
   finishedAt: Date | null;
+  mode: ImportMode | null;
+  warehouseId: string | null;
+  originalFilePath: string | null;
 }

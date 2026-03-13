@@ -251,6 +251,47 @@ export class ProductService extends BaseService {
     return updatedProduct;
   }
 
+  async bulkUpdate(
+    ids: string[],
+    data: Partial<{
+      status: ProductStatus;
+      price: number | null;
+      quantity: number;
+      categoryId: string | null;
+      isFeatured: boolean;
+    }>,
+  ): Promise<{ updatedCount: number }> {
+    const products = await this.productRepo.findByIds(ids);
+    if (products.length === 0) {
+      throw new ProductNotFoundError('No products found for given IDs');
+    }
+
+    if (data.categoryId) {
+      const category = await this.categoryRepo.findById(data.categoryId);
+      if (!category) {
+        throw new CategoryNotFoundError(data.categoryId);
+      }
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.quantity !== undefined) updateData.quantity = data.quantity;
+    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.isFeatured !== undefined) updateData.isFeatured = data.isFeatured;
+
+    const updatedCount = await this.productRepo.updateMany(ids, updateData as any);
+
+    for (const product of products) {
+      this.emit(
+        CATALOG_EVENTS.PRODUCT_UPDATED,
+        new ProductUpdatedEvent(product.id, { bulk: { from: null, to: data } }),
+      );
+    }
+
+    return { updatedCount };
+  }
+
   async changeStatus(id: string, newStatus: ProductStatus): Promise<ProductEntity> {
     const product = await this.productRepo.findById(id);
     if (!product) {

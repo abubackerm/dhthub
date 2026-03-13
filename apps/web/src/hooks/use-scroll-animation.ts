@@ -82,14 +82,14 @@ export function useCounterAnimation(
   useEffect(() => {
     const element = ref.current;
     if (!element || hasAnimated) return;
+    let animationFrame = 0;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
 
-          let startTime: number;
-          let animationFrame: number;
+          let startTime = 0;
 
           const animate = (currentTime: number) => {
             startTime = startTime || currentTime;
@@ -114,6 +114,9 @@ export function useCounterAnimation(
     observer.observe(element);
 
     return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
       if (element) {
         observer.unobserve(element);
       }

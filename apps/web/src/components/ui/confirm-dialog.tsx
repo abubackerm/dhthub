@@ -4,7 +4,7 @@ import * as React from "react"
 import { AlertTriangleIcon, InfoIcon, Trash2Icon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,

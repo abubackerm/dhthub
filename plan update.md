@@ -1,120 +1,104 @@
-This error is a standard NestJS dependency injection issue. The message is telling you exactly what is wrong:
+1️⃣ Add Import Job Listing API
 
-Nest can't resolve dependencies of EnquiryService
-Missing dependency: CartRepository
+Right now the plan includes:
 
-Meaning:
+GET /import/jobs/:id
 
-Your EnquiryService constructor has:
+But admins also need to see all import jobs.
 
-constructor(
-  private eventEmitter: EventEmitter2,
-  private enquiryRepository: EnquiryRepository,
-  private enquiryItemRepository: EnquiryItemRepository,
-  private cartRepository: CartRepository,   // <- PROBLEM
-  private variantRepository: ProductVariantRepository,
-  private productRepository: ProductRepository,
-)
+Add endpoint:
 
-But NestJS cannot find CartRepository inside EnquiryModule.
+GET /import/jobs
 
-Fix (Most Likely)
+Response example:
 
-You must export CartRepository from CartModule.
+{
+  "jobs":[
+    {
+      "id":"IMP-2026-0041",
+      "fileName":"bolts.csv",
+      "status":"RUNNING",
+      "total":50000,
+      "processed":31200,
+      "successCount":30998,
+      "errorCount":202,
+      "createdAt":"..."
+    }
+  ]
+}
 
-apps/api/src/modules/cart/cart.module.ts
-@Module({
-  imports: [
-    EventEmitterModule,
-    forwardRef(() => CatalogModule),
-  ],
-  controllers: [CartController],
-  providers: [
-    CartService,
-    CartRepository,
-    CartItemRepository,
-  ],
-  exports: [
-    CartService,
-    CartRepository,   // ✅ ADD THIS
-  ],
-})
-export class CartModule {}
-Then Import CartModule in EnquiryModule
-apps/api/src/modules/enquiry/enquiry.module.ts
-@Module({
-  imports: [
-    forwardRef(() => CartModule),   // ✅ IMPORTANT
-    CatalogModule,
-    EventEmitterModule,
-  ],
-  controllers: [EnquiryController],
-  providers: [
-    EnquiryService,
-    EnquiryRepository,
-    EnquiryItemRepository,
-  ],
-})
-export class EnquiryModule {}
-Why forwardRef()?
+This will allow building a Job History screen later.
 
-Because later your system may have:
+2️⃣ Add Job Cancellation
 
-Cart → Enquiry
-Enquiry → Cart
+When importing 100k rows, mistakes happen.
 
-Which creates a circular dependency.
+Add endpoint:
 
-forwardRef() prevents NestJS from crashing.
+POST /import/jobs/:id/cancel
 
-If You Still Get Error
+Worker behavior:
 
-Then ensure CartRepository is not missing from providers.
+job status → CANCELLED
+stop processing remaining rows
 
-Check:
+This prevents wasting CPU and DB writes.
 
-cart.module.ts
-providers: [
-  CartService,
-  CartRepository,
-  CartItemRepository
-]
-After Fix
+3️⃣ Add File Size Protection
 
-Restart server:
+CSV uploads can easily reach 200–500MB.
 
-pnpm dev
+Add validation:
 
-or
+maxFileSize = 200MB
+maxRows = 500k
 
-pnpm start:dev
-Expected Dependency Graph
+Return error:
 
-After fix:
+CSV file too large
 
-CartModule
-   └ CartRepository
-        ↓ exported
+This prevents server crashes.
 
-EnquiryModule
-   └ imports CartModule
-        ↓
-   EnquiryService can use CartRepository
-Small Architecture Tip
+4️⃣ Store Original Uploaded File
 
-Your current dependency:
+Right now the plan only processes the CSV.
 
-EnquiryService
-   ├ CartRepository
-   ├ ProductVariantRepository
-   └ ProductRepository
+Also store it:
 
-is perfectly fine for:
+MinIO
 
-createFromCart()
+Example path:
 
-because the service must:
+imports/2026/03/IMP-0041.csv
 
-load cart
-copy cart items
-create enquiry
+Benefits:
+
+debug imports
+re-run jobs
+audit trail
+5️⃣ Add Import Metrics Table
+
+Instead of recalculating counts every time, store them in the job record.
+
+Example table fields:
+
+processed
+successCount
+errorCount
+totalRows
+startedAt
+completedAt
+
+This makes the progress endpoint much faster.
+
+Final Recommended Backend Endpoints
+
+Your import API should now look like this:
+
+GET  /import/template
+GET  /import/jobs
+GET  /import/jobs/:id
+GET  /import/jobs/:id/errors
+
+POST /import/jobs
+POST /import/jobs/:id/cancel

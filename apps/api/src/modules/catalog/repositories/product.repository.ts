@@ -122,6 +122,25 @@ export class ProductRepository {
     });
   }
 
+  async updateMany(
+    ids: string[],
+    data: Partial<{
+      status: string;
+      price: number | null;
+      quantity: number;
+      categoryId: string | null;
+      isFeatured: boolean;
+    }>,
+  ): Promise<number> {
+    const result = await this.getClient().product.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        ...data,
+      },
+    });
+    return result.count;
+  }
+
   async delete(id: string): Promise<ProductEntity> {
     return this.getClient().product.delete({
       where: { id },
@@ -169,6 +188,7 @@ export class ProductRepository {
     const [products, total] = await Promise.all([
       this.getClient().product.findMany({
         where,
+        include: { variants: true },
         take: options.limit,
         skip: options.offset,
         orderBy: { createdAt: 'desc' },

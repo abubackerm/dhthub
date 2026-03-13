@@ -8,12 +8,18 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { WarehouseService } from '../services/warehouse.service';
 import { CreateWarehouseDto, UpdateWarehouseDto } from '../dto';
 import { WarehouseView } from '../dto/views/warehouse.view';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('inventory/warehouses')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('admin', 'super_admin')
 export class WarehouseController {
   constructor(private readonly warehouseService: WarehouseService) {}
 

@@ -7,13 +7,16 @@ import {
   Param,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { EnquiryService } from '../services';
 import { CreateEnquiryDto, UpdateEnquiryStatusDto } from '../dto';
 import { EnquiryView } from '../dto/views';
 import { EnquiryStatus } from '../entities';
+import { AuthGuard } from '../../auth/auth.guard';
 
 @Controller('enquiries')
+@UseGuards(AuthGuard)
 export class EnquiryController {
   constructor(private readonly enquiryService: EnquiryService) {}
 
@@ -22,7 +25,7 @@ export class EnquiryController {
     @Req() req: any,
     @Body() dto: CreateEnquiryDto,
   ): Promise<EnquiryView> {
-    const userId = req.user?.id || 'default-user';
+    const userId = req.user.id;
     return this.enquiryService.createFromCart(userId, dto);
   }
 
@@ -34,13 +37,13 @@ export class EnquiryController {
     if (status) {
       return this.enquiryService.findByStatus(status);
     }
-    const userId = req.user?.id || 'default-user';
+    const userId = req.user.id;
     return this.enquiryService.findByUser(userId);
   }
 
   @Get(':id')
   async findById(@Req() req: any, @Param('id') id: string): Promise<EnquiryView> {
-    const userId = req.user?.id || 'default-user';
+    const userId = req.user.id;
     return this.enquiryService.findById(id, userId);
   }
 
@@ -50,7 +53,7 @@ export class EnquiryController {
     @Body() dto: UpdateEnquiryStatusDto,
     @Req() req: any,
   ): Promise<EnquiryView> {
-    const updatedBy = req.user?.id;
+    const updatedBy = req.user.id;
     return this.enquiryService.updateStatus(id, dto, updatedBy);
   }
 }

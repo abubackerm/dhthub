@@ -24,14 +24,73 @@ model User {
   name         String?
   isActive     Boolean        @default(true) @map("is_active")
   lastLoginAt  DateTime?      @map("last_login_at")
+  emailVerified Boolean       @default(false) @map("email_verified")
+  image        String?
+  role         String         @default("user")
+  banned       Boolean        @default(false)
+  banReason    String?        @map("ban_reason")
+  banExpires   DateTime?      @map("ban_expires")
   ownedOrgs    Organization[] @relation("OwnedOrganizations")
   memberships  Membership[]
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
   createdBy    String?        @map("created_by")
   updatedBy    String?        @map("updated_by")
+  sessions     Session[]
+  accounts     Account[]
 
   @@map("users")
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  token          String   @unique
+  expiresAt      DateTime @map("expires_at")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  impersonatedBy String?  @map("impersonated_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                     String   @id @default(cuid())
+  userId                 String   @map("user_id")
+  accountId              String   @map("account_id")
+  providerId             String   @map("provider_id")
+  accessToken            String?  @map("access_token")
+  refreshToken           String?  @map("refresh_token")
+  accessTokenExpiresAt   DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt  DateTime? @map("refresh_token_expires_at")
+  scope                  String?
+  idToken                String?  @map("id_token")
+  password               String?  @map("password")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("verifications")
 }
 
 model Organization {
@@ -481,6 +540,12 @@ enum ImportJobStatus {
   CANCELLED
 }
 
+enum ImportMode {
+  CREATE_ONLY
+  UPSERT
+  UPDATE_ONLY
+}
+
 model ImportJob {
   id               String           @id @default(uuid())
   fileUrl          String           @map("file_url")
@@ -496,6 +561,9 @@ model ImportJob {
   lockedAt         DateTime?        @map("locked_at")
   lockedBy         String?          @map("locked_by")
   createdBy        String?          @map("created_by")
+  mode             ImportMode?      @map("mode")
+  warehouseId      String?          @map("warehouse_id")
+  originalFilePath String?          @map("original_file_path")
   startedAt        DateTime?        @map("started_at")
   finishedAt       DateTime?        @map("finished_at")
   createdAt        DateTime         @default(now()) @map("created_at")

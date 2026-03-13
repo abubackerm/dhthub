@@ -40,7 +40,11 @@ export class ProductView {
     return view;
   }
 
-  static fromEntities(entities: ProductEntity[]): ProductView[] {
-    return entities.map((entity) => ProductView.fromEntity(entity));
+  static fromEntities(
+    entities: (ProductEntity & { variants?: ProductVariantEntity[] })[],
+  ): ProductView[] {
+    return entities.map((entity) =>
+      ProductView.fromEntity(entity, entity.variants ?? []),
+    );
   }
 }

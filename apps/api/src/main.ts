@@ -4,14 +4,63 @@ import {
   NestFastifyApplication,
   FastifyAdapter,
 } from '@nestjs/platform-fastify';
+import multipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter, LoggingInterceptor } from '@shared/infrastructure';
+import { auth } from './modules/auth/auth';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
+
+  const fastify = app.getHttpAdapter().getInstance();
+
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 200 * 1024 * 1024, // 200MB
+    },
+  });
+
+  fastify.route({
+    method: ['GET', 'POST'],
+    url: '/api/auth/*',
+    async handler(request, reply) {
+      try {
+        const url = new URL(
+          request.url,
+          `http://${request.headers.host ?? 'localhost'}`,
+        );
+
+        const headers = new Headers();
+        Object.entries(request.headers).forEach(([key, value]) => {
+          if (value) {
+            headers.append(key, String(value));
+          }
+        });
+
+        const req = new Request(url.toString(), {
+          method: request.method,
+          headers,
+          body: request.body ? JSON.stringify(request.body) : undefined,
+        });
+
+        const response = await auth.handler(req);
+
+        reply.status(response.status);
+        response.headers.forEach((value, key) => reply.header(key, value));
+
+        const textBody = await response.text();
+        reply.send(textBody.length ? textBody : null);
+      } catch (error) {
+        reply.status(500).send({
+          error: 'Internal authentication error',
+          code: 'AUTH_FAILURE',
+        });
+      }
+    },
+  });
 
   app.setGlobalPrefix('v1');
 

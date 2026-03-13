@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ImportJobRepository } from '../repositories/import-job.repository';
-import { ImportJobEntity, ImportJobStatus } from '../entities';
+import { ImportJobEntity, ImportJobStatus, ImportMode } from '../entities';
 import { ImportJobNotFoundError } from '../domain/errors/import.errors';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImportJobCreatedEvent } from '../events';
@@ -13,6 +13,9 @@ export interface CreateJobInput {
   type: 'CSV' | 'JSON';
   totalRows?: number;
   createdBy?: string;
+  mode?: ImportMode;
+  warehouseId?: string;
+  originalFilePath?: string;
 }
 
 export interface JobMetrics {
@@ -48,6 +51,9 @@ export class ImportJobService {
       type: input.type as any,
       totalRows: input.totalRows,
       createdBy: input.createdBy,
+      mode: input.mode ?? null,
+      warehouseId: input.warehouseId ?? null,
+      originalFilePath: input.originalFilePath ?? null,
     });
 
     // Emit job created event

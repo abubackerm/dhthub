@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { InventoryService } from '../services/inventory.service';
 import {
@@ -18,8 +19,13 @@ import {
 import { StockSummaryView } from '../dto/views/stock-summary.view';
 import { InventoryView } from '../dto/views/inventory.view';
 import { MovementView } from '../dto/views/movement.view';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('inventory')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('admin', 'super_admin')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 

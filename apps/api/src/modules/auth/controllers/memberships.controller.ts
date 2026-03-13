@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { MembershipService } from '../services';
 import {
@@ -14,8 +15,13 @@ import {
   MembershipView,
 } from '../dto';
 import { PaginatedResponseDto } from '@shared/dto';
+import { AuthGuard } from '../auth.guard';
+import { RolesGuard } from '../roles.guard';
+import { Roles } from '../roles.decorator';
 
 @Controller('auth/memberships')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('admin', 'super_admin')
 export class MembershipsController {
   constructor(private readonly membershipService: MembershipService) {}
 

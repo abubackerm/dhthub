@@ -14,9 +14,12 @@ import {
   updateProduct,
   hardDeleteProduct,
   addVariant,
+  bulkUpdateProducts,
   type ProductView,
   type CreateProductInput,
   type UpdateProductInput,
+  type BulkUpdateProductInput,
+  type BulkUpdateResult,
   type CreateVariantInput,
   type ProductsQueryParams,
   type PaginatedResponse,
@@ -99,6 +102,28 @@ export function useDeleteProduct(): UseMutationResult<void, Error, string> {
     },
     onError: (error: Error) => {
       console.error('Failed to delete product:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useBulkUpdateProducts(): UseMutationResult<
+  BulkUpdateResult,
+  Error,
+  BulkUpdateProductInput
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: bulkUpdateProducts,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success(`${result.updatedCount} product(s) updated`);
+    },
+    onError: (error: Error) => {
+      console.error('Bulk update failed:', error);
       const errorMessage =
         error instanceof ApiError ? error.getErrorMessage() : error.message;
       toast.error(errorMessage);

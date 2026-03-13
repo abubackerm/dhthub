@@ -4,22 +4,27 @@ import {
   Get,
   Delete,
   Param,
-  Body,
   Query,
   HttpCode,
   HttpStatus,
-  UsePipes,
-  ValidationPipe,
   ParseIntPipe,
+  UseGuards,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
+import { FastifyRequest } from 'fastify';
 import { ImportService, UploadedFile } from '../services/import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImportErrorRepository } from '../repositories/import-error.repository';
-import { CreateImportJobDto } from '../dto/create-import-job.dto';
 import { ImportStatusView, ImportErrorView, ImportJobWithErrorsView } from '../dto/views';
-import { ImportJobStatus } from '../entities';
+import { ImportJobStatus, ImportMode } from '../entities';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('import')
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('admin', 'super_admin')
 export class ImportController {
   constructor(
     private readonly importService: ImportService,
@@ -32,16 +37,35 @@ export class ImportController {
    * POST /v1/import/jobs
    */
   @Post('jobs')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async createJob(
-    @Body() file: UploadedFile,
-    @Body() dto?: CreateImportJobDto,
+    @Req() req: FastifyRequest,
     @Query('validateOnly') validateOnly?: string,
   ) {
+    const data = await req.file();
+    if (!data) {
+      throw new BadRequestException(
+        'No file provided. Send a multipart/form-data request with a "file" field.',
+      );
+    }
+
+    const buffer = await data.toBuffer();
+    const file: UploadedFile = {
+      fieldname: data.fieldname,
+      filename: data.filename,
+      encoding: data.encoding,
+      mimetype: data.mimetype,
+      buffer,
+      size: buffer.length,
+      originalname: data.filename,
+    };
+
+    const fields = data.fields as Record<string, any>;
+    const createdBy = fields?.createdBy?.value as string | undefined;
+    const mode = fields?.mode?.value as ImportMode | undefined;
+    const warehouseId = fields?.warehouseId?.value as string | undefined;
+
     if (validateOnly === 'true') {
-      const result = await this.importService.validateOnly(file, {
-        createdBy: dto?.createdBy,
-      });
+      const result = await this.importService.validateOnly(file, { createdBy });
       return {
         isValid: result.isValid,
         totalRows: result.totalRows,
@@ -52,7 +76,9 @@ export class ImportController {
     }
 
     const result = await this.importService.uploadCsv(file, {
-      createdBy: dto?.createdBy,
+      createdBy,
+      mode,
+      warehouseId,
     });
 
     return {
@@ -138,6 +164,53 @@ export class ImportController {
   }
 
   /**
+   * Download validation errors for a job as CSV
+   * GET /v1/import/jobs/:id/errors/download
+   */
+  @Get('jobs/:id/errors/download')
+  async downloadJobErrors(
+    @Param('id') id: string,
+  ): Promise<{
+    filename: string;
+    contentType: string;
+    content: string;
+  }> {
+    const job = await this.importJobService.findById(id);
+    const errors = await this.importErrorRepository.findByJobId(id);
+
+    const filename = `${job.fileName ?? 'import'}-errors.csv`;
+
+    const header = ['rowNumber', 'sku', 'error'];
+    const escape = (value: string | number | null): string => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const str = String(value);
+      if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = errors.map((error) => [
+      escape(error.rowNumber),
+      escape(error.sku),
+      escape(error.message),
+    ]);
+
+    const content = [
+      header.join(','),
+      ...rows.map((r) => r.join(',')),
+    ].join('\n');
+
+    return {
+      filename,
+      contentType: 'text/csv',
+      content,
+    };
+  }
+
+  /**
    * Cancel an import job
    * DELETE /v1/import/jobs/:id
    */
@@ -153,9 +226,9 @@ export class ImportController {
    * GET /v1/import/template
    */
   @Get('template')
-  async getTemplate() {
-    const templateInfo = this.importService.getTemplateInfo();
-    const templateContent = this.importService.getTemplate();
+  async getTemplate(@Query('categoryId') categoryId?: string) {
+    const templateInfo = await this.importService.getTemplateInfo(categoryId);
+    const templateContent = await this.importService.getTemplate(categoryId);
 
     return {
       filename: templateInfo.filename,
@@ -170,9 +243,9 @@ export class ImportController {
    * GET /v1/import/template/download
    */
   @Get('template/download')
-  async downloadTemplate() {
-    const templateContent = this.importService.getTemplate();
-    const templateInfo = this.importService.getTemplateInfo();
+  async downloadTemplate(@Query('categoryId') categoryId?: string) {
+    const templateContent = await this.importService.getTemplate(categoryId);
+    const templateInfo = await this.importService.getTemplateInfo(categoryId);
 
     return {
       filename: templateInfo.filename,

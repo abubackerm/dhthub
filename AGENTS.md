@@ -32,3 +32,15 @@
 - Controllers must remain thin with only HTTP request/response handling
 - All business logic belongs in services
 - Use DTO validation for all controller inputs
+
+- Next.js 16 uses `proxy.ts` instead of `middleware.ts` (middleware is deprecated)
+- The proxy file lives at `apps/web/src/proxy.ts` and exports `default async function proxy(req)`
+- Uses same API as middleware: `NextRequest`, `NextResponse`, `export const config = { matcher }`
+
+- Auth route protection uses `AuthGuard` and `RolesGuard` from `apps/api/src/modules/auth/`
+- `AuthGuard` attaches `request.session` and `request.user` from Better Auth session
+- `RolesGuard` reads `request.user.role` and checks against `@Roles()` decorator metadata
+- Admin-only controllers use `@UseGuards(AuthGuard, RolesGuard)` + `@Roles('admin', 'super_admin')`
+
+- Auth pages use `(auth)` route group, so URLs are `/sign-in`, `/sign-up`, `/forgot-password` (no `/auth/` prefix)
+- All internal links must use these routes without the `/auth/` prefix

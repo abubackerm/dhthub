@@ -41,8 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Info, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
 import {
@@ -353,33 +352,35 @@ export default function CategoriesPage() {
       return
     }
 
-    // Build category data, only including defined values
-    const categoryData: Record<string, unknown> = {
+    const baseCategoryData = {
       name: formData.name,
       slug: formData.slug,
+      sortOrder: formData.sortOrder,
+      isActive: true,
     }
-
-    // For description, only include if not empty
-    if (formData.description.trim()) {
-      categoryData.description = formData.description
-    }
-
-    // Note: parentId can only be set on create, not update
-    // To change a category's parent, you would need to use a move operation
-    if (!editingCategory && formData.parentId !== "none") {
-      categoryData.parentId = formData.parentId
-    }
-
-    categoryData.sortOrder = formData.sortOrder
-    categoryData.isActive = true
 
     if (editingCategory) {
+      const updateData: UpdateCategoryInput = {
+        ...baseCategoryData,
+        ...(formData.description.trim()
+          ? { description: formData.description }
+          : {}),
+      }
+
       updateMutation.mutate({
         id: editingCategory.id,
-        data: categoryData as UpdateCategoryInput,
+        data: updateData,
       })
     } else {
-      createMutation.mutate(categoryData as CreateCategoryInput)
+      const createData: CreateCategoryInput = {
+        ...baseCategoryData,
+        ...(formData.description.trim()
+          ? { description: formData.description }
+          : {}),
+        ...(formData.parentId !== "none" ? { parentId: formData.parentId } : {}),
+      }
+
+      createMutation.mutate(createData)
     }
 
     setSheetOpen(false)
