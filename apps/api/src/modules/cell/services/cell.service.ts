@@ -84,7 +84,7 @@ export class CellService {
     const productCount = await this.cellRepository.countProducts(id);
     if (productCount > 0) {
       throw new BadRequestException(
-        `Cannot delete cell because it has ${productCount} product(s). Move or delete the products first.`
+        `Cannot delete cell because it has ${productCount} product(s). Delete the products first.`
       );
     }
 

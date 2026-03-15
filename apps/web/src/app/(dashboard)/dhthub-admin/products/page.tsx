@@ -1,51 +1,14 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
-  Plus,
   Search,
-  Eye,
-  Trash2,
-  Upload,
   Package,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  X,
+  ArrowRight,
 } from "lucide-react"
 
-import { toast } from "sonner"
-
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
 import {
   Table,
   TableBody,
@@ -55,79 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  useProducts,
-  useCreateProduct,
-  useUpdateProduct,
-  useDeleteProduct,
-  useAddVariant,
-  useBulkUpdateProducts,
   useCategoryTree,
-  type ProductView,
-  type ProductStatus,
   type CategoryTreeNode,
 } from "@/lib/api/catalog"
-import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
-
-function StatusBadge({ status }: { status: ProductStatus }) {
-  const styles: Record<ProductStatus, { bg: string; label: string }> = {
-    draft: { bg: "bg-gray-100 text-gray-700", label: "Draft" },
-    active: { bg: "bg-green-100 text-green-700", label: "Active" },
-    archived: { bg: "bg-gray-100 text-gray-500 line-through", label: "Archived" },
-  }
-
-  const style = styles[status]
-  return (
-    <Badge variant="secondary" className={style.bg}>
-      {style.label}
-    </Badge>
-  )
-}
-
-function StockBadge({ quantity }: { quantity: number }) {
-  return quantity > 0 ? (
-    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-      In Stock ({quantity})
-    </Badge>
-  ) : (
-    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-      Out of Stock
-    </Badge>
-  )
-}
-
-interface ProductFormData {
-  categoryId: string
-  name: string
-  description: string
-  price: number
-  quantity: number
-  isFeatured: boolean
-}
-
-const initialFormData: ProductFormData = {
-  categoryId: "",
-  name: "",
-  description: "",
-  price: 0,
-  quantity: 0,
-  isFeatured: false,
-}
-
-interface VariantFormData {
-  sku: string
-  name: string
-  price: number
-  quantity: number
-  isDefault: boolean
-}
-
-const initialVariantFormData: VariantFormData = {
-  sku: "",
-  name: "",
-  price: 0,
-  quantity: 0,
-  isDefault: false,
-}
 
 function flattenCategories(
   nodes: CategoryTreeNode[],
@@ -144,252 +37,107 @@ function flattenCategories(
   return result
 }
 
+function getLeafCategories(
+  nodes: CategoryTreeNode[],
+): CategoryTreeNode[] {
+  const leaves: CategoryTreeNode[] = []
+
+  function traverse(items: CategoryTreeNode[]) {
+    for (const item of items) {
+      if (item.children.length === 0) {
+        leaves.push(item)
+      } else {
+        traverse(item.children)
+      }
+    }
+  }
+
+  traverse(nodes)
+  return leaves
+}
+
 export default function ProductsPage() {
-  const { confirm } = useConfirmDialog()
   const [searchQuery, setSearchQuery] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all")
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
-  const [bulkFields, setBulkFields] = useState<{
-    status?: ProductStatus
-    categoryId?: string
-    price?: number
-    quantity?: number
-    isFeatured?: boolean
-  }>({})
-  const [enabledBulkFields, setEnabledBulkFields] = useState<Set<string>>(new Set())
-
-  const [detailSheetOpen, setDetailSheetOpen] = useState(false)
-  const [addSheetOpen, setAddSheetOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<ProductView | null>(null)
-  const [formData, setFormData] = useState<ProductFormData>(initialFormData)
-  const [variantFormData, setVariantFormData] = useState<VariantFormData>(initialVariantFormData)
-  const [showVariantForm, setShowVariantForm] = useState(false)
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-      setPage(1)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  const queryParams = useMemo(() => ({
-    page,
-    pageSize,
-    search: debouncedSearch || undefined,
-    categoryId: categoryFilter !== "all" ? categoryFilter : undefined,
-    status: statusFilter !== "all" ? (statusFilter as ProductStatus) : undefined,
-  }), [page, pageSize, debouncedSearch, categoryFilter, statusFilter])
-
-  const { data: productsData, isLoading, isError } = useProducts(queryParams)
-  const { data: categoryTree } = useCategoryTree()
-
-  const createProduct = useCreateProduct()
-  const updateProduct = useUpdateProduct()
-  const deleteProduct = useDeleteProduct()
-  const addVariant = useAddVariant()
-  const bulkUpdate = useBulkUpdateProducts()
+  const { data: categoryTree, isLoading, isError } = useCategoryTree()
 
   const flatCategories = useMemo(() => {
     if (!categoryTree) return []
     return flattenCategories(categoryTree)
   }, [categoryTree])
 
-  const getCategoryPath = useCallback((categoryId: string | null) => {
-    if (!categoryId) return "-"
-    const cat = flatCategories.find(c => c.id === categoryId)
-    return cat?.path || "-"
+  const leafCategories = useMemo(() => {
+    if (!categoryTree) return []
+    return getLeafCategories(categoryTree)
+  }, [categoryTree])
+
+  const getParentCategory = useCallback((leafId: string) => {
+    const cat = flatCategories.find(c => c.id === leafId)
+    if (!cat?.path) return { name: "-", id: "" }
+    const parts = cat.path.split(" > ")
+    if (parts.length === 1) return { name: "Root", id: "" }
+    // Find the parent category by name in the path
+    const parentName = parts[parts.length - 2]
+    const parentCat = flatCategories.find(c => c.name === parentName)
+    return { name: parentName, id: parentCat?.id || "" }
   }, [flatCategories])
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      all: productsData?.meta.total ?? 0,
-      draft: 0,
-      active: 0,
-      archived: 0,
-    }
-    return counts
-  }, [productsData])
+  // Group leafs by their parent category (one level above)
+  const categoriesWithLeafs = useMemo(() => {
+    const grouped = new Map<string, { leafs: CategoryTreeNode[]; parentId: string }>()
 
-  const totalPages = useMemo(() => {
-    if (!productsData?.meta.total) return 1
-    return Math.ceil(productsData.meta.total / pageSize)
-  }, [productsData?.meta.total, pageSize])
+    function findAndGroupLeafs(nodes: CategoryTreeNode[], parentName = "") {
+      for (const category of nodes) {
+        const isLeaf = category.children.length === 0
 
-  const handleViewProduct = (product: ProductView) => {
-    setSelectedProduct(product)
-    setShowVariantForm(false)
-    setVariantFormData(initialVariantFormData)
-    setDetailSheetOpen(true)
-  }
-
-  const handleDeleteProduct = async (product: ProductView) => {
-    const confirmed = await confirm({
-      title: "Delete Product",
-      description: `Are you sure you want to delete "${product.name}"? This will archive the product.`,
-      variant: "destructive",
-      confirmLabel: "Delete",
-      cancelLabel: "Cancel",
-    })
-
-    if (confirmed) {
-      deleteProduct.mutate(product.id)
-    }
-  }
-
-  const handleOpenAddSheet = () => {
-    setFormData(initialFormData)
-    setAddSheetOpen(true)
-  }
-
-  const handleSaveProduct = () => {
-    if (!formData.name.trim()) {
-      return
-    }
-
-    createProduct.mutate({
-      name: formData.name,
-      categoryId: formData.categoryId || undefined,
-      description: formData.description || undefined,
-      price: formData.price || undefined,
-      quantity: formData.quantity || undefined,
-      isFeatured: formData.isFeatured,
-    }, {
-      onSuccess: () => {
-        setAddSheetOpen(false)
-        setFormData(initialFormData)
-      }
-    })
-  }
-
-  const handleUpdateStatus = (status: ProductStatus) => {
-    if (!selectedProduct) return
-    updateProduct.mutate({
-      id: selectedProduct.id,
-      data: { status }
-    }, {
-      onSuccess: (updated) => {
-        setSelectedProduct(updated)
-      }
-    })
-  }
-
-  const handleAddVariant = () => {
-    if (!selectedProduct || !variantFormData.sku.trim()) {
-      return
-    }
-
-    addVariant.mutate({
-      productId: selectedProduct.id,
-      data: {
-        sku: variantFormData.sku,
-        name: variantFormData.name || undefined,
-        price: variantFormData.price || undefined,
-        quantity: variantFormData.quantity || undefined,
-        isDefault: variantFormData.isDefault,
-      }
-    }, {
-      onSuccess: () => {
-        setVariantFormData(initialVariantFormData)
-        setShowVariantForm(false)
-      }
-    })
-  }
-
-  const getDefaultVariant = (product: ProductView) => {
-    return product.variants.find(v => v.isDefault) || product.variants[0]
-  }
-
-  const currentPageIds = useMemo(
-    () => productsData?.data.map((p) => p.id) ?? [],
-    [productsData],
-  )
-
-  const allOnPageSelected =
-    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id))
-
-  const someOnPageSelected =
-    currentPageIds.some((id) => selectedIds.has(id)) && !allOnPageSelected
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (allOnPageSelected) {
-        currentPageIds.forEach((id) => next.delete(id))
-      } else {
-        currentPageIds.forEach((id) => next.add(id))
-      }
-      return next
-    })
-  }
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
-  const clearSelection = () => setSelectedIds(new Set())
-
-  const openBulkDialog = () => {
-    setBulkFields({})
-    setEnabledBulkFields(new Set())
-    setBulkDialogOpen(true)
-  }
-
-  const toggleBulkField = (field: string) => {
-    setEnabledBulkFields((prev) => {
-      const next = new Set(prev)
-      if (next.has(field)) {
-        next.delete(field)
-        setBulkFields((f) => {
-          const copy = { ...f }
-          delete copy[field as keyof typeof f]
-          return copy
-        })
-      } else {
-        next.add(field)
-      }
-      return next
-    })
-  }
-
-  const handleBulkUpdate = () => {
-    const data: Record<string, unknown> = {}
-    for (const field of enabledBulkFields) {
-      const value = bulkFields[field as keyof typeof bulkFields]
-      if (value !== undefined) {
-        data[field] = value
+        if (isLeaf) {
+          // This is a leaf, group it by its parent name
+          const key = parentName || "Root"
+          if (!grouped.has(key)) {
+            grouped.set(key, { leafs: [], parentId: category.parentId || "" })
+          }
+          grouped.get(key)?.leafs.push(category)
+        } else {
+          // This is a branch, check if any of its children are leafs
+          const hasLeafChildren = category.children.some(child => child.children.length === 0)
+          if (hasLeafChildren) {
+            const key = category.name
+            if (!grouped.has(key)) {
+              grouped.set(key, { leafs: [], parentId: category.id })
+            }
+            // Add only leaf children
+            category.children.forEach(child => {
+              if (child.children.length === 0) {
+                grouped.get(key)?.leafs.push(child)
+              }
+            })
+          }
+          // Recursively process children to find nested leafs
+          findAndGroupLeafs(category.children, category.name)
+        }
       }
     }
 
-    if (Object.keys(data).length === 0) {
-      toast.error("Select at least one field to update")
-      return
+    if (categoryTree) {
+      findAndGroupLeafs(categoryTree)
     }
 
-    bulkUpdate.mutate(
-      { ids: Array.from(selectedIds), data: data as any },
-      {
-        onSuccess: () => {
-          setBulkDialogOpen(false)
-          clearSelection()
-        },
-      },
-    )
-  }
+    return Array.from(grouped.entries()).map(([parentName, data]) => ({
+      parentName,
+      leafs: data.leafs,
+      id: data.parentId,
+      key: parentName,
+    }))
+  }, [categoryTree])
+
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categoriesWithLeafs
+
+    const query = searchQuery.toLowerCase()
+    return categoriesWithLeafs.filter((category) => {
+      return category.parentName.toLowerCase().includes(query)
+    })
+  }, [categoriesWithLeafs, searchQuery])
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -397,18 +145,8 @@ export default function ProductsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
           <p className="text-muted-foreground">
-            Manage your product catalog
+            Browse and manage products by category
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => toast.info("Bulk upload coming soon")}>
-            <Upload className="h-4 w-4 mr-2" />
-            Bulk Upload
-          </Button>
-          <Button onClick={handleOpenAddSheet}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
         </div>
       </div>
 
@@ -417,651 +155,72 @@ export default function ProductsPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name..."
+              placeholder="Search categories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {flatCategories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.path}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
-
-        <Tabs value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <TabsList>
-            <TabsTrigger value="all">All ({statusCounts.all})</TabsTrigger>
-            <TabsTrigger value="draft">Draft</TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="archived">Archived</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
-
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-4 py-3">
-          <span className="text-sm font-medium">
-            {selectedIds.size} product{selectedIds.size > 1 ? "s" : ""} selected
-          </span>
-          <Separator orientation="vertical" className="h-5" />
-          <Button size="sm" variant="outline" onClick={openBulkDialog}>
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
-            Bulk Update
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            <X className="h-3.5 w-3.5 mr-1.5" />
-            Clear
-          </Button>
-        </div>
-      )}
 
       <div className="border rounded-lg">
         {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">Loading products...</div>
+          <div className="p-8 text-center text-muted-foreground">Loading categories...</div>
         ) : isError ? (
-          <div className="p-8 text-center text-destructive">Failed to load products</div>
+          <div className="p-8 text-center text-destructive">Failed to load categories</div>
+        ) : filteredCategories.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            {searchQuery ? "No categories found" : "No categories yet"}
+          </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10 px-3">
-                  <Checkbox
-                    checked={allOnPageSelected ? true : someOnPageSelected ? "indeterminate" : false}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead className="w-32">Default SKU</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="w-20">Price</TableHead>
-                <TableHead className="w-24">Stock</TableHead>
-                <TableHead className="w-28">Status</TableHead>
-                <TableHead className="w-20">Variants</TableHead>
-                <TableHead className="w-28">Date</TableHead>
+                <TableHead className="w-20">No.</TableHead>
+                <TableHead>Category Name</TableHead>
                 <TableHead className="w-28">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!productsData?.data.length ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8">
-                    <div className="flex flex-col items-center gap-2">
-                      <Package className="h-12 w-12 text-muted-foreground" />
-                      <p className="text-muted-foreground">No products yet</p>
-                      <Button onClick={handleOpenAddSheet} size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Product
-                      </Button>
-                    </div>
+              {filteredCategories.map((category, index) => (
+                <TableRow
+                  key={category.key || category.id || index}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    window.location.href = `/dhthub-admin/products/leaves/${category.id}`
+                  }}
+                >
+                  <TableCell className="font-mono text-sm">
+                    {index + 1}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {category.parentName}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.location.href = `/dhthub-admin/products/leaves/${category.id}`
+                      }}
+                    >
+                      <ArrowRight className="h-4 w-4 mr-2" />
+                      View Leafs ({category.leafs.length})
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : (
-                productsData.data.map((product) => {
-                  const defaultVariant = getDefaultVariant(product)
-                  const isSelected = selectedIds.has(product.id)
-                  return (
-                    <TableRow
-                      key={product.id}
-                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-muted/40" : ""}`}
-                      onClick={() => handleViewProduct(product)}
-                    >
-                      <TableCell className="px-3" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelect(product.id)}
-                          aria-label={`Select ${product.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {defaultVariant?.sku || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                        {getCategoryPath(product.categoryId)}
-                      </TableCell>
-                      <TableCell>
-                        {product.price != null ? `$${product.price.toFixed(2)}` : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <StockBadge quantity={product.quantity} />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={product.status} />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {product.variants.length}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(product.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleViewProduct(product)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteProduct(product)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
+              ))}
             </TableBody>
           </Table>
         )}
       </div>
 
-      {productsData?.data.length ? (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Rows per page:</span>
-            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-              <SelectTrigger className="w-16">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {totalPages} ({productsData.meta.total} total)
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+      {filteredCategories.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredCategories.length} categor{filteredCategories.length === 1 ? "y" : "ies"}
         </div>
-      ) : null}
-
-      <Sheet open={detailSheetOpen} onOpenChange={setDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-[600px] overflow-y-auto">
-          {selectedProduct && (
-            <>
-              <SheetHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <SheetTitle>{selectedProduct.name}</SheetTitle>
-                    <SheetDescription className="text-sm text-muted-foreground mt-1">
-                      {getCategoryPath(selectedProduct.categoryId)}
-                    </SheetDescription>
-                  </div>
-                  <StatusBadge status={selectedProduct.status} />
-                </div>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-6">
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Core Info</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Slug:</span>
-                      <span className="ml-2 font-mono">{selectedProduct.slug}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Type:</span>
-                      <span className="ml-2">{selectedProduct.type}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Price:</span>
-                      <span className="ml-2">
-                        {selectedProduct.price != null ? `$${selectedProduct.price.toFixed(2)}` : "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <span className="ml-2">{selectedProduct.quantity}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Featured:</span>
-                      <span className="ml-2">{selectedProduct.isFeatured ? "Yes" : "No"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedProduct.description && (
-                  <>
-                    <Separator />
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3">Description</h4>
-                      <p className="text-sm text-muted-foreground">{selectedProduct.description}</p>
-                    </div>
-                  </>
-                )}
-
-                <Separator />
-
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold">Variants ({selectedProduct.variants.length})</h4>
-                    {!showVariantForm && (
-                      <Button size="sm" variant="outline" onClick={() => setShowVariantForm(true)}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Variant
-                      </Button>
-                    )}
-                  </div>
-
-                  {showVariantForm && (
-                    <div className="mb-4 p-4 border rounded-lg space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="variantSku">SKU *</Label>
-                          <Input
-                            id="variantSku"
-                            value={variantFormData.sku}
-                            onChange={(e) => setVariantFormData(prev => ({ ...prev, sku: e.target.value }))}
-                            placeholder="SKU-001"
-                            className="font-mono"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="variantName">Name</Label>
-                          <Input
-                            id="variantName"
-                            value={variantFormData.name}
-                            onChange={(e) => setVariantFormData(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Variant name"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="variantPrice">Price</Label>
-                          <Input
-                            id="variantPrice"
-                            type="number"
-                            step="0.01"
-                            value={variantFormData.price}
-                            onChange={(e) => setVariantFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="variantQty">Quantity</Label>
-                          <Input
-                            id="variantQty"
-                            type="number"
-                            value={variantFormData.quantity}
-                            onChange={(e) => setVariantFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="variantDefault"
-                          checked={variantFormData.isDefault}
-                          onChange={(e) => setVariantFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                          className="rounded"
-                        />
-                        <Label htmlFor="variantDefault" className="font-normal">Set as default variant</Label>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleAddVariant} disabled={!variantFormData.sku.trim()}>
-                          Add Variant
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setShowVariantForm(false); setVariantFormData(initialVariantFormData); }}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedProduct.variants.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Price</TableHead>
-                          <TableHead>Qty</TableHead>
-                          <TableHead>Default</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedProduct.variants.map((variant) => (
-                          <TableRow key={variant.id}>
-                            <TableCell className="font-mono text-sm">{variant.sku}</TableCell>
-                            <TableCell>{variant.name || "-"}</TableCell>
-                            <TableCell>
-                              {variant.price != null ? `$${variant.price.toFixed(2)}` : "-"}
-                            </TableCell>
-                            <TableCell>{variant.quantity}</TableCell>
-                            <TableCell>
-                              {variant.isDefault && (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-700">Default</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No variants yet</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Images</h4>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="aspect-square bg-muted rounded-md flex items-center justify-center"
-                      >
-                        <Package className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <SheetFooter className="mt-6 flex gap-2">
-                {selectedProduct.status === "draft" && (
-                  <Button onClick={() => handleUpdateStatus("active")} className="flex-1">
-                    Activate Product
-                  </Button>
-                )}
-                {selectedProduct.status === "active" && (
-                  <Button variant="outline" onClick={() => handleUpdateStatus("archived")} className="flex-1">
-                    Archive Product
-                  </Button>
-                )}
-                {selectedProduct.status === "archived" && (
-                  <Button onClick={() => handleUpdateStatus("active")} className="flex-1">
-                    Reactivate Product
-                  </Button>
-                )}
-              </SheetFooter>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={addSheetOpen} onOpenChange={setAddSheetOpen}>
-        <SheetContent className="w-full sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Add Product</SheetTitle>
-            <SheetDescription>
-              Create a new product in your catalog
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Hex Head Screw 1/4-20 x 1in"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(v) => setFormData((prev) => ({ ...prev, categoryId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {flatCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.path}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="Product description"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isFeatured"
-                checked={formData.isFeatured}
-                onChange={(e) => setFormData((prev) => ({ ...prev, isFeatured: e.target.checked }))}
-                className="rounded"
-              />
-              <Label htmlFor="isFeatured" className="font-normal">Featured product</Label>
-            </div>
-          </div>
-
-          <SheetFooter className="mt-6">
-            <Button variant="outline" onClick={() => setAddSheetOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveProduct} disabled={!formData.name.trim() || createProduct.isPending}>
-              {createProduct.isPending ? "Creating..." : "Create Product"}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Bulk Update {selectedIds.size} Product{selectedIds.size > 1 ? "s" : ""}</DialogTitle>
-            <DialogDescription>
-              Toggle the fields you want to change. Only enabled fields will be updated.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="bulk-status"
-                checked={enabledBulkFields.has("status")}
-                onCheckedChange={() => toggleBulkField("status")}
-                className="mt-2.5"
-              />
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="bulk-status">Status</Label>
-                <Select
-                  value={bulkFields.status ?? ""}
-                  onValueChange={(v) => setBulkFields((f) => ({ ...f, status: v as ProductStatus }))}
-                  disabled={!enabledBulkFields.has("status")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="bulk-category"
-                checked={enabledBulkFields.has("categoryId")}
-                onCheckedChange={() => toggleBulkField("categoryId")}
-                className="mt-2.5"
-              />
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="bulk-category">Category</Label>
-                <Select
-                  value={bulkFields.categoryId ?? ""}
-                  onValueChange={(v) => setBulkFields((f) => ({ ...f, categoryId: v }))}
-                  disabled={!enabledBulkFields.has("categoryId")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {flatCategories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.path}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="bulk-price"
-                checked={enabledBulkFields.has("price")}
-                onCheckedChange={() => toggleBulkField("price")}
-                className="mt-2.5"
-              />
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="bulk-price">Price</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={bulkFields.price ?? ""}
-                  onChange={(e) => setBulkFields((f) => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
-                  disabled={!enabledBulkFields.has("price")}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="bulk-quantity"
-                checked={enabledBulkFields.has("quantity")}
-                onCheckedChange={() => toggleBulkField("quantity")}
-                className="mt-2.5"
-              />
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="bulk-quantity">Quantity</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={bulkFields.quantity ?? ""}
-                  onChange={(e) => setBulkFields((f) => ({ ...f, quantity: parseInt(e.target.value) || 0 }))}
-                  disabled={!enabledBulkFields.has("quantity")}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id="bulk-featured"
-                checked={enabledBulkFields.has("isFeatured")}
-                onCheckedChange={() => toggleBulkField("isFeatured")}
-              />
-              <div className="flex items-center gap-2">
-                <Label htmlFor="bulk-featured">Featured</Label>
-                {enabledBulkFields.has("isFeatured") && (
-                  <Select
-                    value={bulkFields.isFeatured === true ? "true" : bulkFields.isFeatured === false ? "false" : ""}
-                    onValueChange={(v) => setBulkFields((f) => ({ ...f, isFeatured: v === "true" }))}
-                  >
-                    <SelectTrigger className="w-24">
-                      <SelectValue placeholder="..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Yes</SelectItem>
-                      <SelectItem value="false">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleBulkUpdate}
-              disabled={enabledBulkFields.size === 0 || bulkUpdate.isPending}
-            >
-              {bulkUpdate.isPending ? "Updating..." : `Update ${selectedIds.size} Product${selectedIds.size > 1 ? "s" : ""}`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      )}
     </div>
   )
 }

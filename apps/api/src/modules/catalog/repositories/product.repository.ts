@@ -171,6 +171,8 @@ export class ProductRepository {
     limit: number;
     offset: number;
   }): Promise<{ products: ProductEntity[]; total: number }> {
+    console.log('[ProductRepository] findAllWithSearch called with options:', JSON.stringify(options, null, 2))
+    
     const where: any = {};
 
     if (options.search) {
@@ -208,6 +210,8 @@ export class ProductRepository {
       where.status = options.status;
     }
 
+    console.log('[ProductRepository] Final where clause:', JSON.stringify(where, null, 2))
+
     const [products, total] = await Promise.all([
       this.getClient().product.findMany({
         where,
@@ -218,6 +222,8 @@ export class ProductRepository {
       }),
       this.getClient().product.count({ where }),
     ]);
+
+    console.log('[ProductRepository] Found products:', products.length, 'total:', total)
 
     return { products, total };
   }

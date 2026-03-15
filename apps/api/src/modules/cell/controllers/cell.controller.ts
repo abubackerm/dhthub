@@ -8,6 +8,8 @@ import {
   Param,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { CellService } from '../services/cell.service';
 import { CreateCellDto } from '../dto/create-cell.dto';
@@ -79,6 +81,7 @@ export class CellAdminController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   delete(@Param('id') id: string) {
     return this.cellService.delete(id);
   }

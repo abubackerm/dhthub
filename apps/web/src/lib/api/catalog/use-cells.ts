@@ -17,6 +17,7 @@ import {
   type CellsQueryParams,
 } from './cells';
 import { toast } from 'sonner';
+import { CATEGORY_TREE_QUERY_KEY } from './use-categories';
 
 // Query keys
 export const cellKeys = {
@@ -80,6 +81,8 @@ export function useCreateCell() {
     onSuccess: (data) => {
       // Invalidate all cell list queries
       queryClient.invalidateQueries({ queryKey: cellKeys.all });
+      // Invalidate category tree to update cell count
+      queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       if (data.categoryId) {
         queryClient.invalidateQueries({
           queryKey: ['categories', 'detail', data.categoryId],
@@ -103,6 +106,8 @@ export function useUpdateCell() {
       // Invalidate all cell list queries
       queryClient.invalidateQueries({ queryKey: cellKeys.all });
       queryClient.invalidateQueries({ queryKey: cellKeys.detail(data.id) });
+      // Invalidate category tree to update cell count
+      queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       if (data.categoryId) {
         queryClient.invalidateQueries({
           queryKey: ['categories', 'detail', data.categoryId],
@@ -124,6 +129,8 @@ export function useDeleteCell() {
     onSuccess: () => {
       // Invalidate all cell list queries
       queryClient.invalidateQueries({ queryKey: cellKeys.all });
+      // Invalidate category tree to update cell count
+      queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       toast.success('Cell deleted successfully');
     },
     onError: (error) => {

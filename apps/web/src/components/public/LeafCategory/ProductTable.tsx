@@ -70,21 +70,21 @@ export function ProductTable({
   // Handle sort click
   const handleSort = useCallback(
     (columnSlug: string) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const urlParams = new URLSearchParams(searchParams.toString());
 
       if (sortColumn === columnSlug) {
         if (sortDirection === "asc") {
-          params.set("dir", "desc");
+          urlParams.set("dir", "desc");
         } else if (sortDirection === "desc") {
-          params.delete("sort");
-          params.delete("dir");
+          urlParams.delete("sort");
+          urlParams.delete("dir");
         }
       } else {
-        params.set("sort", columnSlug);
-        params.set("dir", "asc");
+        urlParams.set("sort", columnSlug);
+        urlParams.set("dir", "asc");
       }
 
-      router.push(`${basePath}?${params.toString()}`);
+      router.push(`${basePath}?${urlParams.toString()}`);
     },
     [router, searchParams, basePath, sortColumn, sortDirection]
   );
@@ -109,13 +109,13 @@ export function ProductTable({
   const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
 
   const goToPage = (newPage: number) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const urlParams = new URLSearchParams(searchParams.toString());
     if (newPage === 1) {
-      params.delete("page");
+      urlParams.delete("page");
     } else {
-      params.set("page", newPage.toString());
+      urlParams.set("page", newPage.toString());
     }
-    router.push(`${basePath}?${params.toString()}`);
+    router.push(`${basePath}?${urlParams.toString()}`);
   };
 
   return (

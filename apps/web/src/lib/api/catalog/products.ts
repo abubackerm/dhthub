@@ -21,6 +21,7 @@ export async function getProducts(
     searchParams.set('pageSize', String(params.pageSize));
   if (params.search) searchParams.set('search', params.search);
   if (params.categoryId) searchParams.set('categoryId', params.categoryId);
+  if (params.cellId) searchParams.set('cellId', params.cellId);
   if (params.status) searchParams.set('status', params.status);
 
   const qs = searchParams.toString();
@@ -50,6 +51,10 @@ export async function updateProduct(
 
 export async function hardDeleteProduct(id: string): Promise<void> {
   return apiClient.delete<void>(`/v1/catalog/products/${id}/hard`);
+}
+
+export async function removeVariant(productId: string, variantId: string): Promise<void> {
+  return apiClient.delete<void>(`/v1/catalog/products/${productId}/variants/${variantId}`);
 }
 
 export async function addVariant(

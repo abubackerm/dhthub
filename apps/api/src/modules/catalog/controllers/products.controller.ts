@@ -53,17 +53,31 @@ export class ProductsController {
 
   @Get()
   async findAll(@Query() query: ProductQueryDto): Promise<PaginatedResponseDto<ProductView>> {
+    console.log('[ProductsController] findAll called with query:', JSON.stringify(query, null, 2))
+    
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const offset = (page - 1) * pageSize;
 
+    console.log('[ProductsController] Querying with:', {
+      search: query.search,
+      categoryId: query.categoryId,
+      cellId: query.cellId,
+      status: query.status,
+      limit: pageSize,
+      offset,
+    })
+
     const { products, total } = await this.productService.findAllPaginated({
       search: query.search,
       categoryId: query.categoryId,
+      cellId: query.cellId,
       status: query.status,
       limit: pageSize,
       offset,
     });
+
+    console.log('[ProductsController] Found products:', products.length, 'total:', total)
 
     return {
       data: ProductView.fromEntities(products),
@@ -154,5 +168,14 @@ export class ProductsController {
     });
 
     return VariantView.fromEntity(variant as any);
+  }
+
+  @Delete(':productId/variants/:variantId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeVariant(
+    @Param('productId') productId: string,
+    @Param('variantId') variantId: string,
+  ): Promise<void> {
+    await this.productService.removeVariant(productId, variantId);
   }
 }

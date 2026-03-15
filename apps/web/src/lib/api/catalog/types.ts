@@ -192,6 +192,7 @@ export interface ProductsQueryParams {
   pageSize?: number;
   search?: string;
   categoryId?: string;
+  cellId?: string;
   status?: ProductStatus;
 }
 

@@ -48,6 +48,9 @@ import {
   type CreateCellInput,
   type UpdateCellInput,
   type CategoryTreeNode,
+  type AssignAttributeToCellInput,
+  type CellsQueryParams,
+  type AttributeView,
 } from "@/lib/api/catalog"
 import { Loader2 } from "lucide-react"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
@@ -320,7 +323,7 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-[800px] sm:max-w-[800px]">
+      <SheetContent className="w-[800px] sm:max-w-[800px] flex flex-col">
         <SheetHeader>
           <SheetTitle>Manage Cells</SheetTitle>
           <SheetDescription>
@@ -328,39 +331,39 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
-          {/* Cell List */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-lg">Cells</CardTitle>
-                <CardDescription>
-                  {cells.length} cell{cells.length !== 1 ? 's' : ''} in this category
-                </CardDescription>
-              </div>
-              <Button onClick={handleOpenCreateCell} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Cell
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <ScrollArea className="flex-1 mt-6">
+          <div className="space-y-6 pb-6">
+            {/* Cell List */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div>
+                  <CardTitle className="text-lg">Cells</CardTitle>
+                  <CardDescription>
+                    {cells.length} cell{cells.length !== 1 ? 's' : ''} in this category
+                  </CardDescription>
                 </div>
-              ) : cells.length === 0 ? (
-                <div className="text-center py-8">
-                  <Grid3x3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-sm text-muted-foreground mb-4">
-                    No cells created yet. Add your first cell to get started.
-                  </p>
-                  <Button onClick={handleOpenCreateCell} variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Cell
-                  </Button>
-                </div>
-              ) : (
-                <ScrollArea className="h-[400px]">
+                <Button onClick={handleOpenCreateCell} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Cell
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : cells.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Grid3x3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      No cells created yet. Add your first cell to get started.
+                    </p>
+                    <Button onClick={handleOpenCreateCell} variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Cell
+                    </Button>
+                  </div>
+                ) : (
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -372,8 +375,8 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                     >
                       <div className="space-y-2">
                         {cells.map((cell) => (
-                          <SortableCell 
-                            key={cell.id} 
+                          <SortableCell
+                            key={cell.id}
                             cell={cell}
                             onEdit={handleEditCell}
                             onDelete={handleDeleteCell}
@@ -382,82 +385,82 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                       </div>
                     </SortableContext>
                   </DndContext>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Create/Edit Cell Form */}
-          {(isCreatingCell || editingCell) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {editingCell ? "Edit Cell" : "Create New Cell"}
-                </CardTitle>
-                <CardDescription>
-                  {editingCell ? "Update cell details" : "Add a new cell to this category"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cell-name">Cell Name *</Label>
-                  <Input
-                    id="cell-name"
-                    value={cellFormData.name}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="e.g., Standard Hardware"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cell-slug">Slug</Label>
-                  <Input
-                    id="cell-slug"
-                    value={cellFormData.slug}
-                    onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
-                    placeholder="e.g., standard-hardware"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cell-description">Description</Label>
-                  <Textarea
-                    id="cell-description"
-                    value={cellFormData.description}
-                    onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
-                    placeholder="Describe this cell..."
-                    rows={3}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="cell-active">Active Status</Label>
-                  <Switch
-                    id="cell-active"
-                    checked={cellFormData.isActive}
-                    onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
-                  />
-                </div>
-                <SheetFooter className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsCreatingCell(false)
-                      setEditingCell(null)
-                      setCellFormData(initialCellFormData)
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveCell} disabled={createMutation.isPending || updateMutation.isPending}>
-                    {(createMutation.isPending || updateMutation.isPending) && (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    )}
-                    {editingCell ? "Update Cell" : "Create Cell"}
-                  </Button>
-                </SheetFooter>
+                )}
               </CardContent>
             </Card>
-          )}
-        </div>
+
+            {/* Create/Edit Cell Form */}
+            {(isCreatingCell || editingCell) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    {editingCell ? "Edit Cell" : "Create New Cell"}
+                  </CardTitle>
+                  <CardDescription>
+                    {editingCell ? "Update cell details" : "Add a new cell to this category"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cell-name">Cell Name *</Label>
+                    <Input
+                      id="cell-name"
+                      value={cellFormData.name}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      placeholder="e.g., Standard Hardware"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cell-slug">Slug</Label>
+                    <Input
+                      id="cell-slug"
+                      value={cellFormData.slug}
+                      onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
+                      placeholder="e.g., standard-hardware"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cell-description">Description</Label>
+                    <Textarea
+                      id="cell-description"
+                      value={cellFormData.description}
+                      onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
+                      placeholder="Describe this cell..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="cell-active">Active Status</Label>
+                    <Switch
+                      id="cell-active"
+                      checked={cellFormData.isActive}
+                      onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsCreatingCell(false)
+                        setEditingCell(null)
+                        setCellFormData(initialCellFormData)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveCell} disabled={createMutation.isPending || updateMutation.isPending}>
+                      {(createMutation.isPending || updateMutation.isPending) && (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      )}
+                      {editingCell ? "Update Cell" : "Create Cell"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   )

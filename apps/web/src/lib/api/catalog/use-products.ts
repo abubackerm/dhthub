@@ -13,6 +13,7 @@ import {
   createProduct,
   updateProduct,
   hardDeleteProduct,
+  removeVariant,
   addVariant,
   bulkUpdateProducts,
   type ProductView,
@@ -124,6 +125,24 @@ export function useBulkUpdateProducts(): UseMutationResult<
     },
     onError: (error: Error) => {
       console.error('Bulk update failed:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useRemoveVariant(): UseMutationResult<void, Error, { productId: string; variantId: string }> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, variantId }) => removeVariant(productId, variantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Variant removed successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to remove variant:', error);
       const errorMessage =
         error instanceof ApiError ? error.getErrorMessage() : error.message;
       toast.error(errorMessage);

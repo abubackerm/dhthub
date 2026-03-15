@@ -3,7 +3,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export interface ApiErrorResponse {
   statusCode: number;
   error: string;
-  message: string;
+  message: string | string[];
   timestamp: string;
   path: string;
 }
@@ -23,6 +23,10 @@ export class ApiError extends Error {
     if (typeof this.data === 'object' && this.data !== null) {
       const errorResponse = this.data as ApiErrorResponse;
       if (errorResponse.message) {
+        // Handle both string and array message formats (NestJS returns arrays)
+        if (Array.isArray(errorResponse.message)) {
+          return errorResponse.message.join(', ');
+        }
         return errorResponse.message;
       }
     }
