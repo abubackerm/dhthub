@@ -31,7 +31,7 @@ export class CsvParserService {
     } = options ?? {};
 
     let rowNumber = 0;
-    let headers: string[] = [];
+    let headersLogged = false;
 
     const parserStream = csvParser();
 
@@ -39,11 +39,10 @@ export class CsvParserService {
       for await (const row of fileStream.pipe(parserStream)) {
         rowNumber++;
 
-        // Capture headers on first row
-        if (rowNumber === 1) {
-          headers = Object.keys(row);
+        if (!headersLogged) {
+          const headers = Object.keys(row);
+          headersLogged = true;
 
-          // Validate required headers if provided
           if (validateHeaders) {
             const missingHeaders = validateHeaders.filter(
               (h) => !headers.includes(h),
@@ -55,14 +54,17 @@ export class CsvParserService {
             }
           }
 
-          this.logger.debug(`CSV headers: ${headers.join(', ')}`);
+          this.logger.log(`CSV headers: ${headers.join(', ')}`);
         }
 
+        this.logger.debug(`Parsed CSV row ${rowNumber}: ${JSON.stringify(row)}`);
         yield {
           rowNumber,
           data: row as CsvRow,
         };
       }
+
+      this.logger.log(`Finished parsing CSV: ${rowNumber} data rows`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -116,15 +118,19 @@ export class CsvParserService {
   }
 
   /**
-   * Count total rows in CSV file
+   * Count total data rows in CSV file (excludes header and empty rows)
    */
   async countRows(fileStream: Readable): Promise<number> {
     let count = 0;
     const parserStream = csvParser();
 
     try {
-      for await (const _ of fileStream.pipe(parserStream)) {
-        count++;
+      for await (const row of fileStream.pipe(parserStream)) {
+        const values = Object.values(row as Record<string, string>);
+        const hasData = values.some((v) => v !== undefined && v !== null && v.trim() !== '');
+        if (hasData) {
+          count++;
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

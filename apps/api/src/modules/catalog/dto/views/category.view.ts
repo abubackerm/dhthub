@@ -12,6 +12,10 @@ export class CategoryView {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  _count?: {
+    products: number;
+    cells?: number;
+  };
 
   static fromEntity(entity: CategoryEntity): CategoryView {
     const view = new CategoryView();
@@ -26,6 +30,9 @@ export class CategoryView {
     view.isActive = entity.isActive;
     view.createdAt = entity.createdAt;
     view.updatedAt = entity.updatedAt;
+    if ((entity as any)._count) {
+      view._count = (entity as any)._count;
+    }
     return view;
   }
 

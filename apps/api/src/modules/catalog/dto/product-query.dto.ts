@@ -37,6 +37,10 @@ export class ProductQueryDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsString()
+  cellId?: string;
+
+  @IsOptional()
   @IsEnum(ProductStatusQuery)
   status?: ProductStatusQuery;
 }

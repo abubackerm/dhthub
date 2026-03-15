@@ -15,7 +15,7 @@ import { ProductStatusDto } from './update-product.dto';
 export class BulkUpdateFieldsDto {
   @IsOptional()
   @IsString()
-  categoryId?: string;
+  cellId?: string;
 
   @IsOptional()
   @IsEnum(ProductStatusDto)

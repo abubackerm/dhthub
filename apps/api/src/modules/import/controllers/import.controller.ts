@@ -21,6 +21,7 @@ import { ImportJobStatus, ImportMode } from '../entities';
 import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
+import { TemplatePackService } from '../services/template-pack.service';
 
 @Controller('import')
 @UseGuards(AuthGuard, RolesGuard)
@@ -30,10 +31,11 @@ export class ImportController {
     private readonly importService: ImportService,
     private readonly importJobService: ImportJobService,
     private readonly importErrorRepository: ImportErrorRepository,
+    private readonly templatePackService: TemplatePackService,
   ) {}
 
   /**
-   * Upload CSV file and create import job
+   * Upload CSV or ZIP file and create import job
    * POST /v1/import/jobs
    */
   @Post('jobs')
@@ -65,6 +67,10 @@ export class ImportController {
     const warehouseId = fields?.warehouseId?.value as string | undefined;
 
     if (validateOnly === 'true') {
+      // Validate-only mode only supports CSV for now
+      if (!file.filename.endsWith('.csv')) {
+        throw new BadRequestException('Validate only mode only supports CSV files');
+      }
       const result = await this.importService.validateOnly(file, { createdBy });
       return {
         isValid: result.isValid,
@@ -75,11 +81,11 @@ export class ImportController {
       };
     }
 
-    const result = await this.importService.uploadCsv(file, {
-      createdBy,
-      mode,
-      warehouseId,
-    });
+    // Route to appropriate upload method based on file type
+    const isZip = file.filename.endsWith('.zip');
+    const result = isZip
+      ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId })
+      : await this.importService.uploadCsv(file, { createdBy, mode, warehouseId });
 
     return {
       jobId: result.jobId,
@@ -226,9 +232,9 @@ export class ImportController {
    * GET /v1/import/template
    */
   @Get('template')
-  async getTemplate(@Query('categoryId') categoryId?: string) {
-    const templateInfo = await this.importService.getTemplateInfo(categoryId);
-    const templateContent = await this.importService.getTemplate(categoryId);
+  async getTemplate(@Query('cellId') cellId?: string) {
+    const templateInfo = await this.importService.getTemplateInfo(cellId);
+    const templateContent = await this.importService.getTemplate(cellId);
 
     return {
       filename: templateInfo.filename,
@@ -243,14 +249,29 @@ export class ImportController {
    * GET /v1/import/template/download
    */
   @Get('template/download')
-  async downloadTemplate(@Query('categoryId') categoryId?: string) {
-    const templateContent = await this.importService.getTemplate(categoryId);
-    const templateInfo = await this.importService.getTemplateInfo(categoryId);
+  async downloadTemplate(@Query('cellId') cellId?: string) {
+    const templateContent = await this.importService.getTemplate(cellId);
+    const templateInfo = await this.importService.getTemplateInfo(cellId);
 
     return {
       filename: templateInfo.filename,
       contentType: 'text/csv',
       content: templateContent,
+    };
+  }
+
+  /**
+   * Download template pack (ZIP with all CSV templates + README)
+   * GET /v1/import/template-pack
+   */
+  @Get('template-pack')
+  async getTemplatePack() {
+    const zipBuffer = await this.templatePackService.generateTemplatePack();
+
+    return {
+      filename: 'catalog-import-templates.zip',
+      contentType: 'application/zip',
+      content: zipBuffer.toString('base64'),
     };
   }
 

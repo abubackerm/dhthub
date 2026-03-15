@@ -5,9 +5,10 @@ export class CategoryTreeView extends CategoryView {
   children: CategoryTreeView[];
   depth: number;
   productCount: number;
+  cellCount: number;
 
   static fromEntity(
-    entity: CategoryEntity & { _count?: { products?: number } },
+    entity: CategoryEntity & { _count?: { products?: number; cells?: number } },
     children: CategoryTreeView[] = [],
     depth: number = 0,
   ): CategoryTreeView {
@@ -26,6 +27,7 @@ export class CategoryTreeView extends CategoryView {
     view.children = children;
     view.depth = depth;
     view.productCount = entity._count?.products ?? 0;
+    view.cellCount = entity._count?.cells ?? 0;
     return view;
   }
 }

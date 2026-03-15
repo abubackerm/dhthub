@@ -10,8 +10,8 @@ import { ProductVariantRepository } from '@modules/catalog/repositories/product-
 import { ProductRepository } from '@modules/catalog/repositories/product.repository';
 import { VariantAttributeValueEntity } from '../entities';
 import { AttributeDataType } from '../entities/attribute-definition.entity';
-import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
 import { CacheService } from '@core/cache';
+import { CellRepository } from '@modules/cell';
 
 export interface AttributeValueInput {
   attributeId: string;
@@ -36,7 +36,7 @@ export class VariantAttributeService extends BaseService {
     private readonly attributeOptionRepo: AttributeOptionRepository,
     private readonly productVariantRepo: ProductVariantRepository,
     private readonly productRepo: ProductRepository,
-    private readonly categoryRepo: CategoryRepository,
+    private readonly cellRepo: CellRepository,
     private readonly cacheService: CacheService,
   ) {
     super(eventEmitter);
@@ -60,16 +60,16 @@ export class VariantAttributeService extends BaseService {
       throw new NotFoundException('Product not found');
     }
 
-    if (!product.categoryId) {
-      throw new CatalogAttributeErrors.InvalidAttributeValueError('', 'Variant must belong to a category');
+    if (!product.cellId) {
+      throw new CatalogAttributeErrors.InvalidAttributeValueError('', 'Variant must belong to a cell');
     }
 
-    const category = await this.categoryRepo.findById(product.categoryId);
-    if (!category) {
-      throw new NotFoundException('Category not found');
+    const cell = await this.cellRepo.findById(product.cellId);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
     }
 
-    const categoryAttributes = await this.categoryAttributeRepo.findByCategoryId(product.categoryId);
+    const categoryAttributes = await this.categoryAttributeRepo.findByCategoryId(cell.categoryId);
 
     const requiredAttributes = categoryAttributes
       .filter((ca) => ca.attribute.isRequired)
@@ -97,7 +97,7 @@ export class VariantAttributeService extends BaseService {
         (ca) => ca.attributeId === attr.attributeId,
       );
       if (!belongsToCategory) {
-        throw new CatalogAttributeErrors.AttributeNotAssignedToCategoryError(definition.name, category.name);
+        throw new CatalogAttributeErrors.AttributeNotAssignedToCategoryError(definition.name, cell.name);
       }
 
       this.validateValueType(definition, attr);
@@ -117,7 +117,7 @@ export class VariantAttributeService extends BaseService {
       if (!providedAttributeIds.has(requiredAttrId)) {
         const requiredAttrDef = await this.attributeRepo.findById(requiredAttrId);
         if (requiredAttrDef) {
-          throw new CatalogAttributeErrors.MissingRequiredAttributeError(requiredAttrDef.name, category.name);
+          throw new CatalogAttributeErrors.MissingRequiredAttributeError(requiredAttrDef.name, cell.name);
         }
       }
     }

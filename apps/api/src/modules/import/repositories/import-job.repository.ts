@@ -100,7 +100,7 @@ export class ImportJobRepository {
       processedRows: number;
       successRows: number;
       failedRows: number;
-      lastProcessedRow: number;
+      lastProcessedRow?: number;
     },
   ): Promise<ImportJobEntity> {
     return this.getClient().importJob.update({

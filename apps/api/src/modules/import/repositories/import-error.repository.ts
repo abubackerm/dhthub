@@ -53,6 +53,8 @@ export class ImportErrorRepository {
     rowNumber: number;
     sku?: string | null;
     message: string;
+    rawData?: any;
+    sourceFile?: string;
   }): Promise<ImportErrorEntity> {
     return this.getClient().importError.create({
       data: {
@@ -60,6 +62,8 @@ export class ImportErrorRepository {
         rowNumber: data.rowNumber,
         sku: data.sku ?? null,
         message: data.message,
+        rawData: data.rawData ?? null,
+        sourceFile: data.sourceFile ?? null,
       },
     });
   }

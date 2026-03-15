@@ -10,7 +10,7 @@ export interface CreateJobInput {
   fileUrl: string;
   fileName?: string;
   fileSize?: number;
-  type: 'CSV' | 'JSON';
+  type: 'CSV' | 'JSON' | 'ZIP';
   totalRows?: number;
   createdBy?: string;
   mode?: ImportMode;
@@ -195,6 +195,28 @@ export class ImportJobService {
   async markAsFailed(jobId: string): Promise<ImportJobEntity> {
     this.logger.error(`Marking job ${jobId} as failed`);
     return this.importJobRepository.markAsFailed(jobId);
+  }
+
+  /**
+   * Update job progress
+   */
+  async updateProgress(
+    jobId: string,
+    data: {
+      processedRows: number;
+      successRows: number;
+      failedRows: number;
+    },
+  ): Promise<ImportJobEntity> {
+    return this.importJobRepository.updateProgress(jobId, data);
+  }
+
+  /**
+   * Update total rows (used after ZIP extraction when row count is known)
+   */
+  async updateTotalRows(jobId: string, totalRows: number): Promise<ImportJobEntity> {
+    this.logger.log(`Updating totalRows for job ${jobId}: ${totalRows}`);
+    return this.importJobRepository.update(jobId, { totalRows });
   }
 
   /**

@@ -1,0 +1,14 @@
+productName,sku,category,diameter,length,thread-pitch,material,finish,grade,price,stock
+Hex Bolt M8,b12,industrial.fasteners.hex-bolts,,,,,,,1,1000
+Hex Bolt M9,b13,industrial.fasteners.hex-bolts,,,,,,,2,1000
+Hex Bolt M10,b14,industrial.fasteners.hex-bolts,,,,,,,3,1000
+Hex Bolt M11,b15,industrial.fasteners.hex-bolts,,,,,,,4,1000
+Hex Bolt M12,b16,industrial.fasteners.hex-bolts,,,,,,,5,1000
+Hex Bolt M13,b17,industrial.fasteners.hex-bolts,,,,,,,6,1000
+Hex Bolt M14,b18,industrial.fasteners.hex-bolts,,,,,,,7,1000
+Hex Bolt M15,b19,industrial.fasteners.hex-bolts,,,,,,,8,1000
+Hex Bolt M16,b20,industrial.fasteners.hex-bolts,,,,,,,9,1000
+Hex Bolt M17,b21,industrial.fasteners.hex-bolts,,,,,,,10,1000
+Hex Bolt M18,b22,industrial.fasteners.hex-bolts,,,,,,,11,1000
+Hex Bolt M19,b23,industrial.fasteners.hex-bolts,,,,,,,12,1000
+Hex Bolt M20,b24,industrial.fasteners.hex-bolts,,,,,,,13,1000

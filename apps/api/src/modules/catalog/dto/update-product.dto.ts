@@ -37,7 +37,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  categoryId?: string;
+  cellId?: string;
 
   @IsOptional()
   @IsEnum(ProductStatusDto)

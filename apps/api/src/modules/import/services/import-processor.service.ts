@@ -7,6 +7,7 @@ import { ImportProgressService } from './import-progress.service';
 import { CsvParserService, CsvRow } from './csv-parser.service';
 import { ImportValidationService, ValidationError } from './import-validation.service';
 import { ProductService } from '@modules/catalog/services/product.service';
+import { ImportFileType } from '../entities';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Readable } from 'stream';
@@ -28,7 +29,14 @@ export class ImportProcessorService {
 
   @OnEvent(IMPORT_EVENTS.JOB_CREATED, { async: true })
   async handleJobCreated(event: ImportJobCreatedEvent): Promise<void> {
-    this.logger.log(`Processing import job: ${event.jobId}`);
+    this.logger.log(`Processing import job: ${event.jobId}, type: ${event.type}`);
+
+    // Only process CSV file types with this processor
+    // ZIP files are handled by CatalogImportProcessorService -> BullMQ worker
+    if (event.type === ImportFileType.ZIP) {
+      this.logger.log(`Skipping ZIP job ${event.jobId} - handled by BullMQ worker`);
+      return;
+    }
 
     const workerId = `processor-${process.pid}`;
 
@@ -131,15 +139,15 @@ export class ImportProcessorService {
 
   private async createProductFromRow(
     row: CsvRow,
-    context: { categoryMap: Map<string, string> },
+    context: { cellMap: Map<string, string> },
   ): Promise<void> {
     const productName = row.productName!.trim();
     const sku = row.sku!.trim();
-    const categoryPath = row.category!.trim();
+    const cellPath = row.cell!.trim();
     const price = parseFloat(row.price!);
     const stock = parseInt(row.stock!, 10);
 
-    const categoryId = context.categoryMap.get(categoryPath) ?? null;
+    const cellId = context.cellMap.get(cellPath) ?? null;
 
     const slug = await this.productService.generateUniqueSlug(productName);
 
@@ -154,7 +162,7 @@ export class ImportProcessorService {
       null,
       undefined,
       stock,
-      categoryId,
+      cellId,
       false,
       null,
       undefined,

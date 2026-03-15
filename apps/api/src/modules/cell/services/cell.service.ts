@@ -1,0 +1,166 @@
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { CellRepository } from '../repositories/cell.repository';
+import { CreateCellDto } from '../dto/create-cell.dto';
+import { UpdateCellDto } from '../dto/update-cell.dto';
+import { AssignAttributeDto } from '../dto/assign-attribute.dto';
+import { Prisma } from '@prisma/client';
+
+@Injectable()
+export class CellService {
+  constructor(private readonly cellRepository: CellRepository) {}
+
+  async create(userId: string, dto: CreateCellDto) {
+    // Validate that categoryId is a leaf category
+    const category = await this.cellRepository.findLeafCategoryById(dto.categoryId);
+
+    if (!category.isLeaf) {
+      throw new BadRequestException('Cells can only be created under leaf categories (categories with no children)');
+    }
+
+    // Generate slug if not provided
+    const slug = dto.slug || this.generateSlug(dto.name);
+
+    // Check if slug already exists
+    const existingCell = await this.cellRepository.findBySlug(slug);
+    if (existingCell) {
+      throw new ConflictException('A cell with this slug already exists');
+    }
+
+    const cellData: Prisma.CellCreateInput = {
+      name: dto.name,
+      slug,
+      description: dto.description,
+      sortOrder: dto.sortOrder ?? 0,
+      isActive: dto.isActive ?? true,
+      category: {
+        connect: { id: dto.categoryId },
+      },
+      createdBy: userId,
+    };
+
+    return this.cellRepository.create(cellData);
+  }
+
+  async update(id: string, userId: string, dto: UpdateCellDto) {
+    const existingCell = await this.cellRepository.findById(id);
+    if (!existingCell) {
+      throw new NotFoundException('Cell not found');
+    }
+
+    // Generate slug if name is provided but slug is not
+    let slug = dto.slug;
+    if (dto.name && !slug) {
+      slug = this.generateSlug(dto.name);
+    }
+
+    // Check if new slug conflicts with existing cell (excluding current cell)
+    if (slug && slug !== existingCell.slug) {
+      const conflictCell = await this.cellRepository.findBySlug(slug);
+      if (conflictCell) {
+        throw new ConflictException('A cell with this slug already exists');
+      }
+    }
+
+    const updateData: Prisma.CellUpdateInput = {
+      ...(dto.name && { name: dto.name }),
+      ...(slug && { slug }),
+      ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
+      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      updatedBy: userId,
+    };
+
+    return this.cellRepository.update(id, updateData);
+  }
+
+  async delete(id: string) {
+    // Check if cell exists
+    const cell = await this.cellRepository.findById(id);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+
+    // Check if cell has products
+    const productCount = await this.cellRepository.countProducts(id);
+    if (productCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete cell because it has ${productCount} product(s). Move or delete the products first.`
+      );
+    }
+
+    return this.cellRepository.delete(id);
+  }
+
+  async findById(id: string) {
+    const cell = await this.cellRepository.findById(id);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+    return cell;
+  }
+
+  async findBySlug(slug: string) {
+    const cell = await this.cellRepository.findBySlug(slug);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+    return cell;
+  }
+
+  async findByCategoryId(categoryId: string, activeOnly: boolean = false) {
+    return this.cellRepository.findByCategoryId(categoryId, activeOnly);
+  }
+
+  async list(params: {
+    skip?: number;
+    take?: number;
+    categoryId?: string;
+    activeOnly?: boolean;
+  }) {
+    return this.cellRepository.list(params);
+  }
+
+  async assignAttribute(cellId: string, dto: AssignAttributeDto) {
+    // Check if cell exists
+    const cell = await this.cellRepository.findById(cellId);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+
+    return this.cellRepository.addAttribute(
+      cellId,
+      dto.attributeId,
+      dto.displayOrder ?? 0
+    );
+  }
+
+  async removeAttribute(cellId: string, attributeId: string) {
+    // Check if cell exists
+    const cell = await this.cellRepository.findById(cellId);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+
+    return this.cellRepository.removeAttribute(cellId, attributeId);
+  }
+
+  async getAttributes(cellId: string) {
+    // Check if cell exists
+    const cell = await this.cellRepository.findById(cellId);
+    if (!cell) {
+      throw new NotFoundException('Cell not found');
+    }
+
+    return this.cellRepository.getAttributes(cellId);
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+}

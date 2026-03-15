@@ -44,3 +44,27 @@
 
 - Auth pages use `(auth)` route group, so URLs are `/sign-in`, `/sign-up`, `/forgot-password` (no `/auth/` prefix)
 - All internal links must use these routes without the `/auth/` prefix
+
+- Use canonical Tailwind CSS variable syntax for project's DHT theme colors and variables
+- Always use `text-(--dht-red)` instead of `text-[var(--dht-red)]`
+- Always use `bg-(--dht-darker)` instead of `bg-[var(--dht-darker)]`
+- Always use `hover:text-(--dht-red-hover)` instead of `hover:text-[var(--dht-red-hover)]`
+- Data-slot selectors: `**:data-[slot=dialog-close]:text-white` instead of `[&_[data-slot=dialog-close]]:text-white`
+- This pattern applies to all `--dht-*` custom CSS variables in the workspace
+
+- Fix React hydration mismatches when server/client render differently based on auth state
+- Use `useState` with initial value matching server render, then update in `useEffect`
+- Example: `const [isAdmin, setIsAdmin] = useState(false)` + `useEffect(() => setIsAdmin(userRole === 'admin'), [userRole])`
+- Ensures initial render matches server HTML, then updates client-side after hydration
+- Required when using `authClient.useSession()` in client components with conditional rendering
+
+- Use `authClient.useSession()` from `@/lib/auth-client` in client components for auth state
+- Session data includes `session.user` object with optional properties like `role`
+- Check authentication: `const isAuthenticated = !!session?.user`
+- Access user data: `const userName = session?.user?.name || "Profile"`
+- For role checks: `const userRole = (session?.user as { role?: string } | undefined)?.role`
+
+- React Query `invalidateQueries` requires parent key for partial key matching
+- Invalidating `cellKeys.lists()` (e.g., `['cells', 'list']`) doesn't match specific queries like `['cells', 'list', {categoryId: 'xxx'}]`
+- Use parent key `cellKeys.all` (e.g., `['cells']`) to invalidate all child queries automatically
+- This pattern applies when queries use derived keys that include parameters beyond the base key

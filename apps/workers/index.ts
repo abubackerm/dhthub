@@ -15,5 +15,6 @@
 // Queue Configuration
 export * from './queue.config';
 
-// Import Worker
+// Import Workers
 export { ImportWorker } from './import.worker';
+export { CatalogImportWorker } from './catalog-import.worker';

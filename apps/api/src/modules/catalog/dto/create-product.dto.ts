@@ -35,7 +35,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  categoryId?: string;
+  cellId?: string;
 
   @IsOptional()
   @IsEnum(ProductTypeDto)

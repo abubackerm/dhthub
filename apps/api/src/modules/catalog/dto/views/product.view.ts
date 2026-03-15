@@ -9,7 +9,7 @@ export class ProductView {
   description: string | null;
   type: 'simple' | 'variable';
   status: 'draft' | 'active' | 'archived';
-  categoryId: string | null;
+  cellId: string | null;
   price: number | null;
   quantity: number;
   isFeatured: boolean;
@@ -29,7 +29,7 @@ export class ProductView {
     view.description = entity.description;
     view.type = entity.type as 'simple' | 'variable';
     view.status = entity.status as 'draft' | 'active' | 'archived';
-    view.categoryId = entity.categoryId;
+    view.cellId = entity.cellId;
     view.price = entity.price;
     view.quantity = entity.quantity;
     view.isFeatured = entity.isFeatured;

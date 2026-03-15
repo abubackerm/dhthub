@@ -14,6 +14,7 @@ export type PrismaDelegate<T> = {
   updateMany: (args: any) => Promise<{ count: number }>;
   count: (args?: any) => Promise<number>;
   createMany: (args: any) => Promise<{ count: number }>;
+  aggregate: (args?: any) => Promise<T>;
 };
 
 // Type for models accessible in transactions
@@ -83,6 +84,14 @@ export class DatabaseProvider {
 
   get variantAttributeValue(): PrismaDelegate<any> {
     return this.prisma.variantAttributeValue;
+  }
+
+  get cell(): PrismaDelegate<any> {
+    return this.prisma.cell;
+  }
+
+  get cellAttribute(): PrismaDelegate<any> {
+    return this.prisma.cellAttribute;
   }
 
   get price(): PrismaDelegate<any> {

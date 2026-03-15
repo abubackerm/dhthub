@@ -7,15 +7,14 @@ import {
   ProductNotFoundError,
   ProductSkuAlreadyExistsError,
   ProductSlugAlreadyExistsError,
-  CategoryNotFoundError,
   ProductVariantNotFoundError,
   InvalidProductOperationError,
   ProductVersionConflictError,
   CatalogProductLimitReachedError,
+  CellNotFoundError,
 } from '@shared/domain/errors';
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductVariantRepository } from '../repositories/product-variant.repository';
-import { CategoryRepository } from '../repositories/category.repository';
 import { ProductImageRepository } from '../repositories/product-image.repository';
 import { ProductEntity, ProductStatus, ProductType } from '../entities/product.entity';
 import { ProductVariantEntity } from '../entities/product-variant.entity';
@@ -28,6 +27,7 @@ import {
   ProductVariantDeletedEvent,
 } from '../events';
 import { VariantAttributeService } from '@modules/catalog-attributes/services/variant-attribute.service';
+import { CellRepository } from '@modules/cell';
 
 interface AttributeValue {
   attributeId: string;
@@ -42,10 +42,10 @@ export class ProductService extends BaseService {
     eventEmitter: EventEmitter2,
     private readonly productRepo: ProductRepository,
     private readonly variantRepo: ProductVariantRepository,
-    private readonly categoryRepo: CategoryRepository,
     private readonly imageRepo: ProductImageRepository,
     private readonly configService: ConfigService,
     @Optional() private readonly variantAttributeService?: VariantAttributeService,
+    @Optional() private readonly cellRepo?: CellRepository,
   ) {
     super(eventEmitter);
   }
@@ -61,7 +61,7 @@ export class ProductService extends BaseService {
     costPrice?: number | null,
     currency?: string,
     quantity?: number,
-    categoryId?: string | null,
+    cellId?: string | null,
     isFeatured?: boolean,
     metadata?: Record<string, unknown> | null,
     createdBy?: string,
@@ -86,10 +86,10 @@ export class ProductService extends BaseService {
       throw new ProductSlugAlreadyExistsError(slug);
     }
 
-    if (categoryId) {
-      const category = await this.categoryRepo.findById(categoryId);
-      if (!category) {
-        throw new CategoryNotFoundError(categoryId);
+    if (cellId && this.cellRepo) {
+      const cell = await this.cellRepo.findById(cellId);
+      if (!cell) {
+        throw new CellNotFoundError(cellId);
       }
     }
 
@@ -105,7 +105,7 @@ export class ProductService extends BaseService {
       costPrice,
       currency,
       quantity,
-      categoryId,
+      cellId,
       isFeatured,
       metadata,
       createdBy,
@@ -168,7 +168,7 @@ export class ProductService extends BaseService {
       costPrice: number | null;
       currency: string;
       quantity: number;
-      categoryId: string | null;
+      cellId: string | null;
       isFeatured: boolean;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
@@ -214,7 +214,7 @@ export class ProductService extends BaseService {
       costPrice: number | null;
       currency: string;
       quantity: number;
-      categoryId: string | null;
+      cellId: string | null;
       isFeatured: boolean;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
@@ -257,7 +257,7 @@ export class ProductService extends BaseService {
       status: ProductStatus;
       price: number | null;
       quantity: number;
-      categoryId: string | null;
+      cellId: string | null;
       isFeatured: boolean;
     }>,
   ): Promise<{ updatedCount: number }> {
@@ -266,18 +266,11 @@ export class ProductService extends BaseService {
       throw new ProductNotFoundError('No products found for given IDs');
     }
 
-    if (data.categoryId) {
-      const category = await this.categoryRepo.findById(data.categoryId);
-      if (!category) {
-        throw new CategoryNotFoundError(data.categoryId);
-      }
-    }
-
     const updateData: Record<string, unknown> = {};
     if (data.status !== undefined) updateData.status = data.status;
     if (data.price !== undefined) updateData.price = data.price;
     if (data.quantity !== undefined) updateData.quantity = data.quantity;
-    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+    if (data.cellId !== undefined) updateData.cellId = data.cellId;
     if (data.isFeatured !== undefined) updateData.isFeatured = data.isFeatured;
 
     const updatedCount = await this.productRepo.updateMany(ids, updateData as any);
@@ -556,6 +549,7 @@ export class ProductService extends BaseService {
   async findAllPaginated(options: {
     search?: string;
     categoryId?: string;
+    cellId?: string;
     status?: string;
     limit: number;
     offset: number;

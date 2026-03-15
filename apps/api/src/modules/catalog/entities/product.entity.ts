@@ -24,7 +24,7 @@ export class ProductEntity extends BaseEntity {
   costPrice: number | null;
   currency: string;
   quantity: number;
-  categoryId: string | null;
+  cellId: string | null;
   isFeatured: boolean;
   metadata: Record<string, unknown> | null;
 }

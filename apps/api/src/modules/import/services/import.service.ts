@@ -7,8 +7,7 @@ import { InvalidFileFormatError, InvalidImportDataError } from '../domain/errors
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CategoryAttributeService } from '@modules/catalog-attributes';
-import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
+import { CellRepository } from '@modules/cell/repositories/cell.repository';
 
 export interface UploadResult {
   jobId: string;
@@ -52,8 +51,7 @@ export class ImportService {
     private readonly importJobService: ImportJobService,
     private readonly csvParserService: CsvParserService,
     private readonly importValidationService: ImportValidationService,
-    private readonly categoryAttributeService: CategoryAttributeService,
-    private readonly categoryRepository: CategoryRepository,
+    private readonly cellRepository: CellRepository,
   ) {
     this.ensureUploadDirectory();
   }
@@ -150,6 +148,75 @@ export class ImportService {
   }
 
   /**
+   * Upload ZIP file and create import job
+   */
+  async uploadZip(
+    file: UploadedFile,
+    options?: {
+      createdBy?: string;
+      mode?: ImportMode;
+      warehouseId?: string;
+    },
+  ): Promise<UploadResult> {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    const originalname = file.originalname ?? file.filename;
+    if (file.mimetype !== 'application/zip' && !originalname.endsWith('.zip')) {
+      throw new InvalidFileFormatError(originalname, 'ZIP');
+    }
+
+    if (file.size > this.maxFileSizeBytes) {
+      throw new BadRequestException('ZIP file too large');
+    }
+
+    this.logger.log(`Uploading ZIP file: ${originalname} (${file.size} bytes)`);
+
+    // Save file to local filesystem
+    const timestamp = Date.now();
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const storageFileName = `${timestamp}-${originalname}`;
+    const relativePath = path.join('imports', `${year}`, `${month}`, storageFileName);
+    const filePath = path.join(this.uploadDir, relativePath);
+    const fileUrl = `/uploads/import/${relativePath.replace(/\\/g, '/')}`;
+
+    const fileDir = path.dirname(filePath);
+    if (!fs.existsSync(fileDir)) {
+      fs.mkdirSync(fileDir, { recursive: true });
+    }
+
+    fs.writeFileSync(filePath, file.buffer);
+
+    this.logger.debug(`File saved to: ${filePath}`);
+
+    // Create import job (will process ZIP later in worker)
+    const job = await this.importJobService.create({
+      fileUrl,
+      fileName: originalname,
+      fileSize: file.size,
+      type: ImportFileType.ZIP,
+      totalRows: 0, // Will be calculated after extraction
+      createdBy: options?.createdBy,
+      mode: options?.mode ?? undefined,
+      warehouseId: options?.warehouseId ?? undefined,
+      originalFilePath: relativePath.replace(/\\/g, '/'),
+    });
+
+    this.logger.log(`ZIP upload complete: job ${job.id}`);
+
+    return {
+      jobId: job.id,
+      fileUrl: job.fileUrl,
+      fileName: job.fileName ?? '',
+      fileSize: job.fileSize ?? 0,
+      totalRows: 0,
+    };
+  }
+
+  /**
    * Validate CSV file without importing (dry run)
    */
   async validateOnly(
@@ -226,16 +293,16 @@ export class ImportService {
   /**
    * Get CSV template content
    */
-  async getTemplate(categoryId?: string): Promise<string> {
+  async getTemplate(cellId?: string): Promise<string> {
     // Base columns that are always present
-    const baseHeaders = ['productName', 'sku', 'category', 'price', 'stock'];
+    const baseHeaders = ['productName', 'sku', 'cell', 'price', 'stock'];
 
-    if (!categoryId) {
-      // Fallback to a generic template when no category is provided
+    if (!cellId) {
+      // Fallback to a generic template when no cell is provided
       const headers = [
         'productName',
         'sku',
-        'category',
+        'cell',
         'diameter',
         'length',
         'material',
@@ -247,7 +314,7 @@ export class ImportService {
       const exampleRow = [
         'Hex Bolt M8',
         'BOLT-M8-20-ZINC',
-        'industrial.fasteners.hex-bolts',
+        'hex-bolts-standard',
         '8',
         '20',
         'steel',
@@ -260,7 +327,7 @@ export class ImportService {
         [
           'Hex Bolt M8',
           'BOLT-M8-25-ZINC',
-          'industrial.fasteners.hex-bolts',
+          'hex-bolts-standard',
           '8',
           '25',
           'steel',
@@ -271,7 +338,7 @@ export class ImportService {
         [
           'Hex Bolt M10',
           'BOLT-M10-30-ZINC',
-          'industrial.fasteners.hex-bolts',
+          'hex-bolts-standard',
           '10',
           '30',
           'steel',
@@ -288,18 +355,18 @@ export class ImportService {
       ].join('\n');
     }
 
-    // Category-specific template: include dynamic attribute columns based on assigned attributes
-    const category = await this.categoryRepository.findById(categoryId);
-    const categoryPath = category?.path ?? 'unknown.category';
+    // Cell-specific template: include dynamic attribute columns based on assigned attributes
+    const cell = await this.cellRepository.findById(cellId);
+    const cellSlug = cell?.slug ?? 'unknown-cell';
 
-    const categoryAttributes = await this.categoryAttributeService.getCategoryAttributes(categoryId);
-    const attributeHeaders = categoryAttributes
+    const cellAttributes = await this.cellRepository.getAttributes(cellId);
+    const attributeHeaders = cellAttributes
       .map((ca) => ca.attribute)
       .filter((attr): attr is { slug: string } => Boolean(attr && (attr as any).slug))
       .map((attr) => (attr as any).slug as string);
 
     const headers = [
-      ...baseHeaders.slice(0, 3), // productName, sku, category
+      ...baseHeaders.slice(0, 3), // productName, sku, cell
       ...attributeHeaders,
       ...baseHeaders.slice(3), // price, stock
     ];
@@ -307,7 +374,7 @@ export class ImportService {
     const exampleRow = [
       'Example Product',
       'SKU-001',
-      categoryPath,
+      cellSlug,
       ...attributeHeaders.map(() => ''),
       '0.50',
       '1000',
@@ -319,17 +386,17 @@ export class ImportService {
   /**
    * Get CSV template headers and description
    */
-  async getTemplateInfo(categoryId?: string) {
-    if (!categoryId) {
+  async getTemplateInfo(cellId?: string) {
+    if (!cellId) {
       return {
         filename: 'product-import-template.csv',
         headers: [
           { name: 'productName', required: true, description: 'Product name' },
           { name: 'sku', required: true, description: 'Unique SKU' },
           {
-            name: 'category',
+            name: 'cell',
             required: true,
-            description: 'Category path (e.g., industrial.fasteners.hex-bolts)',
+            description: 'Cell slug (e.g., hex-bolts-standard)',
           },
           { name: 'diameter', required: false, description: 'Numeric attribute' },
           { name: 'length', required: false, description: 'Numeric attribute' },
@@ -343,19 +410,19 @@ export class ImportService {
       };
     }
 
-    const categoryAttributes = await this.categoryAttributeService.getCategoryAttributes(categoryId);
+    const cellAttributes = await this.cellRepository.getAttributes(cellId);
 
     const baseHeaders = [
       { name: 'productName', required: true, description: 'Product name' },
       { name: 'sku', required: true, description: 'Unique SKU' },
       {
-        name: 'category',
+        name: 'cell',
         required: true,
-        description: 'Category path (e.g., industrial.fasteners.hex-bolts)',
+        description: 'Cell slug (e.g., hex-bolts-standard)',
       },
     ];
 
-    const attributeHeaders = categoryAttributes
+    const attributeHeaders = cellAttributes
       .map((ca) => ca.attribute)
       .filter(
         (attr): attr is { slug: string; name: string; isRequired?: boolean } =>
@@ -376,7 +443,7 @@ export class ImportService {
       filename: 'product-import-template.csv',
       headers: [...baseHeaders, ...attributeHeaders, ...tailHeaders],
       description:
-        'Template for bulk product import into the selected category. Attribute columns are generated from the category schema.',
+        'Template for bulk product import into the selected cell. Attribute columns are generated from the cell schema.',
     };
   }
 

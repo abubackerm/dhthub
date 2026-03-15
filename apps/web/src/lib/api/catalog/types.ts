@@ -16,6 +16,7 @@ export interface CategoryTreeNode extends Category {
   children: CategoryTreeNode[];
   depth: number;
   productCount: number;
+  cellCount?: number;
 }
 
 export interface CreateCategoryInput {
@@ -201,4 +202,57 @@ export interface BulkUpdateProductInput {
 
 export interface BulkUpdateResult {
   updatedCount: number;
+}
+
+// Cell Types
+export interface Cell {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  categoryId: string;
+  category?: Category;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CellWithAttributes extends Cell {
+  attributes: Array<{
+    cellAttributeId: string;
+    attributeId: string;
+    displayOrder: number;
+    attribute: AttributeView;
+  }>;
+  productCount: number;
+}
+
+export interface CreateCellInput {
+  name: string;
+  slug?: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  categoryId: string;
+}
+
+export interface UpdateCellInput {
+  name?: string;
+  slug?: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface AssignAttributeToCellInput {
+  attributeId: string;
+  displayOrder?: number;
+}
+
+export interface CellsQueryParams {
+  categoryId?: string;
+  activeOnly?: boolean;
+  page?: number;
+  pageSize?: number;
 }

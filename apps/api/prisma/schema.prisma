@@ -174,7 +174,7 @@ model Product {
   currency       String        @default("USD")
   // TRANSITIONAL: Stock moves to Inventory module
   quantity       Int           @default(0)
-  categoryId     String?       @map("category_id")
+  cellId         String?       @map("cell_id")
   isFeatured     Boolean       @default(false) @map("is_featured")
   metadata       Json?
   createdAt      DateTime      @default(now()) @map("created_at")
@@ -182,12 +182,12 @@ model Product {
   createdBy      String?       @map("created_by")
   updatedBy      String?       @map("updated_by")
 
-  category Category?        @relation(fields: [categoryId], references: [id])
+  cell     Cell?            @relation(fields: [cellId], references: [id])
   variants ProductVariant[]
   images   ProductImage[]
 
   @@index([status])
-  @@index([categoryId])
+  @@index([cellId])
   @@index([sku])
   @@index([slug])
   @@index([createdAt])
@@ -245,7 +245,7 @@ model Category {
 
   parent             Category?           @relation("CategoryTree", fields: [parentId], references: [id])
   children           Category[]          @relation("CategoryTree")
-  products           Product[]
+  cells              Cell[]
   categoryAttributes CategoryAttribute[]
 
   @@index([slug])
@@ -312,6 +312,7 @@ model AttributeDefinition {
   options            AttributeOption[]
   values             VariantAttributeValue[]
   categoryAttributes CategoryAttribute[]
+  cellAttributes     CellAttribute[]
 
   @@index([slug])
   @@index([dataType])
@@ -382,6 +383,46 @@ model CategoryAttribute {
   @@unique([categoryId, attributeId])
   @@index([categoryId, attributeId])
   @@map("category_attributes")
+}
+
+// ============================================
+// CELL MODULE - Cell Level in Catalog Hierarchy
+// ============================================
+
+model Cell {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  categoryId  String   @map("category_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+
+  category        Category           @relation(fields: [categoryId], references: [id])
+  products        Product[]
+  cellAttributes  CellAttribute[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@map("cells")
+}
+
+model CellAttribute {
+  id           String   @id @default(cuid())
+  cellId       String   @map("cell_id")
+  attributeId  String   @map("attribute_id")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  cell      Cell                @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  attribute AttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([cellId, attributeId])
+  @@map("cell_attributes")
 }
 
 // ============================================
@@ -530,6 +571,7 @@ model InventoryMovement {
 enum ImportFileType {
   CSV
   XLSX
+  ZIP
 }
 
 enum ImportJobStatus {
@@ -583,6 +625,8 @@ model ImportError {
   rowNumber Int      @map("row_number")
   sku       String?
   message   String
+  rawData   Json?    @map("raw_data")
+  sourceFile String?  @map("source_file")
   createdAt DateTime @default(now()) @map("created_at")
 
   job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)

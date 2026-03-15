@@ -16,7 +16,11 @@ export class VariantDocumentBuilder {
       include: {
         product: {
           include: {
-            category: true,
+            cell: {
+              include: {
+                category: true,
+              },
+            },
           },
         },
         images: {
@@ -42,8 +46,11 @@ export class VariantDocumentBuilder {
       productId: variant.productId,
       productName: variant.product.name,
       sku: variant.sku,
-      categoryId: variant.product.categoryId,
-      categoryPath: variant.product.category?.path ?? null,
+      cellId: variant.product.cellId,
+      categoryId: variant.product.cell?.categoryId ?? null,
+      categoryPath: variant.product.cell?.category?.path ?? null,
+      categoryName: variant.product.cell?.category?.name ?? null,
+      cellName: variant.product.cell?.name ?? null,
       price: pricing.price,
       currency: pricing.currency,
       stock: inventory.stock,

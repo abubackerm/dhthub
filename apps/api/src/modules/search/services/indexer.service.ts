@@ -140,10 +140,13 @@ export class IndexerService {
   async configureIndexSettings(indexName: string = this.ALIAS_NAME): Promise<void> {
     try {
       const settings: IndexSettings = {
-        searchableAttributes: ['productName', 'sku', 'categoryPath'],
+        searchableAttributes: ['productName', 'sku', 'categoryPath', 'cellName'],
         filterableAttributes: [
           'categoryPath',
           'categoryId',
+          'categoryName',
+          'cellId',
+          'cellName',
           'price',
           'stock',
           'attributes.material',

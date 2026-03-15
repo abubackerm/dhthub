@@ -1,16 +1,24 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bullmq';
 import { ImportController } from './controllers/import.controller';
+import { ImportWorkerController } from './controllers/import-worker.controller';
 import { ImportService } from './services/import.service';
 import { ImportJobService } from './services/import-job.service';
 import { CsvParserService } from './services/csv-parser.service';
 import { ImportValidationService } from './services/import-validation.service';
 import { ImportProgressService } from './services/import-progress.service';
 import { ImportProcessorService } from './services/import-processor.service';
+import { CatalogImportProcessorService } from './services/catalog-import-processor.service';
+import { TemplatePackService } from './services/template-pack.service';
+import { ZipExtractorService } from './services/zip-extractor.service';
+import { CatalogImportService } from './services/catalog-import.service';
+import { ImageImportService } from './services/image-import.service';
 import { ImportJobRepository } from './repositories/import-job.repository';
 import { ImportErrorRepository } from './repositories/import-error.repository';
 import { CoreModule } from '@core/core.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { CellModule } from '../cell/cell.module';
 import { CatalogAttributesModule } from '../catalog-attributes/catalog-attributes.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -19,8 +27,37 @@ import { InventoryModule } from '../inventory/inventory.module';
   imports: [
     CoreModule,
     EventEmitterModule,
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6380', 10),
+        password: process.env.REDIS_PASSWORD || undefined,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      },
+    }),
+    BullModule.registerQueue({
+      name: 'catalog-import',
+      defaultJobOptions: {
+        removeOnComplete: {
+          count: 100,
+          age: 3600,
+        },
+        removeOnFail: {
+          count: 500,
+          age: 7 * 24 * 3600,
+        },
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      },
+    }),
     // Import CatalogModule for ProductService, CategoryService, CategoryRepository
     CatalogModule,
+    // Import CellModule for CellRepository
+    CellModule,
     // Import CatalogAttributesModule for VariantAttributeService, AttributeDefinitionRepository
     CatalogAttributesModule,
     // Import PricingModule for PricingService, PriceRepository
@@ -28,15 +65,20 @@ import { InventoryModule } from '../inventory/inventory.module';
     // Import InventoryModule for InventoryService, WarehouseRepository
     InventoryModule,
   ],
-  controllers: [ImportController],
+  controllers: [ImportController, ImportWorkerController],
   providers: [
     // Services
     ImportService,
     ImportJobService,
     ImportProcessorService,
+    CatalogImportProcessorService,
     CsvParserService,
     ImportValidationService,
     ImportProgressService,
+    TemplatePackService,
+    ZipExtractorService,
+    CatalogImportService,
+    ImageImportService,
     // Repositories
     ImportJobRepository,
     ImportErrorRepository,

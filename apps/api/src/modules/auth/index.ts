@@ -6,3 +6,6 @@ export * from './contracts';
 export * from './events';
 export * from './repositories';
 export * from './services';
+export * from './auth.guard';
+export * from './roles.guard';
+export * from './roles.decorator';

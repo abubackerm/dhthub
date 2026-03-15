@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
+import { CellRepository } from '@modules/cell/repositories/cell.repository';
 import { ProductVariantRepository } from '@modules/catalog/repositories/product-variant.repository';
 import { AttributeDefinitionRepository } from '@modules/catalog-attributes/repositories/attribute-definition.repository';
-import { CategoryAttributeRepository } from '@modules/catalog-attributes/repositories/category-attribute.repository';
 import { AttributeOptionRepository } from '@modules/catalog-attributes/repositories/attribute-option.repository';
 import { AttributeDataType } from '@modules/catalog-attributes/entities';
 import { CsvRow } from './csv-parser.service';
@@ -21,10 +20,10 @@ export interface ValidationResult {
 }
 
 export interface ValidationContext {
-  categoryMap: Map<string, string>; // categoryPath -> categoryId
+  cellMap: Map<string, string>; // cellPath -> cellId
   attributeMap: Map<string, string>; // attributeSlug -> attributeId
   attributeOptionMap: Map<string, string>; // attributeSlug:optionValue -> optionId
-  requiredAttributesByCategory: Map<string, Set<string>>; // categoryId -> Set<attributeSlug>
+  requiredAttributesByCell: Map<string, Set<string>>; // cellId -> Set<attributeSlug>
   skuSet: Set<string>; // Set of existing SKUs for uniqueness check
 }
 
@@ -33,10 +32,9 @@ export class ImportValidationService {
   private readonly logger = new Logger(ImportValidationService.name);
 
   constructor(
-    private readonly categoryRepository: CategoryRepository,
+    private readonly cellRepository: CellRepository,
     private readonly productVariantRepository: ProductVariantRepository,
     private readonly attributeDefinitionRepository: AttributeDefinitionRepository,
-    private readonly categoryAttributeRepository: CategoryAttributeRepository,
     private readonly attributeOptionRepository: AttributeOptionRepository,
   ) {}
 
@@ -47,12 +45,12 @@ export class ImportValidationService {
   async buildValidationContext(): Promise<ValidationContext> {
     this.logger.debug('Building validation context...');
 
-    // Load all categories
-    const categories = await this.categoryRepository.findAll();
-    const categoryMap = new Map<string, string>();
-    for (const category of categories) {
-      if (category.path) {
-        categoryMap.set(category.path, category.id);
+    // Load all cells
+    const cells = await this.cellRepository.list({ activeOnly: false });
+    const cellMap = new Map<string, string>();
+    for (const cell of cells.cells) {
+      if (cell.slug) {
+        cellMap.set(cell.slug, cell.id);
       }
     }
 
@@ -76,15 +74,18 @@ export class ImportValidationService {
       }
     }
 
-    // Load required attributes by category
-    const categoryAttributes = await this.categoryAttributeRepository.findAll();
-    const requiredAttributesByCategory = new Map<string, Set<string>>();
-    for (const ca of categoryAttributes) {
-      const attr = await this.attributeDefinitionRepository.findById(ca.attributeId);
-      if (attr && attr.isRequired) {
-        const requiredAttrs = requiredAttributesByCategory.get(ca.categoryId) ?? new Set();
-        requiredAttrs.add(attr.slug);
-        requiredAttributesByCategory.set(ca.categoryId, requiredAttrs);
+    // Load required attributes by cell
+    const requiredAttributesByCell = new Map<string, Set<string>>();
+    for (const cell of cells.cells) {
+      const cellAttributes = await this.cellRepository.getAttributes(cell.id);
+      const requiredAttrs = requiredAttributesByCell.get(cell.id) ?? new Set();
+      for (const ca of cellAttributes) {
+        if (ca.attribute.isRequired) {
+          requiredAttrs.add(ca.attribute.slug);
+        }
+      }
+      if (requiredAttrs.size > 0) {
+        requiredAttributesByCell.set(cell.id, requiredAttrs);
       }
     }
 
@@ -98,16 +99,16 @@ export class ImportValidationService {
     }
 
     this.logger.debug(
-      `Validation context built: ${categoryMap.size} categories, ` +
+      `Validation context built: ${cellMap.size} cells, ` +
       `${attributeMap.size} attributes, ${attributeOptionMap.size} options, ` +
       `${skuSet.size} existing SKUs`,
     );
 
     return {
-      categoryMap,
+      cellMap,
       attributeMap,
       attributeOptionMap,
-      requiredAttributesByCategory,
+      requiredAttributesByCell,
       skuSet,
     };
   }
@@ -124,7 +125,7 @@ export class ImportValidationService {
     const errors: ValidationError[] = [];
 
     // Validate required columns
-    const requiredColumns = ['productName', 'sku', 'category', 'price', 'stock'];
+    const requiredColumns = ['productName', 'sku', 'cell', 'price', 'stock'];
     for (const col of requiredColumns) {
       if (!row[col]) {
         errors.push({
@@ -143,23 +144,23 @@ export class ImportValidationService {
     // Extract fields with type safety
     const productName = row.productName!;
     const sku = row.sku!;
-    const categoryPath = row.category!;
+    const cellPath = row.cell!;
     const price = row.price!;
     const stock = row.stock!;
 
-    // Validate category exists
-    const categoryId = context.categoryMap.get(categoryPath);
-    if (!categoryId) {
+    // Validate cell exists
+    const cellId = context.cellMap.get(cellPath);
+    if (!cellId) {
       errors.push({
         rowNumber,
         sku,
-        field: 'category',
-        message: `Category not found: ${categoryPath}`,
+        field: 'cell',
+        message: `Cell not found: ${cellPath}`,
         severity: 'error',
       });
     } else {
-      // Check required attributes for category
-      const requiredAttrs = context.requiredAttributesByCategory.get(categoryId);
+      // Check required attributes for cell
+      const requiredAttrs = context.requiredAttributesByCell.get(cellId);
       if (requiredAttrs && requiredAttrs.size > 0) {
         for (const requiredAttr of requiredAttrs) {
           if (!row[requiredAttr]) {
@@ -167,7 +168,7 @@ export class ImportValidationService {
               rowNumber,
               sku,
               field: requiredAttr,
-              message: `Missing required attribute for category: ${requiredAttr}`,
+              message: `Missing required attribute for cell: ${requiredAttr}`,
               severity: 'error',
             });
           }
@@ -232,7 +233,7 @@ export class ImportValidationService {
     // Validate attribute values
     for (const [key, value] of Object.entries(row)) {
       // Skip standard columns
-      if (['productName', 'sku', 'category', 'price', 'stock'].includes(key)) {
+      if (['productName', 'sku', 'cell', 'price', 'stock'].includes(key)) {
         continue;
       }
 
@@ -386,7 +387,7 @@ export class ImportValidationService {
   validateFileFormat(headers: string[]): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    const requiredHeaders = ['productName', 'sku', 'category', 'price', 'stock'];
+    const requiredHeaders = ['productName', 'sku', 'cell', 'price', 'stock'];
     const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
 
     if (missingHeaders.length > 0) {

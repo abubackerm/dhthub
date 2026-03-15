@@ -43,23 +43,48 @@ export class CategoryRepository {
         children: {
           orderBy: { sortOrder: 'asc' },
         },
-        _count: {
-          select: { products: true },
-        },
       },
     }) as any;
   }
 
-  async findAllWithProductCount(): Promise<CategoryEntity[]> {
+  async findAllWithProductCount(): Promise<any[]> {
     const client = this.getClient();
-    return client.category.findMany({
+    const categories = await client.category.findMany({
       orderBy: { sortOrder: 'asc' },
-      include: {
+    });
+
+    // Get all cells grouped by categoryId
+    const categoryIds = categories.map(c => c.id);
+    const cells = await client.cell.findMany({
+      where: {
+        categoryId: { in: categoryIds },
+      },
+      select: {
+        categoryId: true,
         _count: {
           select: { products: true },
         },
       },
-    }) as any;
+    });
+
+    // Aggregate product and cell counts per category
+    const countMap = new Map<string, { products: number; cells: number }>();
+    cells.forEach((cell: any) => {
+      const currentCounts = countMap.get(cell.categoryId) || { products: 0, cells: 0 };
+      countMap.set(cell.categoryId, {
+        products: currentCounts.products + cell._count.products,
+        cells: currentCounts.cells + 1,
+      });
+    });
+
+    // Add product and cell counts to each category
+    return categories.map(category => ({
+      ...category,
+      _count: {
+        products: countMap.get(category.id)?.products || 0,
+        cells: countMap.get(category.id)?.cells || 0,
+      },
+    }));
   }
 
   async findChildren(parentId: string): Promise<CategoryEntity[]> {
@@ -70,9 +95,6 @@ export class CategoryRepository {
       include: {
         children: {
           orderBy: { sortOrder: 'asc' },
-        },
-        _count: {
-          select: { products: true },
         },
       },
     }) as any;

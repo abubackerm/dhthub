@@ -44,8 +44,16 @@ export class ProductRepository {
   }
 
   async findByCategoryId(categoryId: string): Promise<ProductEntity[]> {
-    return this.getClient().product.findMany({
+    const cells = await this.getClient().cell.findMany({
       where: { categoryId },
+      select: { id: true },
+    });
+
+    if (cells.length === 0) return [];
+
+    const cellIds = cells.map((cell) => cell.id);
+    return this.getClient().product.findMany({
+      where: { cellId: { in: cellIds } },
     });
   }
 
@@ -67,7 +75,7 @@ export class ProductRepository {
     costPrice?: number | null;
     currency?: string;
     quantity?: number;
-    categoryId?: string | null;
+    cellId?: string | null;
     isFeatured?: boolean;
     metadata?: Record<string, unknown> | null;
     createdBy?: string;
@@ -85,7 +93,7 @@ export class ProductRepository {
         costPrice: data.costPrice ?? null,
         currency: data.currency ?? 'USD',
         quantity: data.quantity ?? 0,
-        categoryId: data.categoryId ?? null,
+        cellId: data.cellId ?? null,
         isFeatured: data.isFeatured ?? false,
         metadata: data.metadata ?? null,
         createdBy: data.createdBy,
@@ -107,7 +115,7 @@ export class ProductRepository {
       costPrice: number | null;
       currency: string;
       quantity: number;
-      categoryId: string | null;
+      cellId: string | null;
       isFeatured: boolean;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
@@ -128,7 +136,7 @@ export class ProductRepository {
       status: string;
       price: number | null;
       quantity: number;
-      categoryId: string | null;
+      cellId: string | null;
       isFeatured: boolean;
     }>,
   ): Promise<number> {
@@ -158,6 +166,7 @@ export class ProductRepository {
   async findAllWithSearch(options: {
     search?: string;
     categoryId?: string;
+    cellId?: string;
     status?: string;
     limit: number;
     offset: number;
@@ -178,7 +187,21 @@ export class ProductRepository {
     }
 
     if (options.categoryId) {
-      where.categoryId = options.categoryId;
+      // Find all cells under this category
+      const cells = await this.getClient().cell.findMany({
+        where: { categoryId: options.categoryId },
+        select: { id: true },
+      });
+
+      if (cells.length === 0) {
+        return { products: [], total: 0 };
+      }
+
+      where.cellId = { in: cells.map((cell) => cell.id) };
+    }
+
+    if (options.cellId) {
+      where.cellId = options.cellId;
     }
 
     if (options.status) {

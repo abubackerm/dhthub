@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Settings2,
   PlusCircle,
+  Grid3x3,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -53,6 +54,7 @@ import {
   type CreateCategoryInput,
   type UpdateCategoryInput,
 } from "@/lib/api/catalog"
+import { CellManagementSheet } from "./components/cell-management-sheet"
 
 interface CategoryFormData {
   name: string
@@ -109,6 +111,7 @@ interface CategoryTreeItemProps {
   onToggle: (id: string) => void
   onEdit: (category: CategoryTreeNode) => void
   onAddChild: (parentId: string) => void
+  onManageCells: (category: CategoryTreeNode) => void
   onManageSchema: (category: CategoryTreeNode) => void
   onDelete: (category: CategoryTreeNode) => void
 }
@@ -120,6 +123,7 @@ function CategoryTreeItem({
   onToggle,
   onEdit,
   onAddChild,
+  onManageCells,
   onManageSchema,
   onDelete,
 }: CategoryTreeItemProps) {
@@ -170,7 +174,7 @@ function CategoryTreeItem({
         {/* Count info */}
         <span className="text-xs text-muted-foreground min-w-20 text-right">
           {isLeaf
-            ? `${category.productCount} products`
+            ? `${category.cellCount ?? 0} cells, ${category.productCount} products`
             : `${childCount} subcategories`}
         </span>
 
@@ -205,6 +209,10 @@ function CategoryTreeItem({
             {isLeaf && (
               <>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onManageCells(category)}>
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  Manage Cells
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onManageSchema(category)}>
                   <Settings2 className="h-4 w-4 mr-2" />
                   Manage Schema
@@ -234,6 +242,7 @@ function CategoryTreeItem({
               onToggle={onToggle}
               onEdit={onEdit}
               onAddChild={onAddChild}
+              onManageCells={onManageCells}
               onManageSchema={onManageSchema}
               onDelete={onDelete}
             />
@@ -259,6 +268,10 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<CategoryTreeNode | null>(null)
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData)
   const [isAddingChild, setIsAddingChild] = useState(false)
+
+  // Cell management state
+  const [cellSheetOpen, setCellSheetOpen] = useState(false)
+  const [selectedCategoryForCells, setSelectedCategoryForCells] = useState<CategoryTreeNode | null>(null)
 
   const allCategoriesFlat = useMemo(() => getAllCategoriesFlat(categories), [categories])
 
@@ -306,6 +319,11 @@ export default function CategoriesPage() {
 
   const handleManageSchema = (category: CategoryTreeNode) => {
     toast.info(`Manage schema for "${category.name}" - Navigate to Attributes page`)
+  }
+
+  const handleManageCells = (category: CategoryTreeNode) => {
+    setSelectedCategoryForCells(category)
+    setCellSheetOpen(true)
   }
 
   const handleDeleteCategory = async (category: CategoryTreeNode) => {
@@ -485,6 +503,7 @@ export default function CategoriesPage() {
                   onToggle={handleToggle}
                   onEdit={handleEditCategory}
                   onAddChild={handleAddChild}
+                  onManageCells={handleManageCells}
                   onManageSchema={handleManageSchema}
                   onDelete={handleDeleteCategory}
                 />
@@ -619,6 +638,18 @@ export default function CategoriesPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* Cell Management Sheet */}
+      {selectedCategoryForCells && (
+        <CellManagementSheet
+          open={cellSheetOpen}
+          onClose={() => {
+            setCellSheetOpen(false)
+            setSelectedCategoryForCells(null)
+          }}
+          category={selectedCategoryForCells}
+        />
+      )}
     </div>
   )
 }

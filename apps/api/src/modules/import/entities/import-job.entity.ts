@@ -4,6 +4,7 @@ import { ImportJobStatus } from './import-job-status.enum';
 export enum ImportFileType {
   CSV = 'CSV',
   JSON = 'JSON',
+  ZIP = 'ZIP',
 }
 
 export enum ImportMode {

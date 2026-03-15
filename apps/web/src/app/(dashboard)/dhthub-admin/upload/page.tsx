@@ -8,6 +8,7 @@ import {
   Download,
   ChevronRight,
   Check,
+  Info,
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -31,7 +32,7 @@ import {
   createImportJob,
   downloadErrorCsv,
   downloadTemplate,
-  getCategoryAttributes,
+  downloadTemplatePack,
   getImportJob,
   getImportJobErrors,
   searchCategories,
@@ -39,6 +40,7 @@ import {
   type ImportMode,
   type ImportJobWithErrorsView,
 } from "@/lib/api/import"
+import { getCells, getCellAttributes, type Cell } from "@/lib/api/catalog"
 
 type UploadStep = 1 | 2 | 3
 type UploadState = "idle" | "uploading" | "success" | "errors"
@@ -47,6 +49,14 @@ type CategorySearchResult = {
   id: string
   name: string
   path: string
+}
+
+type CellSearchResult = {
+  id: string
+  name: string
+  slug: string
+  categoryId: string
+  categoryName: string
 }
 
 function formatCategoryPath(result: CategorySearchResult): string {
@@ -62,9 +72,12 @@ export default function UploadPage() {
   const [categoryResults, setCategoryResults] = useState<CategorySearchResult[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
   const [selectedCategory, setSelectedCategory] = useState<CategorySearchResult | null>(null)
+  const [cells, setCells] = useState<Cell[]>([])
+  const [selectedCellId, setSelectedCellId] = useState<string>("")
+  const [selectedCell, setSelectedCell] = useState<Cell | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadState, setUploadState] = useState<UploadState>("idle")
-  const [categoryAttributes, setCategoryAttributes] = useState<
+  const [cellAttributes, setCellAttributes] = useState<
     Array<{ id: string; name: string; slug: string; isRequired: boolean }>
   >([])
   const [importMode, setImportMode] = useState<ImportMode>("UPSERT")
@@ -99,16 +112,35 @@ export default function UploadPage() {
     }
   }, [categoryQuery])
 
+  // Load cells when category is selected
   useEffect(() => {
     if (!selectedCategoryId) {
-      setCategoryAttributes([])
+      setCells([])
       return
     }
 
     ;(async () => {
       try {
-        const attrs = await getCategoryAttributes(selectedCategoryId)
-        setCategoryAttributes(
+        const cellsData = await getCells({ categoryId: selectedCategoryId })
+        setCells(cellsData.data || [])
+      } catch (error) {
+        console.error("Failed to load cells", error)
+        toast.error("Failed to load cells")
+      }
+    })()
+  }, [selectedCategoryId])
+
+  // Load cell attributes when cell is selected
+  useEffect(() => {
+    if (!selectedCellId) {
+      setCellAttributes([])
+      return
+    }
+
+    ;(async () => {
+      try {
+        const attrs = await getCellAttributes(selectedCellId)
+        setCellAttributes(
           attrs.map((attr) => ({
             id: attr.id,
             name: attr.name,
@@ -117,11 +149,11 @@ export default function UploadPage() {
           })),
         )
       } catch (error) {
-        console.error("Failed to load category attributes", error)
-        toast.error("Failed to load category attributes")
+        console.error("Failed to load cell attributes", error)
+        toast.error("Failed to load cell attributes")
       }
     })()
-  }, [selectedCategoryId])
+  }, [selectedCellId])
 
   useEffect(() => {
     if (!isPolling || !job) return
@@ -155,6 +187,17 @@ export default function UploadPage() {
     const found = categoryResults.find((c) => c.id === categoryId) ?? null
     setSelectedCategoryId(categoryId)
     setSelectedCategory(found)
+    setCategoryQuery("")
+    setCategoryResults([])
+    // Reset cell selection when category changes
+    setSelectedCellId("")
+    setSelectedCell(null)
+  }
+
+  const handleCellSelect = (cellId: string) => {
+    const found = cells.find((c) => c.id === cellId) ?? null
+    setSelectedCellId(cellId)
+    setSelectedCell(found)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,10 +210,10 @@ export default function UploadPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
-    if (file && (file.name.endsWith(".csv") || file.name.endsWith(".xlsx"))) {
+    if (file && (file.name.endsWith(".csv") || file.name.endsWith(".xlsx") || file.name.endsWith(".zip"))) {
       setSelectedFile(file)
     } else {
-      toast.error("Please upload a CSV or Excel file")
+      toast.error("Please upload a CSV, Excel, or ZIP file")
     }
   }
 
@@ -199,7 +242,7 @@ export default function UploadPage() {
           successRows: 0,
           failedRows: 0,
           lastProcessedRow: 0,
-          type: "CSV",
+          type: selectedFile.name.endsWith('.zip') ? "ZIP" : "CSV",
           status: "PENDING",
           lockedAt: null,
           lockedBy: null,
@@ -232,7 +275,7 @@ export default function UploadPage() {
   }
 
   const handleDownloadTemplate = () => {
-    downloadTemplate(selectedCategoryId || undefined)
+    downloadTemplate(selectedCellId || undefined)
       .then((template) => {
         const blob = new Blob([template.content], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
@@ -247,6 +290,30 @@ export default function UploadPage() {
       .catch((error) => {
         console.error("Failed to download template", error)
         toast.error("Failed to download template")
+      })
+  }
+
+  const handleDownloadTemplatePack = () => {
+    downloadTemplatePack()
+      .then((templatePack) => {
+        const binaryString = atob(templatePack.content)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        const blob = new Blob([bytes], { type: templatePack.contentType })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = templatePack.filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      })
+      .catch((error) => {
+        console.error("Failed to download template pack", error)
+        toast.error("Failed to download template pack")
       })
   }
 
@@ -274,6 +341,9 @@ export default function UploadPage() {
     setStep(1)
     setSelectedCategoryId("")
     setSelectedCategory(null)
+    setCells([])
+    setSelectedCellId("")
+    setSelectedCell(null)
     setCategoryQuery("")
     setCategoryResults([])
     setSelectedFile(null)
@@ -294,9 +364,30 @@ export default function UploadPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Upload Products</h1>
         <p className="text-muted-foreground">
-          Bulk upload products into a leaf category using a CSV file
+          Bulk upload products into a cell using a CSV file
         </p>
       </div>
+
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Choose Your Import Method</AlertTitle>
+        <AlertDescription>
+          <div className="mt-2 space-y-2">
+            <div>
+              <strong className="text-sm font-medium">Single CSV Import:</strong>
+              <p className="text-sm text-muted-foreground">
+                Download template for one category → Fill → Upload CSV
+              </p>
+            </div>
+            <div>
+              <strong className="text-sm font-medium">Multi-CSV Catalog Import:</strong>
+              <p className="text-sm text-muted-foreground">
+                Download template pack → Fill 5 CSV files → ZIP → Upload
+              </p>
+            </div>
+          </div>
+        </AlertDescription>
+      </Alert>
 
       {/* Step Indicator */}
       <div className="flex items-center gap-4">
@@ -311,7 +402,7 @@ export default function UploadPage() {
             {step > 1 ? <Check className="h-4 w-4" /> : "1"}
           </div>
           <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
-            Select Category
+            Select Cell
           </span>
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -346,16 +437,16 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Step 1: Select Category */}
+      {/* Step 1: Select Cell */}
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Select a Leaf Category</CardTitle>
+            <CardTitle>Select a Cell</CardTitle>
             <CardDescription>
-              Choose the category where you want to upload products
+              Choose the cell where you want to upload products. First select a category, then select a cell.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="grid gap-2">
               <Label>Category</Label>
               <div className="space-y-2">
@@ -389,17 +480,53 @@ export default function UploadPage() {
             </div>
 
             {selectedCategory && (
+              <div className="grid gap-2">
+                <Label>Cell</Label>
+                {cells.length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-4 border rounded-md">
+                    No cells found in this category. Please create cells in the Categories page first.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="max-h-60 overflow-y-auto rounded-md border bg-popover text-sm shadow">
+                      {cells.map((cell) => (
+                        <button
+                          key={cell.id}
+                          type="button"
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent ${
+                            selectedCellId === cell.id ? "bg-accent" : ""
+                          }`}
+                          onClick={() => handleCellSelect(cell.id)}
+                        >
+                          <span className="font-medium">{cell.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {cell.slug}
+                          </span>
+                          <Badge variant={cell.isActive ? "default" : "secondary"} className="text-xs ml-auto">
+                            {cell.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedCell && (
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Selected Category</Label>
+                  <Label>Selected Cell</Label>
                   <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2">
                     <div>
-                      <div className="font-medium">{selectedCategory.name}</div>
+                      <div className="font-medium">{selectedCell.name}</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatCategoryPath(selectedCategory)}
+                        {selectedCell.description || "No description"}
                       </div>
                     </div>
-                    <Badge variant="outline">Leaf Category</Badge>
+                    <Badge variant={selectedCell.isActive ? "default" : "secondary"}>
+                      {selectedCell.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
                 </div>
 
@@ -407,7 +534,7 @@ export default function UploadPage() {
                   <div>
                     <p className="text-sm font-medium">CSV Template</p>
                     <p className="text-xs text-muted-foreground">
-                      Download a pre-formatted template with the correct columns for this category
+                      Download a pre-formatted template with the correct columns for this cell
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
@@ -416,7 +543,20 @@ export default function UploadPage() {
                   </Button>
                 </div>
 
-                {categoryAttributes.length > 0 && (
+                <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                  <div>
+                    <p className="text-sm font-medium">Template Pack (ZIP)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Download all catalog templates (products, variants, images, attributes) for multi-CSV import
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleDownloadTemplatePack}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Template Pack
+                  </Button>
+                </div>
+
+                {cellAttributes.length > 0 && (
                   <div className="grid gap-4">
                     <div>
                       <Label>Required & Optional Attributes</Label>
@@ -428,7 +568,7 @@ export default function UploadPage() {
                       <div>
                         <h3 className="mb-2 text-sm font-medium">Required Attributes</h3>
                         <div className="space-y-1">
-                          {categoryAttributes
+                          {cellAttributes
                             .filter((attr) => attr.isRequired)
                             .map((attr) => (
                               <div
@@ -446,7 +586,7 @@ export default function UploadPage() {
                       <div>
                         <h3 className="mb-2 text-sm font-medium">Optional Attributes</h3>
                         <div className="space-y-1">
-                          {categoryAttributes
+                          {cellAttributes
                             .filter((attr) => !attr.isRequired)
                             .map((attr) => (
                               <div
@@ -471,7 +611,7 @@ export default function UploadPage() {
               <Button variant="outline" asChild>
                 <Link href="/dhthub-admin/products">Cancel</Link>
               </Button>
-              <Button onClick={() => setStep(2)} disabled={!selectedCategoryId}>
+              <Button onClick={() => setStep(2)} disabled={!selectedCellId}>
                 Continue
               </Button>
             </div>
@@ -487,7 +627,7 @@ export default function UploadPage() {
               <div>
                 <CardTitle>Upload CSV File</CardTitle>
                 <CardDescription>
-                  Upload your product data in CSV format. We'll validate it before importing.
+                  Upload your product data in CSV format, or use ZIP for multi-CSV catalog imports. We'll validate it before importing.
                 </CardDescription>
               </div>
               <Badge variant="outline">Step 2 of 3</Badge>
@@ -522,7 +662,7 @@ export default function UploadPage() {
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
-                accept=".csv"
+                accept=".csv,.xlsx,.zip"
                 onChange={handleFileSelect}
               />
               <UploadIcon className="h-10 w-10 text-muted-foreground" />
@@ -531,7 +671,7 @@ export default function UploadPage() {
                 <p className="text-xs text-muted-foreground">or click to browse</p>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                CSV up to 200MB and 500k rows.
+                CSV up to 200MB and 500k rows, or ZIP with multiple CSV files.
               </p>
             </div>
 
@@ -577,7 +717,11 @@ export default function UploadPage() {
                   <AlertCircle className="h-4 w-4 animate-spin" />
                   <AlertTitle>Processing Import...</AlertTitle>
                   <AlertDescription>
-                    {job?.processedRows ?? 0} of {job?.totalRows ?? "?"} rows processed.
+                    {job?.status === "PENDING"
+                      ? "Waiting for worker to pick up the job..."
+                      : job?.totalRows
+                        ? `${job.processedRows} of ${job.totalRows} rows processed.`
+                        : "Extracting and processing files..."}
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -593,18 +737,18 @@ export default function UploadPage() {
                     Upload Complete
                   </AlertTitle>
                   <AlertDescription className="text-green-700 dark:text-green-400">
-                    {job.successRows} of {job.totalRows} rows imported successfully.
+                    {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully.
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
                   <div>
-                    <p className="text-2xl font-bold">{job.totalRows ?? 0}</p>
+                    <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
                     <p className="text-sm text-muted-foreground">Total Rows</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
-                    <p className="text-sm text-muted-foreground">Valid</p>
+                    <p className="text-sm text-muted-foreground">Imported</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{job.failedRows}</p>
@@ -633,18 +777,18 @@ export default function UploadPage() {
                     {job.successRows > 0 ? "Upload Completed with Errors" : "Upload Failed"}
                   </AlertTitle>
                   <AlertDescription className="text-amber-700 dark:text-amber-400">
-                    {job.successRows} of {job.totalRows} rows imported successfully. {job.failedRows} rows had errors.
+                    {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully. {job.failedRows} rows had errors.
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
                   <div>
-                    <p className="text-2xl font-bold">{job.totalRows ?? 0}</p>
+                    <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
                     <p className="text-sm text-muted-foreground">Total Rows</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
-                    <p className="text-sm text-muted-foreground">Valid</p>
+                    <p className="text-sm text-muted-foreground">Imported</p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold text-red-600">{job.failedRows}</p>

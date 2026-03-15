@@ -10,6 +10,7 @@ import { CartModule } from './modules/cart/cart.module';
 import { SearchModule } from './modules/search/search.module';
 import { ImportModule } from './modules/import/import.module';
 import { EnquiryModule } from './modules/enquiry/enquiry.module';
+import { CellModule } from './modules/cell/cell.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { EnquiryModule } from './modules/enquiry/enquiry.module';
     SearchModule,
     ImportModule,
     EnquiryModule,
+    CellModule,
   ],
 })
 export class AppModule {}

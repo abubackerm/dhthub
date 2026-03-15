@@ -6,6 +6,7 @@ export * from './role.errors';
 export * from './product.errors';
 export * from './product-variant.errors';
 export * from './category.errors';
+export * from './cell.errors';
 export * from './attribute.errors';
 export * from './variant.errors';
 export * from './catalog-attribute.errors';

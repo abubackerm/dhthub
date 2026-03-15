@@ -1,5 +1,4 @@
 import { apiClient } from './client';
-import type { CategoryAttributeView } from './catalog';
 
 export type ImportMode = 'CREATE_ONLY' | 'UPSERT' | 'UPDATE_ONLY';
 
@@ -70,23 +69,9 @@ export async function searchCategories(query: string, limit = 20, leafOnly = tru
   );
 }
 
-export async function getCategoryAttributes(categoryId: string) {
-  const attributes = await apiClient.get<CategoryAttributeView[]>(
-    `/v1/catalog/categories/${categoryId}/attributes`,
-  );
-
-  return attributes.map((item) => ({
-    id: item.attribute.id,
-    name: item.attribute.name,
-    slug: item.attribute.slug,
-    dataType: item.attribute.dataType,
-    isRequired: item.attribute.isRequired,
-  }));
-}
-
-export async function downloadTemplate(categoryId?: string) {
-  const endpoint = categoryId
-    ? `/v1/import/template?categoryId=${encodeURIComponent(categoryId)}`
+export async function downloadTemplate(cellId?: string) {
+  const endpoint = cellId
+    ? `/v1/import/template?cellId=${encodeURIComponent(cellId)}`
     : '/v1/import/template';
   return apiClient.get<{
     filename: string;
@@ -222,5 +207,14 @@ export async function downloadErrorCsv(id: string): Promise<Blob> {
   };
 
   return new Blob([content], { type: 'text/csv' });
+}
+
+export async function downloadTemplatePack() {
+  const endpoint = '/v1/import/template-pack';
+  return apiClient.get<{
+    filename: string;
+    contentType: string;
+    content: string;
+  }>(endpoint);
 }
 

@@ -13,7 +13,6 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { ProductService } from '../services/product.service';
-import { CategoryService } from '../services/category.service';
 import {
   CreateProductDto,
   CreateVariantDto,
@@ -27,18 +26,11 @@ import { PaginatedResponseDto } from '@shared/dto';
 
 @Controller('catalog/products')
 export class ProductsController {
-  constructor(
-    private readonly productService: ProductService,
-    private readonly categoryService: CategoryService,
-  ) {}
+  constructor(private readonly productService: ProductService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateProductDto): Promise<ProductView> {
-    if (dto.categoryId) {
-      await this.categoryService.findById(dto.categoryId);
-    }
-
     const slug = dto.slug ?? await this.productService.generateUniqueSlug(dto.name);
 
     const product = await this.productService.create(
@@ -52,7 +44,7 @@ export class ProductsController {
       null,
       'USD',
       dto.quantity ?? 0,
-      dto.categoryId ?? null,
+      dto.cellId ?? null,
       dto.isFeatured ?? false,
     );
 
@@ -87,7 +79,7 @@ export class ProductsController {
       status: dto.data.status as any,
       price: dto.data.price,
       quantity: dto.data.quantity,
-      categoryId: dto.data.categoryId,
+      cellId: dto.data.cellId,
       isFeatured: dto.data.isFeatured,
     });
   }
@@ -115,15 +107,11 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ): Promise<ProductView> {
-    if (dto.categoryId) {
-      await this.categoryService.findById(dto.categoryId);
-    }
-
     const product = await this.productService.update(id, {
       name: dto.name,
       slug: dto.slug,
       description: dto.description,
-      categoryId: dto.categoryId,
+      cellId: dto.cellId,
       status: dto.status as any,
       price: dto.price,
       quantity: dto.quantity,

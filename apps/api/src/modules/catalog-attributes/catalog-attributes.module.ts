@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CatalogModule } from '@modules/catalog/catalog.module';
+import { CellModule } from '@modules/cell/cell.module';
 import { AttributeDefinitionService } from './services/attribute-definition.service';
 import { AttributeOptionService } from './services/attribute-option.service';
 import { VariantAttributeService } from './services/variant-attribute.service';
@@ -17,7 +18,7 @@ import { CategoryAttributesController } from './controllers/category-attributes.
 import { VariantAttributesController } from './controllers/variant-attributes.controller';
 
 @Module({
-  imports: [EventEmitterModule, CatalogModule],
+  imports: [EventEmitterModule, CatalogModule, CellModule],
   controllers: [
     AttributesController,
     UnitsController,
