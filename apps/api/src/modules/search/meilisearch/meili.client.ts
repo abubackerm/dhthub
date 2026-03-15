@@ -15,6 +15,7 @@ export class MeiliClient extends MeiliSearch implements OnModuleDestroy {
     super({
       host: `${host}:${port}`,
       apiKey,
+      timeout: 5000, // 5s - fail fast if Meilisearch is unreachable
     });
 
     this.logger.log(`Meilisearch client initialized for ${host}:${port}`);

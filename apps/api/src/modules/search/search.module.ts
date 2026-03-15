@@ -50,6 +50,9 @@ export class SearchModule {
   constructor(private readonly indexerService: IndexerService) {}
 
   async onModuleInit() {
-    await this.indexerService.ensureIndex();
+    // Run ensureIndex in background so API starts even if Meilisearch is unavailable
+    this.indexerService.ensureIndex().catch(() => {
+      // Index creation failed; search will be degraded until Meilisearch is available
+    });
   }
 }

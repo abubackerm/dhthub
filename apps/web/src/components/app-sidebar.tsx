@@ -213,7 +213,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = authClient.useSession()
 
   const userRole = (session?.user as { role?: string } | undefined)?.role
-  const isAdmin = userRole === "admin" || userRole === "super_admin"
+  const [isAdmin, setIsAdmin] = React.useState(false)
+
+  React.useEffect(() => {
+    const nextIsAdmin = userRole === "admin" || userRole === "super_admin"
+    setIsAdmin(nextIsAdmin)
+  }, [userRole])
 
   const navGroups = React.useMemo(() => {
     return allNavGroups
