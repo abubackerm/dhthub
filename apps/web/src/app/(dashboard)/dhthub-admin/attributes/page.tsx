@@ -42,17 +42,37 @@ import {
   createAttribute,
   createAttributeOption,
   deleteAttributeOption,
+  deleteAttribute,
   getCategoryAttributes,
   removeAttributeFromCategory,
   updateAttribute,
   updateAttributeOption,
+  uploadAttributesCsv,
+  downloadAttributeTemplate,
+  getAllAttributes,
   useCategoryTree,
   type AttributeDataType,
   type AttributeFilterType,
   type CategoryAttributeView,
   type CategoryTreeNode,
+  type AttributeView,
 } from "@/lib/api/catalog"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs"
+import { Upload } from "lucide-react"
 
 type SheetMode = "create" | "edit" | "view"
 type FilterTypeValue = Exclude<AttributeFilterType, null> | "NONE"
@@ -71,7 +91,6 @@ interface AttributeFormData {
   sortOrder: number
   filterType: FilterTypeValue
   isFilterable: boolean
-  isRequired: boolean
   options: AttributeOptionDraft[]
 }
 
@@ -83,7 +102,6 @@ const initialFormData: AttributeFormData = {
   sortOrder: 1,
   filterType: "NONE",
   isFilterable: false,
-  isRequired: false,
   options: [],
 }
 
@@ -191,7 +209,6 @@ function formDataFromAttribute(record: CategoryAttributeView): AttributeFormData
     sortOrder: record.attribute.sortOrder,
     filterType: record.attribute.filterType ?? "NONE",
     isFilterable: record.attribute.isFilterable,
-    isRequired: record.attribute.isRequired,
     options: record.options.map((option) => ({
       id: option.id,
       label: option.label,
@@ -267,11 +284,17 @@ export default function AttributesPage() {
     [categoryTree],
   )
 
+  const [activeTab, setActiveTab] = useState<"global" | "assignment">("global")
   const [selectedCategoryId, setSelectedCategoryId] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetMode, setSheetMode] = useState<SheetMode>("create")
-  const [activeAttribute, setActiveAttribute] = useState<CategoryAttributeView | null>(null)
+  const [activeAttribute, setActiveAttribute] = useState<CategoryAttributeView | AttributeView | null>(null)
   const [formData, setFormData] = useState<AttributeFormData>(initialFormData)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [validateOnly, setValidateOnly] = useState(false)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
 
   useEffect(() => {
     if (!selectedCategoryId && leafCategories.length > 0) {
@@ -291,7 +314,17 @@ export default function AttributesPage() {
   } = useQuery({
     queryKey: ["category-attributes", selectedCategoryId],
     queryFn: () => getCategoryAttributes(selectedCategoryId),
-    enabled: Boolean(selectedCategoryId),
+    enabled: Boolean(selectedCategoryId) && activeTab === "assignment",
+  })
+
+  const {
+    data: globalAttributes = [],
+    isLoading: globalAttributesLoading,
+    error: globalAttributesError,
+  } = useQuery({
+    queryKey: ["global-attributes"],
+    queryFn: getAllAttributes,
+    enabled: activeTab === "global",
   })
 
   const createMutation = useMutation({
@@ -307,12 +340,13 @@ export default function AttributesPage() {
             ? payload.formData.filterType
             : undefined,
         isFilterable: payload.formData.isFilterable,
-        isRequired: payload.formData.isRequired,
       })
 
-      await assignAttributeToCategory(payload.categoryId, {
-        attributeId: attribute.id,
-      })
+      if (payload.categoryId) {
+        await assignAttributeToCategory(payload.categoryId, {
+          attributeId: attribute.id,
+        })
+      }
 
       if (payload.formData.dataType === "enum") {
         for (const [index, option] of payload.formData.options.entries()) {
@@ -325,9 +359,14 @@ export default function AttributesPage() {
       }
     },
     onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["category-attributes", variables.categoryId],
-      })
+      await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
+
+      if (variables.categoryId) {
+        await queryClient.invalidateQueries({
+          queryKey: ["category-attributes", variables.categoryId],
+        })
+      }
+
       toast.success("Attribute created successfully")
       handleCloseSheet()
     },
@@ -352,7 +391,6 @@ export default function AttributesPage() {
             ? payload.formData.filterType
             : undefined,
         isFilterable: payload.formData.isFilterable,
-        isRequired: payload.formData.isRequired,
       })
 
       const existingOptionIds = new Set(payload.record.options.map((option) => option.id))
@@ -414,6 +452,82 @@ export default function AttributesPage() {
     },
   })
 
+  const deleteGlobalAttributeMutation = useMutation({
+    mutationFn: async (attributeId: string) => deleteAttribute(attributeId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
+      toast.success("Attribute deleted successfully")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to delete attribute"))
+    },
+  })
+
+  const assignAttributeMutation = useMutation({
+    mutationFn: async (payload: { categoryId: string; attributeId: string }) => {
+      await assignAttributeToCategory(payload.categoryId, { attributeId: payload.attributeId })
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["category-attributes", variables.categoryId],
+      })
+      toast.success("Attribute assigned to category")
+      setAssignDialogOpen(false)
+      setSelectedAttributeToAssign("")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to assign attribute"))
+    },
+  })
+
+  const importMutation = useMutation({
+    mutationFn: async (payload: { file: File; validateOnly: boolean }) => {
+      return uploadAttributesCsv(payload.file, { validateOnly: payload.validateOnly })
+    },
+    onSuccess: async (result) => {
+      if (result.errors.length > 0) {
+        toast.error(`Import completed with ${result.errors.length} errors`)
+      } else {
+        toast.success(`Import successful: ${result.successRows} rows processed`)
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
+
+      if (selectedCategoryId) {
+        await queryClient.invalidateQueries({
+          queryKey: ["category-attributes", selectedCategoryId],
+        })
+      }
+
+      setImportDialogOpen(false)
+      setImportFile(null)
+      setValidateOnly(false)
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to import attributes"))
+    },
+  })
+
+  const downloadTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const blob = await downloadAttributeTemplate()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'attribute-templates.zip'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    },
+    onSuccess: () => {
+      toast.success("Template downloaded successfully")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to download template"))
+    },
+  })
+
   function handleCloseSheet() {
     setSheetOpen(false)
     setSheetMode("create")
@@ -435,6 +549,22 @@ export default function AttributesPage() {
     setSheetMode("edit")
     setActiveAttribute(record)
     setFormData(formDataFromAttribute(record))
+    setSheetOpen(true)
+  }
+
+  function openEditGlobalSheet(attribute: AttributeView) {
+    setSheetMode("edit")
+    setActiveAttribute(attribute as any)
+    setFormData({
+      name: attribute.name,
+      slug: attribute.slug,
+      dataType: attribute.dataType,
+      group: attribute.group ?? "",
+      sortOrder: attribute.sortOrder,
+      filterType: attribute.filterType ?? "NONE",
+      isFilterable: attribute.isFilterable,
+      options: [],
+    })
     setSheetOpen(true)
   }
 
@@ -466,6 +596,22 @@ export default function AttributesPage() {
       categoryId: selectedCategoryId,
       assignmentId: record.assignmentId,
     })
+  }
+
+  async function handleDeleteGlobal(attribute: AttributeView) {
+    const confirmed = await confirm({
+      title: "Delete global attribute?",
+      description: `Are you sure you want to delete "${attribute.name}"? This will remove it from all categories and cannot be undone.`,
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      variant: "destructive",
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    deleteGlobalAttributeMutation.mutate(attribute.id)
   }
 
   function handleNameChange(name: string) {
@@ -574,12 +720,19 @@ export default function AttributesPage() {
       return
     }
 
-    if (!selectedCategoryId) {
-      toast.error("Select a category first")
+    if (activeTab === "global" && sheetMode === "create") {
+      createMutation.mutate({
+        categoryId: "",
+        formData,
+      })
       return
     }
 
-    if (sheetMode === "create") {
+    if (activeTab === "assignment" && sheetMode === "create") {
+      if (!selectedCategoryId) {
+        toast.error("Select a category first")
+        return
+      }
       createMutation.mutate({
         categoryId: selectedCategoryId,
         formData,
@@ -588,9 +741,13 @@ export default function AttributesPage() {
     }
 
     if (sheetMode === "edit" && activeAttribute) {
+      if (activeTab === "assignment" && !selectedCategoryId) {
+        toast.error("Select a category first")
+        return
+      }
       updateMutation.mutate({
         categoryId: selectedCategoryId,
-        record: activeAttribute,
+        record: activeAttribute as CategoryAttributeView,
         formData,
       })
     }
@@ -605,10 +762,115 @@ export default function AttributesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Attributes</h1>
           <p className="text-muted-foreground">
-            Manage the live attribute schema for each leaf category.
+            {activeTab === "global"
+              ? "Manage global attribute definitions available across all categories."
+              : "Assign attributes to specific leaf categories."}
           </p>
         </div>
+        <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Import CSV
+        </Button>
       </div>
+
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "global" | "assignment")}>
+        <TabsList>
+          <TabsTrigger value="global">Global Attributes</TabsTrigger>
+          <TabsTrigger value="assignment">Category Assignment</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="global" className="mt-4">
+          <Card>
+            <CardHeader className="flex-row items-start justify-between space-y-0">
+              <div>
+                <CardTitle className="text-lg">Global Attributes</CardTitle>
+                <CardDescription>
+                  All attribute definitions available for category assignment
+                </CardDescription>
+              </div>
+              <Button onClick={openCreateSheet}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Attribute
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {globalAttributesLoading ? (
+                <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading attributes...
+                </div>
+              ) : globalAttributesError ? (
+                <div className="py-4 text-sm text-destructive">
+                  {getErrorMessage(globalAttributesError, "Failed to load attributes")}
+                </div>
+              ) : globalAttributes.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <p>No global attributes found.</p>
+                  <p className="mt-1 text-sm">Import CSV or create your first attribute.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Slug</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead>Filter</TableHead>
+                      <TableHead>Required</TableHead>
+                      <TableHead className="w-[140px] text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {globalAttributes.map((attribute) => (
+                      <TableRow key={attribute.id}>
+                        <TableCell className="font-medium">{attribute.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {attribute.slug}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{getDataTypeLabel(attribute.dataType)}</Badge>
+                        </TableCell>
+                        <TableCell>{attribute.group || "-"}</TableCell>
+                        <TableCell>{getFilterLabel(attribute.filterType)}</TableCell>
+                        <TableCell>
+                          {attribute.isRequired ? (
+                            <Check className="h-4 w-4 text-(--dht-green)" />
+                          ) : (
+                            <span className="text-muted-foreground">No</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditGlobalSheet(attribute)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteGlobal(attribute)}
+                              disabled={deleteGlobalAttributeMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="assignment" className="mt-4">
 
       <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
@@ -664,9 +926,9 @@ export default function AttributesPage() {
               </CardTitle>
               <CardDescription>{selectedCategory?.path ?? "No category selected"}</CardDescription>
             </div>
-            <Button onClick={openCreateSheet} disabled={!selectedCategory}>
+            <Button onClick={() => setAssignDialogOpen(true)} disabled={!selectedCategory}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Attribute
+              Assign Attribute
             </Button>
           </CardHeader>
           <CardContent>
@@ -712,7 +974,7 @@ export default function AttributesPage() {
                       <TableCell>{getFilterLabel(record.attribute.filterType)}</TableCell>
                       <TableCell>
                         {record.attribute.isRequired ? (
-                          <Check className="h-4 w-4 text-green-600" />
+                          <Check className="h-4 w-4 text-(--dht-green)" />
                         ) : (
                           <span className="text-muted-foreground">No</span>
                         )}
@@ -755,6 +1017,8 @@ export default function AttributesPage() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+      </Tabs>
 
       <Sheet open={sheetOpen} onOpenChange={(open) => (open ? setSheetOpen(true) : handleCloseSheet())}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
@@ -767,9 +1031,9 @@ export default function AttributesPage() {
                   : "View Attribute"}
             </SheetTitle>
             <SheetDescription>
-              {selectedCategory
+              {activeTab === "assignment" && selectedCategory
                 ? `Category: ${selectedCategory.path}`
-                : "Select a category to manage attributes."}
+                : "Managing global attribute definition."}
             </SheetDescription>
           </SheetHeader>
 
@@ -848,23 +1112,6 @@ export default function AttributesPage() {
                         ...prev,
                         sortOrder: Number(event.target.value) || 0,
                       }))
-                    }
-                    disabled={isReadOnly}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border px-3 py-3">
-                  <div className="grid gap-1">
-                    <Label htmlFor="attribute-required">Required</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Mark this attribute as mandatory for products.
-                    </p>
-                  </div>
-                  <Switch
-                    id="attribute-required"
-                    checked={formData.isRequired}
-                    onCheckedChange={(checked) =>
-                      setFormData((prev) => ({ ...prev, isRequired: checked }))
                     }
                     disabled={isReadOnly}
                   />
@@ -1004,6 +1251,156 @@ export default function AttributesPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Attribute to Category</DialogTitle>
+            <DialogDescription>
+              Select a global attribute to assign to {selectedCategory?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Attribute</Label>
+              <Select value={selectedAttributeToAssign} onValueChange={setSelectedAttributeToAssign}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an attribute" />
+                </SelectTrigger>
+                <SelectContent>
+                  {globalAttributes.map((attr) => (
+                    <SelectItem key={attr.id} value={attr.id}>
+                      {attr.name} ({attr.slug})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setAssignDialogOpen(false)
+              setSelectedAttributeToAssign("")
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedCategoryId && selectedAttributeToAssign) {
+                  assignAttributeMutation.mutate({
+                    categoryId: selectedCategoryId,
+                    attributeId: selectedAttributeToAssign,
+                  })
+                }
+              }}
+              disabled={!selectedAttributeToAssign || assignAttributeMutation.isPending}
+            >
+              {assignAttributeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Attributes</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or ZIP file to bulk import attribute definitions. Use the template below for the correct format.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => downloadTemplateMutation.mutate()}
+                disabled={downloadTemplateMutation.isPending}
+              >
+                {downloadTemplateMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Download Template
+              </Button>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Upload File</Label>
+              <Input
+                type="file"
+                accept=".csv,.zip"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    setImportFile(file)
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Upload a CSV or ZIP file containing attributes.csv and optionally attribute-options.csv
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="validate-only"
+                checked={validateOnly}
+                onCheckedChange={setValidateOnly}
+              />
+              <Label htmlFor="validate-only">Validate only (don't import)</Label>
+            </div>
+
+            {importFile && (
+              <div className="rounded-md border p-3 text-sm">
+                <div className="font-medium">{importFile.name}</div>
+                <div className="text-muted-foreground">{(importFile.size / 1024).toFixed(2)} KB</div>
+              </div>
+            )}
+
+            {importMutation.data?.errors && importMutation.data.errors.length > 0 && (
+              <div className="rounded-md border border-destructive p-3">
+                <div className="text-sm font-medium text-destructive">
+                  {importMutation.data.errors.length} errors found
+                </div>
+                <div className="mt-2 max-h-48 overflow-y-auto text-xs">
+                  {importMutation.data.errors.map((error, i) => (
+                    <div key={i} className="text-destructive">
+                      Row {error.rowNumber}: {error.message}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false)
+                setImportFile(null)
+                setValidateOnly(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (importFile) {
+                  importMutation.mutate({ file: importFile, validateOnly })
+                }
+              }}
+              disabled={!importFile || importMutation.isPending}
+            >
+              {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {validateOnly ? "Validate" : "Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

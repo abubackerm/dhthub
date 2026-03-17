@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useLeafPageData } from "@/lib/api/catalog/use-categories";
+import { useFilterContext } from "@/contexts/filter-context";
 import type {
   LeafPageView,
   LeafCellView,
@@ -12,9 +13,9 @@ import type {
   LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
-import { FilterPanel } from "./FilterPanel";
 import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MobileFilterToggle } from "./MobileFilterToggle";
 
 import { ChevronRight } from "lucide-react";
 
@@ -30,6 +31,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
   const { data, isLoading, error } = useLeafPageData(categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
+  const { setFilterData } = useFilterContext();
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
@@ -55,6 +57,22 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
     });
     return variants;
   }, [data]);
+
+  // Set filter data in context when data is loaded
+  useEffect(() => {
+    if (data && data.filterableAttributes.length > 0) {
+      setFilterData({
+        attributes: data.filterableAttributes,
+        variants: allVariants,
+        basePath,
+      });
+    } else {
+      setFilterData(null);
+    }
+
+    // Cleanup when unmounting
+    return () => setFilterData(null);
+  }, [data, allVariants, basePath, setFilterData]);
 
   const totalVariantCount = useMemo(() => allVariants.length, [allVariants]);
 
@@ -107,7 +125,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
   }
 
   return (
-    <div className="catalog-page leaf-page-active">
+    <div className="catalog-page">
       {/* Breadcrumb */}
       <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Link href="/" className="catalog-breadcrumb__link">Home</Link>
@@ -138,50 +156,36 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
         {totalVariantCount} item{totalVariantCount !== 1 ? "s" : ""} available
       </p>
 
-      {/* Layout: FilterPanel sidebar + Content */}
-      <div className="flex gap-8">
-        {/* Filter Panel as sidebar */}
-        {data.filterableAttributes.length > 0 && (
-          <div className="hidden lg:block">
-            <FilterPanel
-              attributes={data.filterableAttributes}
-              variants={allVariants}
-              basePath={basePath}
-            />
+      {/* Mobile Filter */}
+      {data.filterableAttributes.length > 0 && (
+        <div className="lg:hidden mb-4">
+          <MobileFilterToggle
+            attributes={data.filterableAttributes}
+            variants={allVariants}
+            basePath={basePath}
+          />
+        </div>
+      )}
+
+      {/* Main Content: cells > products > table */}
+      <div>
+        {filteredCells.length === 0 && (
+          <div className="text-center py-16 border rounded-lg bg-muted/20">
+            <p className="text-muted-foreground">No items match your filters.</p>
+            <Link href={basePath} className="text-(--dht-red) hover:underline mt-2 inline-block">
+              Clear all filters
+            </Link>
           </div>
         )}
 
-        {/* Main Content: cells > products > table */}
-        <div className="flex-1 min-w-0">
-          {/* Mobile Filter */}
-          {data.filterableAttributes.length > 0 && (
-            <div className="lg:hidden mb-4">
-              <FilterPanel
-                attributes={data.filterableAttributes}
-                variants={allVariants}
-                basePath={basePath}
-              />
-            </div>
-          )}
-
-          {filteredCells.length === 0 && (
-            <div className="text-center py-16 border rounded-lg bg-muted/20">
-              <p className="text-muted-foreground">No items match your filters.</p>
-              <Link href={basePath} className="text-(--dht-red) hover:underline mt-2 inline-block">
-                Clear all filters
-              </Link>
-            </div>
-          )}
-
-          {filteredCells.map((cell) => (
-            <CellSection
-              key={cell.id}
-              cell={cell}
-              basePath={basePath}
-              filterableAttributes={data.filterableAttributes}
-            />
-          ))}
-        </div>
+        {filteredCells.map((cell) => (
+          <CellSection
+            key={cell.id}
+            cell={cell}
+            basePath={basePath}
+            filterableAttributes={data.filterableAttributes}
+          />
+        ))}
       </div>
     </div>
   );
@@ -285,20 +289,15 @@ function LeafCategoryPageSkeleton() {
       </nav>
       <Skeleton className="h-8 w-64 mt-4" />
       <Skeleton className="h-4 w-48 mt-2" />
-      <div className="flex gap-8 mt-6">
-        <div className="hidden lg:block w-[260px]">
-          <Skeleton className="h-[500px] w-full rounded-lg" />
+      <div className="mt-6">
+        <div>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-6 w-36 mb-2" />
+          <Skeleton className="h-48 w-full" />
         </div>
-        <div className="flex-1 space-y-8">
-          <div>
-            <Skeleton className="h-6 w-48 mb-2" />
-            <Skeleton className="h-6 w-36 mb-2" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-          <div>
-            <Skeleton className="h-6 w-48 mb-2" />
-            <Skeleton className="h-48 w-full" />
-          </div>
+        <div>
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-48 w-full" />
         </div>
       </div>
     </div>

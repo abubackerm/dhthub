@@ -96,11 +96,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const userRole = (session?.user as { role?: string } | undefined)?.role
   const [isAdmin, setIsAdmin] = React.useState(false)
+  const [user, setUser] = React.useState({
+    name: "User",
+    email: "",
+    avatar: "",
+  })
 
   React.useEffect(() => {
     const nextIsAdmin = userRole === "admin" || userRole === "super_admin"
     setIsAdmin(nextIsAdmin)
   }, [userRole])
+
+  React.useEffect(() => {
+    setUser({
+      name: session?.user?.name || "User",
+      email: session?.user?.email || "",
+      avatar: session?.user?.image || "",
+    })
+  }, [session])
 
   const navGroups = React.useMemo(() => {
     return allNavGroups
@@ -116,12 +129,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         }),
       }))
   }, [isAdmin])
-
-  const user = {
-    name: session?.user?.name || "User",
-    email: session?.user?.email || "",
-    avatar: session?.user?.image || "",
-  }
 
   return (
     <Sidebar {...props}>

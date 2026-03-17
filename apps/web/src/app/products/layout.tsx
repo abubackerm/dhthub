@@ -1,6 +1,7 @@
 import { DHTHeader } from "@/app/(home)/components/dht-header";
 import { DHTFooter } from "@/app/(home)/components/dht-footer";
 import { CatalogSidebar } from "@/components/public/CatalogSidebar";
+import { FilterProvider } from "@/contexts/filter-context";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -20,10 +21,12 @@ export default function ProductsLayout({ children }: { children: React.ReactNode
 
       {/* Main Layout: Sidebar + Content */}
       <div className="catalog-layout">
-        <CatalogSidebar />
-        <main className="catalog-content">
-          {children}
-        </main>
+        <FilterProvider>
+          <CatalogSidebar />
+          <main className="catalog-content">
+            {children}
+          </main>
+        </FilterProvider>
       </div>
 
       <DHTFooter />

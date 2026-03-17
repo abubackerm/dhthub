@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is([data-dashboard-theme].dark *, html[data-dashboard-resolved-theme="dark"] [data-dashboard-theme] *));
 
 @theme inline {
   --font-sans: var(--font-inter);
@@ -87,7 +87,19 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
+/*
+ * Dark variables for the dashboard.
+ *
+ * Two selectors activate these:
+ *   1. [data-dashboard-theme].dark — after React mounts and sets the class
+ *   2. html[data-dashboard-resolved-theme="dark"] [data-dashboard-theme]
+ *      — before React hydrates, using the value the inline <script> wrote
+ *
+ * This prevents the light-mode flash on reload for dark-mode users while
+ * keeping the theme strictly scoped to the dashboard.
+ */
+[data-dashboard-theme].dark,
+html[data-dashboard-resolved-theme="dark"] [data-dashboard-theme] {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -130,6 +142,10 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  [data-dashboard-theme] {
+    color: var(--foreground);
   }
 }
 
@@ -267,26 +283,26 @@ html {
   background: #f0faf5;
 }
 
+/* Sidebar filter styles */
+.sidebar-filter {
+  padding: 0.75rem 1rem;
+}
+
+.sidebar-filter .accordion-trigger {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sidebar-filter .accordion-content {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* Content area */
 .catalog-content {
   flex: 1;
   min-width: 0;
   background: #fff;
-}
-
-/* Hide CatalogSidebar when a leaf page is displayed */
-.leaf-page-active ~ .catalog-sidebar,
-.catalog-layout:has(.leaf-page-active) > .catalog-sidebar {
-  display: none;
-}
-
-/* Allow proper width for breadcrumb in leaf pages */
-.catalog-layout:has(.leaf-page-active) .catalog-content {
-  min-width: auto;
-}
-
-.catalog-layout:has(.leaf-page-active) .catalog-page {
-  overflow-x: auto;
 }
 
 /* Catalog Page (inside content) */

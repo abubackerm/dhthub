@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useConsolidatedLeafData } from "@/lib/api/catalog/use-categories";
+import { useFilterContext } from "@/contexts/filter-context";
 import type {
   LeafCellView,
   LeafProductView,
@@ -11,9 +12,9 @@ import type {
   LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
-import { FilterPanel } from "./FilterPanel";
 import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MobileFilterToggle } from "./MobileFilterToggle";
 
 import { ChevronRight } from "lucide-react";
 
@@ -27,6 +28,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
   const { data, isLoading, error } = useConsolidatedLeafData(categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
+  const { setFilterData } = useFilterContext();
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
@@ -64,6 +66,22 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
     });
     return variants;
   }, [data?.leafCategories]);
+
+  // Set filter data in context when data is loaded
+  useEffect(() => {
+    if (data && data.filterableAttributes && data.filterableAttributes.length > 0) {
+      setFilterData({
+        attributes: data.filterableAttributes,
+        variants: allVariants,
+        basePath,
+      });
+    } else {
+      setFilterData(null);
+    }
+
+    // Cleanup when unmounting
+    return () => setFilterData(null);
+  }, [data, allVariants, basePath, setFilterData]);
 
   const totalVariantCount = useMemo(() => allVariants.length, [allVariants]);
 
@@ -126,7 +144,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
   }
 
   return (
-    <div className="catalog-page leaf-page-active">
+    <div className="catalog-page">
       {/* Breadcrumb */}
       <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Link href="/" className="catalog-breadcrumb__link">Home</Link>
@@ -149,78 +167,64 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
         {totalVariantCount} item{totalVariantCount !== 1 ? "s" : ""} available across {data.leafCategories.length} categor{data.leafCategories.length !== 1 ? "ies" : "y"}
       </p>
 
-      {/* Layout: FilterPanel sidebar + Content */}
-      <div className="flex gap-8">
-        {/* Filter Panel as sidebar */}
-        {data.filterableAttributes.length > 0 && (
-          <div className="hidden lg:block">
-            <FilterPanel
-              attributes={data.filterableAttributes}
-              variants={allVariants}
-              basePath={basePath}
-            />
+      {/* Mobile Filter */}
+      {data.filterableAttributes.length > 0 && (
+        <div className="lg:hidden mb-4">
+          <MobileFilterToggle
+            attributes={data.filterableAttributes}
+            variants={allVariants}
+            basePath={basePath}
+          />
+        </div>
+      )}
+
+      {/* Main Content: leaves > cells > products */}
+      <div>
+        {filteredLeafCategories.length === 0 && (
+          <div className="text-center py-16 border rounded-lg bg-muted/20">
+            <p className="text-muted-foreground">No items match your filters.</p>
+            <Link href={basePath} className="text-(--dht-red) hover:underline mt-2 inline-block">
+              Clear all filters
+            </Link>
           </div>
         )}
 
-        {/* Main Content: leaves > cells > products */}
-        <div className="flex-1 min-w-0">
-          {/* Mobile Filter */}
-          {data.filterableAttributes.length > 0 && (
-            <div className="lg:hidden mb-4">
-              <FilterPanel
-                attributes={data.filterableAttributes}
-                variants={allVariants}
-                basePath={basePath}
-              />
-            </div>
-          )}
+        {filteredLeafCategories.map((leafCat, leafIndex) => (
+          <div key={leafCat.id}>
+            {/* Separator between leaf categories */}
+            {leafIndex > 0 && (
+              <hr className="my-10 border-t-2 border-gray-300" />
+            )}
 
-          {filteredLeafCategories.length === 0 && (
-            <div className="text-center py-16 border rounded-lg bg-muted/20">
-              <p className="text-muted-foreground">No items match your filters.</p>
-              <Link href={basePath} className="text-(--dht-red) hover:underline mt-2 inline-block">
-                Clear all filters
-              </Link>
-            </div>
-          )}
+            {/* h1: Leaf category name */}
+            <h1 className="catalog-page__title">{leafCat.name}</h1>
+            {leafCat.description && (
+              <p className="text-muted-foreground mb-6 max-w-3xl">{leafCat.description}</p>
+            )}
 
-          {filteredLeafCategories.map((leafCat, leafIndex) => (
-            <div key={leafCat.id}>
-              {/* Separator between leaf categories */}
-              {leafIndex > 0 && (
-                <hr className="my-10 border-t-2 border-gray-300" />
-              )}
+            {/* Cells under this leaf */}
+            {leafCat.cells.map((cell) => (
+              <div key={cell.id} className="cell-section">
+                {/* h2: Cell name */}
+                <h2 className="text-xl font-semibold text-foreground mb-4">{cell.name}</h2>
+                {cell.description && (
+                  <p className="text-sm text-muted-foreground mb-4">{cell.description}</p>
+                )}
 
-              {/* h1: Leaf category name */}
-              <h1 className="catalog-page__title">{leafCat.name}</h1>
-              {leafCat.description && (
-                <p className="text-muted-foreground mb-6 max-w-3xl">{leafCat.description}</p>
-              )}
-
-              {/* Cells under this leaf */}
-              {leafCat.cells.map((cell) => (
-                <div key={cell.id} className="cell-section">
-                  {/* h2: Cell name */}
-                  <h2 className="text-xl font-semibold text-foreground mb-4">{cell.name}</h2>
-                  {cell.description && (
-                    <p className="text-sm text-muted-foreground mb-4">{cell.description}</p>
-                  )}
-
-                  {/* Products under this cell */}
-                  {cell.products.map((product) => (
-                    <ProductSection
-                      key={product.id}
-                      product={product}
-                      filterableAttributes={data.filterableAttributes}
-                      basePath={basePath}
-                      leafSlug={leafCat.slug}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+                {/* Products under this cell */}
+                {cell.products.map((product) => (
+                  <ProductSection
+                    key={product.id}
+                    product={product}
+                    filterableAttributes={data.filterableAttributes}
+                    basePath={basePath}
+                    leafSlug={leafCat.slug}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -295,22 +299,17 @@ function ConsolidatedLeafCategoryPageSkeleton() {
         <Skeleton className="h-4 w-32 ml-2" />
       </nav>
       <Skeleton className="h-4 w-48 mt-2 mb-6" />
-      <div className="flex gap-8">
-        <div className="hidden lg:block w-[260px]">
-          <Skeleton className="h-[500px] w-full rounded-lg" />
+      <div>
+        <div>
+          <Skeleton className="h-8 w-64 mb-4" />
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-6 w-36 mb-2" />
+          <Skeleton className="h-48 w-full" />
         </div>
-        <div className="flex-1 space-y-8">
-          <div>
-            <Skeleton className="h-8 w-64 mb-4" />
-            <Skeleton className="h-6 w-48 mb-2" />
-            <Skeleton className="h-6 w-36 mb-2" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-          <div>
-            <Skeleton className="h-8 w-64 mb-4" />
-            <Skeleton className="h-6 w-48 mb-2" />
-            <Skeleton className="h-48 w-full" />
-          </div>
+        <div>
+          <Skeleton className="h-8 w-64 mb-4" />
+          <Skeleton className="h-6 w-48 mb-2" />
+          <Skeleton className="h-48 w-full" />
         </div>
       </div>
     </div>

@@ -24,11 +24,21 @@ export async function createAttribute(
   return apiClient.post<AttributeView>('/v1/catalog/attributes', data);
 }
 
+export async function getAllAttributes(): Promise<AttributeView[]> {
+  return apiClient.get<AttributeView[]>('/v1/catalog/attributes');
+}
+
 export async function updateAttribute(
   id: string,
   data: UpdateAttributeInput,
 ): Promise<AttributeView> {
   return apiClient.patch<AttributeView>(`/v1/catalog/attributes/${id}`, data);
+}
+
+export async function deleteAttribute(
+  id: string,
+): Promise<void> {
+  return apiClient.delete<void>(`/v1/catalog/attributes/${id}`);
 }
 
 export async function assignAttributeToCategory(
@@ -86,4 +96,84 @@ export async function deleteAttributeOption(
   return apiClient.delete<void>(
     `/v1/catalog/attributes/${attributeId}/options/${optionId}`,
   );
+}
+
+export interface AttributeImportResult {
+  totalRows: number;
+  successRows: number;
+  failedRows: number;
+  createdAttributes: string[];
+  updatedAttributes: string[];
+  createdOptions: number;
+  updatedOptions: number;
+  errors: Array<{
+    rowNumber: number;
+    slug?: string;
+    message: string;
+  }>;
+}
+
+export interface AttributeTemplate {
+  filename: string;
+  headers: {
+    attributes: string[];
+    options: string[];
+  };
+  description: string;
+  files: {
+    attributes: {
+      filename: string;
+      content: string;
+    };
+    options: {
+      filename: string;
+      content: string;
+    };
+  };
+}
+
+export async function uploadAttributesCsv(
+  file: File,
+  options?: { validateOnly?: boolean },
+): Promise<AttributeImportResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const url = new URL(`${apiClient.defaults.baseURL}/v1/catalog/attributes/import`);
+  if (options?.validateOnly) {
+    url.searchParams.set('validateOnly', 'true');
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      // Don't set Content-Type, let FormData set it with boundary
+    },
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Upload failed');
+  }
+
+  return response.json();
+}
+
+export async function getAttributeTemplate(): Promise<AttributeTemplate> {
+  return apiClient.get<AttributeTemplate>('/v1/catalog/attributes/import/template');
+}
+
+export async function downloadAttributeTemplate(): Promise<Blob> {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/catalog/attributes/import/template/download`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to download template');
+  }
+
+  return response.blob();
 }

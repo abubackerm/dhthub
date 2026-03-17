@@ -2,11 +2,14 @@
  * Theme initialization script that runs before React hydration.
  * This prevents the "flash of unthemed content" (FOUC) issue.
  *
- * The script:
- * 1. Reads the theme preference from localStorage
- * 2. Resolves "system" theme using matchMedia
- * 3. Applies the correct class to the <html> element immediately
- * 4. Restores persisted color theme CSS variables from localStorage
+ * SCOPING: This script stores the resolved theme on a data attribute
+ * (`data-resolved-theme`) on `<html>` so the ThemeProvider's wrapper
+ * div can read it synchronously on first render. It does NOT add
+ * `dark` / `light` classes to `<html>` -- that would leak theme
+ * styles to public website pages.
+ *
+ * It also restores persisted color theme CSS variables from localStorage
+ * scoped under `[data-dashboard-theme]` selectors.
  */
 
 export function getThemeScript() {
@@ -20,12 +23,11 @@ export function getThemeScript() {
           resolvedTheme = 'dark';
         } else if (theme === 'system') {
           resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } else if (!theme) {
+          resolvedTheme = 'light';
         }
 
-        var root = document.documentElement;
-        root.classList.remove('light', 'dark');
-        root.classList.add(resolvedTheme);
-        root.setAttribute('data-theme-initialized', 'true');
+        document.documentElement.setAttribute('data-dashboard-resolved-theme', resolvedTheme);
 
         var raw = localStorage.getItem('dht-theme-customizer');
         if (raw) {
@@ -34,11 +36,11 @@ export function getThemeScript() {
           if (vars && typeof vars === 'object') {
             var keys = Object.keys(vars);
             for (var i = 0; i < keys.length; i++) {
-              root.style.setProperty('--' + keys[i], vars[keys[i]]);
+              document.documentElement.style.setProperty('--' + keys[i], vars[keys[i]]);
             }
           }
           if (config.radius) {
-            root.style.setProperty('--radius', config.radius);
+            document.documentElement.style.setProperty('--radius', config.radius);
           }
         }
       } catch (e) {

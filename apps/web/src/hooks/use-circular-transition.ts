@@ -22,9 +22,9 @@ export function useCircularTransition(): CircularTransitionHook {
     const x = (coords.x / window.innerWidth) * 100
     const y = (coords.y / window.innerHeight) * 100
 
-    // Set the CSS variables on document element
-    document.documentElement.style.setProperty('--x', `${x}%`)
-    document.documentElement.style.setProperty('--y', `${y}%`)
+    const dashboardRoot = document.querySelector<HTMLElement>('[data-dashboard-theme]') ?? document.documentElement
+    dashboardRoot.style.setProperty('--x', `${x}%`)
+    dashboardRoot.style.setProperty('--y', `${y}%`)
 
     // Check if View Transitions API is supported
     if ('startViewTransition' in document) {

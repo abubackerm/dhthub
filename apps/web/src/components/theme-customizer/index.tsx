@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useThemeManager } from '@/hooks/use-theme-manager'
+import { useTheme } from '@/hooks/use-theme'
 import { useSidebarConfig } from '@/contexts/sidebar-context'
 import { tweakcnThemes } from '@/config/theme-data'
 import { ThemeTab } from './theme-tab'
@@ -19,6 +20,7 @@ export interface ThemeCustomizerProps {
 
 export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
   const { isDarkMode, setBrandColorsValues, applyTheme, applyTweakcnTheme, applyRadius, resetTheme, loadPersistedConfig, updateBrandColorsFromTheme } = useThemeManager()
+  const { portalContainer } = useTheme()
   const { config: sidebarConfig, updateConfig: updateSidebarConfig } = useSidebarConfig()
 
   const [activeTab, setActiveTab] = React.useState("theme")
@@ -85,6 +87,7 @@ export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
         <SheetContent
           side={sidebarConfig.side === "left" ? "right" : "left"}
           className="w-[400px] p-0 gap-0 pointer-events-auto [&>button]:hidden overflow-hidden flex flex-col"
+          container={portalContainer}
         >
           <SheetHeader className="space-y-0 p-4 pb-2">
             <div className="flex items-center gap-2">

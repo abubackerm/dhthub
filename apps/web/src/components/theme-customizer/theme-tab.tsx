@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useThemeManager } from '@/hooks/use-theme-manager'
+import { useTheme } from '@/hooks/use-theme'
 import { useCircularTransition } from '@/hooks/use-circular-transition'
 import { colorThemes, tweakcnThemes } from '@/config/theme-data'
 import { radiusOptions } from '@/config/theme-customizer-constants'
@@ -36,6 +37,7 @@ export function ThemeTab({
     applyTweakcnTheme,
     applyRadius
   } = useThemeManager()
+  const { portalContainer } = useTheme()
 
   const { toggleTheme } = useCircularTransition()
 
@@ -95,7 +97,7 @@ export function ThemeTab({
           <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Choose Theme Preset 1" />
           </SelectTrigger>
-          <SelectContent className="max-h-60">
+          <SelectContent className="max-h-60" container={portalContainer}>
             <div className="p-2">
               {colorThemes.map((theme) => (
                 <SelectItem key={theme.value} value={theme.value} className="cursor-pointer">
@@ -151,7 +153,7 @@ export function ThemeTab({
           <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Choose Theme Preset 2" />
           </SelectTrigger>
-          <SelectContent className="max-h-60">
+          <SelectContent className="max-h-60" container={portalContainer}>
             <div className="p-2">
               {tweakcnThemes.map((theme) => (
                 <SelectItem key={theme.value} value={theme.value} className="cursor-pointer">

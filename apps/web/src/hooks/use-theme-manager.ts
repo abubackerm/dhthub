@@ -45,6 +45,10 @@ function clearPersistedConfig() {
   }
 }
 
+function getDashboardRoot(): HTMLElement {
+  return document.querySelector<HTMLElement>('[data-dashboard-theme]') ?? document.documentElement
+}
+
 export function useThemeManager() {
   const { theme, setTheme } = useTheme()
   const [brandColorsValues, setBrandColorsValues] = React.useState<Record<string, string>>({})
@@ -56,7 +60,7 @@ export function useThemeManager() {
   }, [theme])
 
   const clearCssVars = React.useCallback(() => {
-    const root = document.documentElement
+    const root = getDashboardRoot()
     const allPossibleVars = [
       'background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground',
       'primary', 'primary-foreground', 'secondary', 'secondary-foreground', 'muted', 'muted-foreground',
@@ -108,7 +112,7 @@ export function useThemeManager() {
 
     clearCssVars()
     const styles = darkMode ? found.preset.styles.dark : found.preset.styles.light
-    const root = document.documentElement
+    const root = getDashboardRoot()
 
     Object.entries(styles).forEach(([key, value]) => {
       root.style.setProperty(`--${key}`, value)
@@ -129,7 +133,7 @@ export function useThemeManager() {
   const applyTweakcnTheme = React.useCallback((themePreset: ThemePreset, darkMode: boolean) => {
     clearCssVars()
     const styles = darkMode ? themePreset.styles.dark : themePreset.styles.light
-    const root = document.documentElement
+    const root = getDashboardRoot()
 
     Object.entries(styles).forEach(([key, value]) => {
       root.style.setProperty(`--${key}`, value)
@@ -149,7 +153,7 @@ export function useThemeManager() {
   }, [clearCssVars, updateBrandColorsFromTheme])
 
   const applyImportedTheme = React.useCallback((themeData: ImportedTheme, darkMode: boolean) => {
-    const root = document.documentElement
+    const root = getDashboardRoot()
     const themeVars = darkMode ? themeData.dark : themeData.light
     
     Object.entries(themeVars).forEach(([variable, value]) => {
@@ -175,7 +179,7 @@ export function useThemeManager() {
   }, [])
 
   const applyRadius = React.useCallback((radius: string) => {
-    document.documentElement.style.setProperty('--radius', radius)
+    getDashboardRoot().style.setProperty('--radius', radius)
 
     const existing = loadPersistedConfig()
     if (existing) {
@@ -192,7 +196,7 @@ export function useThemeManager() {
   }, [])
 
   const handleColorChange = (cssVar: string, value: string) => {
-    document.documentElement.style.setProperty(cssVar, value)
+    getDashboardRoot().style.setProperty(cssVar, value)
   }
 
   return {

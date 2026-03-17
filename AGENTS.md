@@ -68,3 +68,43 @@
 - Invalidating `cellKeys.lists()` (e.g., `['cells', 'list']`) doesn't match specific queries like `['cells', 'list', {categoryId: 'xxx'}]`
 - Use parent key `cellKeys.all` (e.g., `['cells']`) to invalidate all child queries automatically
 - This pattern applies when queries use derived keys that include parameters beyond the base key
+
+- Dark/light mode theme is STRICTLY scoped to the dashboard — NEVER apply it globally
+- `ThemeProvider` must ONLY live in `apps/web/src/app/(dashboard)/dashboard-client.tsx`, NEVER in root layout
+- The root layout (`apps/web/src/app/layout.tsx`) must NOT import or render `ThemeProvider` or `SidebarConfigProvider`
+- `ThemeProvider` renders a `<div data-dashboard-theme>` wrapper with `dark`/`light` class — it does NOT touch `document.documentElement`
+- The Tailwind dark variant in `globals.css` is `@custom-variant dark (&:is([data-dashboard-theme].dark *));`
+- The `.dark` CSS variable block in `globals.css` uses `[data-dashboard-theme].dark` selector, not bare `.dark`
+- `useThemeManager` and `useCircularTransition` must use `document.querySelector('[data-dashboard-theme]')` instead of `document.documentElement`
+- The theme-init script in `<head>` sets `data-dashboard-resolved-theme` attribute on `<html>`, NOT `dark`/`light` classes
+- Public website pages (`(home)`, `about`, `products`, `(auth)`) always render in light mode with no theme switching
+
+- NestJS `ImportProgressService` has `markFailed(jobId, error)` method with error parameter
+- NestJS `ImportJobService` has `markAsFailed(jobId)` method with only jobId parameter
+- Import job services have different method signatures: ProgressService accepts error, JobService does not
+- Always verify method names and signatures when using services across different contexts
+- Method name `markAsFailed` (ImportProgressService) vs `markAsFailed` (ImportJobService) are different
+
+- Use `forwardRef()` to resolve circular dependencies between modules
+- Circular dependency occurs when ModuleA imports ModuleB and ModuleB imports ModuleA
+- Wrap module imports with `forwardRef(() => ModuleName)` in the imports array
+- Both modules involved must use `forwardRef()` for consistent resolution
+- Common pattern: ImportModule ↔ CatalogAttributesModule need forward references
+
+- Export all services from modules that are needed by other modules
+- `ImportModule.exports` determines what's available to importing modules
+- Required services like `ImportProgressService`, `ZipExtractorService` must be explicitly exported
+- Missing exports cause `UnknownDependenciesException` when services are injected but not available
+- Services needed by multiple modules should be exported from their source module
+
+- ZIP file imports use worker-based architecture with BullMQ for async processing
+- Standalone workers live in `apps/workers/` directory (e.g., `catalog-import.worker.ts`)
+- Workers consume from Redis queues and call API endpoints to process actual import
+- Workers use internal controllers (no auth) as trusted callers from worker processes
+- ZIP files are saved to `uploads/import/{year}/{month}/` with timestamp-based filenames
+- Import flow: Frontend upload → Save file & create job → Emit event → Enqueue to BullMQ → Worker processes
+- Workers enable resource-intensive operations (ZIP extraction, large CSV imports) without blocking API requests
+- Worker controllers provide internal endpoints like `/v1/import/worker/process-catalog` for worker callbacks
+- BullMQ queues configured with retry logic (3 attempts, exponential backoff) and job cleanup policies
+- ZIP extraction uses `adm-zip` library, normalizes filenames (removes `_template` suffix)
+- Multiple CSV files can be bundled in ZIP: products.csv, variants.csv (required), attributes.csv, images.csv
