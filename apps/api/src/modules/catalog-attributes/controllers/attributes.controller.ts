@@ -10,8 +10,13 @@ import {
   HttpStatus,
   HttpCode,
   NotFoundException,
+  Req,
+  Res,
+  UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
-import { AttributeDefinitionService } from '../services';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { AttributeDefinitionService, AttributeImportService } from '../services';
 import { AttributeOptionService } from '../services/attribute-option.service';
 import {
   CreateAttributeDto,
@@ -22,12 +27,18 @@ import {
 import { CreateAttributeOptionDto } from '../dto/create-attribute-option.dto';
 import { AttributeView } from '../dto/views/attribute.view';
 import { AttributeOptionView } from '../dto/views/attribute-option.view';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
+import { ImportService, UploadedFile } from '@modules/import/services/import.service';
 
 @Controller('catalog/attributes')
 export class AttributesController {
   constructor(
     private readonly attributeService: AttributeDefinitionService,
     private readonly optionService: AttributeOptionService,
+    private readonly importService: AttributeImportService,
+    private readonly importModuleService: ImportService,
   ) {}
 
   @Post()
@@ -151,5 +162,129 @@ export class AttributesController {
     }
 
     await this.optionService.delete(optionId);
+  }
+
+  @Post('import')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'super_admin')
+  async importAttributes(
+    @Req() req: FastifyRequest,
+    @Res() reply: FastifyReply,
+    @Query('validateOnly') validateOnly?: string,
+  ) {
+    const data = await req.file();
+    if (!data) {
+      throw new BadRequestException('No file provided');
+    }
+
+    const buffer = await data.toBuffer();
+    const filename = data.filename;
+    const createdBy = (data.fields as any)?.createdBy?.value;
+
+    const isZip = filename.endsWith('.zip');
+
+    // Handle ZIP files (async worker processing)
+    if (isZip) {
+      // Save ZIP file and create import job
+      const file: UploadedFile = {
+        fieldname: data.fieldname,
+        filename: data.filename,
+        encoding: data.encoding,
+        mimetype: data.mimetype,
+        buffer,
+        size: buffer.length,
+        originalname: data.filename,
+      };
+
+      const result = await this.importModuleService.uploadZip(file, { createdBy });
+      return reply.status(HttpStatus.ACCEPTED).send({
+        jobId: result.jobId,
+        fileUrl: result.fileUrl,
+        fileName: result.fileName,
+        fileSize: result.fileSize,
+        message: 'ZIP file upload accepted. Processing will begin shortly.',
+      });
+    }
+
+    // Handle CSV files (sync processing)
+    const path = require('path');
+    const fs = require('fs');
+    const os = require('os');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'attribute-import-'));
+    let attributesFile: string | null = null;
+    let optionsFile: string | null = null;
+
+    try {
+      const baseName = path.basename(filename).toLowerCase();
+      if (baseName === 'attributes.csv') {
+        attributesFile = path.join(tmpDir, 'attributes.csv');
+        fs.writeFileSync(attributesFile, buffer);
+      } else if (baseName === 'attribute-options.csv') {
+        optionsFile = path.join(tmpDir, 'attribute-options.csv');
+        fs.writeFileSync(optionsFile, buffer);
+      }
+
+      const result = await this.importService.importFromFiles(
+        attributesFile,
+        optionsFile,
+        {
+          validateOnly: validateOnly === 'true',
+          createdBy,
+        },
+      );
+
+      return result;
+    } finally {
+      try {
+        if (fs.existsSync(tmpDir)) {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      } catch (error) {
+        console.error('Failed to clean up temp directory:', error);
+      }
+    }
+  }
+
+  @Get('import/template')
+  async getTemplate() {
+    const template = await this.importService.generateTemplate();
+
+    return {
+      filename: 'attribute-templates.zip',
+      headers: {
+        attributes: ['name', 'slug', 'dataType', 'group', 'sortOrder', 'isFilterable', 'filterType', 'isRequired', 'unitSymbol'],
+        options: ['attributeSlug', 'label', 'value', 'sortOrder'],
+      },
+      description: 'Download attribute templates for bulk import. Include attributes.csv and optionally attribute-options.csv.',
+      files: {
+        attributes: {
+          filename: 'attributes.csv',
+          content: template.attributesCsv,
+        },
+        options: {
+          filename: 'attribute-options.csv',
+          content: template.optionsCsv,
+        },
+      },
+    };
+  }
+
+  @Get('import/template/download')
+  async downloadTemplate(@Res() reply: FastifyReply) {
+    const template = await this.importService.generateTemplate();
+
+    // Create ZIP file
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip();
+
+    zip.addFile('attributes.csv', template.attributesCsv);
+    zip.addFile('attribute-options.csv', template.optionsCsv);
+
+    const zipBuffer = zip.toBuffer();
+
+    reply
+      .type('application/zip')
+      .header('Content-Disposition', 'attachment; filename="attribute-templates.zip"')
+      .send(zipBuffer);
   }
 }

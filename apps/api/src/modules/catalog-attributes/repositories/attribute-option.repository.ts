@@ -7,7 +7,7 @@ import { AttributeOptionEntity } from '../entities';
 export class AttributeOptionRepository {
   constructor(private readonly db: DatabaseProvider) {}
 
-  private getClient(): TransactionClient | DatabaseProvider {
+  public getClient(): TransactionClient | DatabaseProvider {
     const tx = transactionContext.getStore();
     return tx ?? this.db;
   }

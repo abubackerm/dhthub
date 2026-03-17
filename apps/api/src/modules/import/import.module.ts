@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
 import { ImportController } from './controllers/import.controller';
@@ -59,7 +59,7 @@ import { InventoryModule } from '../inventory/inventory.module';
     // Import CellModule for CellRepository
     CellModule,
     // Import CatalogAttributesModule for VariantAttributeService, AttributeDefinitionRepository
-    CatalogAttributesModule,
+    forwardRef(() => CatalogAttributesModule),
     // Import PricingModule for PricingService, PriceRepository
     PricingModule,
     // Import InventoryModule for InventoryService, WarehouseRepository
@@ -88,6 +88,9 @@ import { InventoryModule } from '../inventory/inventory.module';
     ImportJobService,
     ImportJobRepository,
     ImportErrorRepository,
+    CsvParserService,
+    ImportProgressService,
+    ZipExtractorService,
   ],
 })
 export class ImportModule {}

@@ -7,7 +7,7 @@ import { AttributeDefinitionEntity, AttributeDataType, AttributeFilterType } fro
 export class AttributeDefinitionRepository {
   constructor(private readonly db: DatabaseProvider) {}
 
-  private getClient(): TransactionClient | DatabaseProvider {
+  getClient(): TransactionClient | DatabaseProvider {
     const tx = transactionContext.getStore();
     return tx ?? this.db;
   }

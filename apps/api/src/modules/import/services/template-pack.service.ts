@@ -28,10 +28,10 @@ export class TemplatePackService {
    * Generate products.csv template
    */
   private generateProductsTemplate(): string {
-    const headers = ['product_slug', 'product_name', 'category_slug', 'description'];
+    const headers = ['product_slug', 'product_name', 'cell_slug', 'description'];
     const exampleRows = [
-      'wedge-anchor,Wedge Anchor,anchors,Steel wedge anchors for concrete fastening',
-      'hex-bolt,Hex Head Bolt,bolts,Standard hex bolts for general purpose',
+      'wedge-anchor,Wedge Anchor,wedge-anchors,Steel wedge anchors for concrete fastening',
+      'hex-bolt,Hex Head Bolt,hex-bolts,Standard hex bolts for general purpose',
     ];
 
     return [headers.join(','), ...exampleRows].join('\n');
@@ -149,12 +149,14 @@ Each row is a product family.
 Required columns:
 - product_slug: Unique identifier (e.g., wedge-anchor)
 - product_name: Display name
-- category_slug: Category path (e.g., anchors, industrial.fasteners.hex-bolts)
+- cell_slug: Cell slug where products should appear (e.g., wedge-anchors, hex-bolts)
+  - Cell must exist in database or will be created if category exists
+  - Use existing cell slug to avoid duplicate products
 - description: Product description
 
 Example:
-product_slug,product_name,category_slug,description
-wedge-anchor,Wedge Anchor,anchors,Steel wedge anchors for concrete fastening
+product_slug,product_name,cell_slug,description
+wedge-anchor,Wedge Anchor,wedge-anchors,Steel wedge anchors for concrete fastening
 
 variants.csv
 -----------
@@ -228,7 +230,7 @@ VALIDATION RULES
 
 2. products.csv:
    - product_slug must be unique
-   - category_slug must reference an existing category
+   - cell_slug must reference an existing cell or will be created if category exists
 
 3. images.csv:
    - sku must exist in variants.csv

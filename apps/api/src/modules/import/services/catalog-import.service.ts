@@ -217,16 +217,37 @@ export class CatalogImportService {
             }
           }
 
-          const product = await this.db.product.create({
-            data: {
-              slug: productSlug,
-              name: productName,
-              cellId: cellId,
-              description: description || null,
-              type: 'variable',
-              status: 'active',
-            },
+          // Upsert product - create if not exists, update if already exists
+          let product;
+          const existingProduct = await this.db.product.findUnique({
+            where: { slug: productSlug },
           });
+
+          if (existingProduct) {
+            // Update existing product
+            product = await this.db.product.update({
+              where: { id: existingProduct.id },
+              data: {
+                name: productName,
+                cellId: cellId,
+                description: description || existingProduct.description,
+              },
+            });
+            this.logger.log(`Updated existing product: ${productSlug}`);
+          } else {
+            // Create new product
+            product = await this.db.product.create({
+              data: {
+                slug: productSlug,
+                name: productName,
+                cellId: cellId,
+                description: description || null,
+                type: 'variable',
+                status: 'active',
+              },
+            });
+            this.logger.log(`Created new product: ${productSlug}`);
+          }
 
           productMap[productSlug] = {
             id: product.id,
@@ -415,17 +436,48 @@ export class CatalogImportService {
     await this.db.$transaction(async (prisma) => {
       for (const item of batch) {
         try {
-          const variant = await prisma.productVariant.create({
-            data: {
-              productId: item.productId,
-              sku: item.sku,
-              name: item.name,
-              price: item.price,
-              quantity: item.stock,
-              attributes: item.attributes as any,
-            },
+          // Check if variant already exists
+          const existingVariant = await prisma.productVariant.findUnique({
+            where: { sku: item.sku },
           });
 
+          let variant;
+          if (existingVariant) {
+            // Update existing variant
+            variant = await prisma.productVariant.update({
+              where: { id: existingVariant.id },
+              data: {
+                productId: item.productId,
+                name: item.name,
+                price: item.price,
+                quantity: item.stock,
+                attributes: item.attributes as any,
+              },
+            });
+            this.logger.debug(`Updated existing variant: ${item.sku}`);
+          } else {
+            // Create new variant
+            variant = await prisma.productVariant.create({
+              data: {
+                productId: item.productId,
+                sku: item.sku,
+                name: item.name,
+                price: item.price,
+                quantity: item.stock,
+                attributes: item.attributes as any,
+              },
+            });
+            this.logger.debug(`Created new variant: ${item.sku}`);
+          }
+
+          // Delete existing attribute values for this variant if updating
+          if (existingVariant) {
+            await prisma.variantAttributeValue.deleteMany({
+              where: { variantId: variant.id },
+            });
+          }
+
+          // Create/update attribute values
           for (const [attrSlug, value] of Object.entries(item.attributes)) {
             const attribute = context.attributeMap[attrSlug];
             if (!attribute) {

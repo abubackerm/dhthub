@@ -29,6 +29,7 @@ redisConnection.on('error', (err) => {
 export const QUEUES = {
   PRODUCT_IMPORT: 'product-import',
   CATALOG_IMPORT: 'catalog-import',
+  ATTRIBUTE_IMPORT: 'attribute-import',
   EMAIL: 'email',
   EXPORT: 'export',
   NOTIFICATION: 'notification',

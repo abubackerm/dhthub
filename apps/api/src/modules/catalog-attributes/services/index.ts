@@ -8,3 +8,6 @@ export { UnitService } from './unit.service';
 export type { CreateUnitData, UpdateUnitData } from './unit.service';
 export { CategoryAttributeService } from './category-attribute.service';
 export type { AssignCategoryAttributeData } from './category-attribute.service';
+export { AttributeImportService } from './attribute-import.service';
+export type { ImportOptions, AttributeImportSummary } from './attribute-import.service';
+export { AttributeImportProcessorService } from './attribute-import-processor.service';
