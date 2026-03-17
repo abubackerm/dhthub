@@ -7,6 +7,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useSidebarConfig } from "@/hooks/use-sidebar-config";
 import { ThemeProvider } from "@/components/theme-provider";
+import { getThemeScript } from "@/lib/theme-init";
+import Script from "next/script";
 
 export default function DashboardLayout({
   children,
@@ -16,8 +18,12 @@ export default function DashboardLayout({
   const { config } = useSidebarConfig();
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
-      <SidebarProvider
+    <>
+      <Script id="theme-init" strategy="beforeInteractive">
+        {getThemeScript()}
+      </Script>
+      <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
+        <SidebarProvider
         style={{
           "--sidebar-width": "16rem",
           "--sidebar-width-icon": "3rem",
@@ -65,6 +71,7 @@ export default function DashboardLayout({
           </>
         )}
       </SidebarProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </>
   );
 }

@@ -15,11 +15,23 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { X, SlidersHorizontal } from "lucide-react";
-import { Attribute, Product } from "@/lib/mock-data";
+import type {
+  LeafFilterableAttributeView,
+  LeafVariantView,
+  LeafAttributeValueView,
+} from "@/lib/api/catalog/types";
 
 interface FilterPanelProps {
-  attributes: Attribute[];
-  products: Product[];
+  attributes: LeafFilterableAttributeView[];
+  variants: Array<
+    LeafVariantView & {
+      productId: string;
+      productName: string;
+      productSlug: string;
+      cellId: string;
+      cellName: string;
+    }
+  >;
   basePath: string;
 }
 
@@ -29,21 +41,15 @@ interface FilterValue {
   value: string;
 }
 
-export function FilterPanel({ attributes, products, basePath }: FilterPanelProps) {
+export function FilterPanel({ attributes, variants, basePath }: FilterPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // Get filterable attributes
-  const filterableAttributes = useMemo(
-    () => attributes.filter((attr) => attr.isFilterable),
-    [attributes]
-  );
 
   // Parse current filters from URL
   const activeFilters = useMemo(() => {
     const filters: FilterValue[] = [];
-    
-    filterableAttributes.forEach((attr) => {
+
+    attributes.forEach((attr) => {
       if (attr.filterType === "RANGE") {
         const min = searchParams.get(`${attr.slug}_min`);
         const max = searchParams.get(`${attr.slug}_max`);
@@ -53,21 +59,17 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
         if (max) {
           filters.push({ key: `${attr.slug}_max`, label: `${attr.name} Max`, value: max });
         }
-      } else if (attr.filterType === "TOGGLE") {
-        const value = searchParams.get(attr.slug);
-        if (value === "true") {
-          filters.push({ key: attr.slug, label: attr.name, value: "Yes" });
-        }
-      } else if (attr.filterType === "CHECKBOX_LIST") {
+      } else if (attr.filterType === "CHECKBOX" || attr.filterType === "SELECT") {
         const values = searchParams.getAll(attr.slug);
         values.forEach((v) => {
-          filters.push({ key: attr.slug, label: attr.name, value: v });
+          const option = attr.options.find((o) => o.value === v);
+          filters.push({ key: attr.slug, label: attr.name, value: option?.label || v });
         });
       }
     });
 
     return filters;
-  }, [searchParams, filterableAttributes]);
+  }, [searchParams, attributes]);
 
   // Update URL with new filter params
   const updateFilters = useCallback(
@@ -89,15 +91,18 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
           });
         } else if (value !== null) {
           // For multi-value params, append
-          if (params.has(key)) {
-            params.append(key, value);
+          const existing = params.getAll(key);
+          params.delete(key);
+          if (existing.length > 0 && !existing.includes(value)) {
+            [...existing, value].forEach((v) => params.append(key, v));
           } else {
             params.set(key, value);
           }
         }
       });
 
-      router.push(`${basePath}?${params.toString()}`);
+      const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+      router.push(newUrl);
     },
     [router, searchParams, basePath]
   );
@@ -109,35 +114,59 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
 
   // Get value counts for checkbox filters
   const getValueCounts = useCallback(
-    (attr: Attribute) => {
+    (attr: LeafFilterableAttributeView) => {
       const counts: Record<string, number> = {};
-      products.forEach((product) => {
-        const value = product.attributes[attr.slug];
-        if (value) {
-          counts[value] = (counts[value] || 0) + 1;
+      variants.forEach((variant) => {
+        const av = variant.attributeValues.find((v) => v.attributeId === attr.id);
+        if (av) {
+          let value: string | null = null;
+          if (av.dataType === "enum" && av.optionValue) {
+            value = av.optionValue;
+          } else if (av.dataType === "text" && av.textValue) {
+            value = av.textValue;
+          } else if (av.dataType === "boolean") {
+            value = av.booleanValue ? "true" : "false";
+          } else if (av.dataType === "number" && av.numberValue !== null) {
+            value = String(av.numberValue);
+          }
+          if (value) {
+            counts[value] = (counts[value] || 0) + 1;
+          }
         }
       });
       return counts;
     },
-    [products]
+    [variants]
   );
 
   // Get min/max for range filters
   const getRangeBounds = useCallback(
-    (attr: Attribute) => {
-      const values = products
-        .map((p) => parseFloat(p.attributes[attr.slug]))
-        .filter((v) => !isNaN(v));
-      
+    (attr: LeafFilterableAttributeView) => {
+      const values = variants
+        .map((v) => {
+          const av = v.attributeValues.find((av) => av.attributeId === attr.id);
+          return av?.numberValue;
+        })
+        .filter((v): v is number => v !== null && !isNaN(v));
+
       if (values.length === 0) return { min: 0, max: 100 };
-      
+
       return {
         min: Math.min(...values),
         max: Math.max(...values),
       };
     },
-    [products]
+    [variants]
   );
+
+  // Check if there are any filterable attributes
+  const filterableAttributes = attributes.filter(
+    (attr) => attr.filterType === "RANGE" || attr.filterType === "CHECKBOX" || attr.filterType === "SELECT"
+  );
+
+  if (filterableAttributes.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full lg:w-[260px] shrink-0">
@@ -147,7 +176,7 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
           <SlidersHorizontal className="w-4 h-4" />
           Filters
           {activeFilters.length > 0 && (
-            <Badge className="ml-auto bg-[--dht-red]">{activeFilters.length}</Badge>
+            <Badge className="ml-auto bg-(--dht-red)">{activeFilters.length}</Badge>
           )}
         </Button>
       </div>
@@ -155,13 +184,13 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
       <div className="bg-card border rounded-lg p-4 sticky top-4 hidden lg:block">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-foreground">Filters</h3>
+          <h3 className="font-semibold text-foreground text-sm">Filters</h3>
           {activeFilters.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={clearAllFilters}
-              className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
             >
               Clear all
             </Button>
@@ -170,12 +199,12 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
 
         {/* Active Filter Chips */}
         {activeFilters.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b">
+          <div className="flex flex-wrap gap-1.5 mb-4 pb-4 border-b">
             {activeFilters.map((filter, index) => (
               <Badge
                 key={`${filter.key}-${filter.value}-${index}`}
                 variant="secondary"
-                className="gap-1 pr-1"
+                className="gap-1 pr-1 text-xs"
               >
                 <span className="text-xs">
                   {filter.label}: {filter.value}
@@ -196,18 +225,20 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
         )}
 
         {/* Filter Accordion */}
-        <Accordion type="multiple" className="w-full" defaultValue={filterableAttributes.map(a => a.slug)}>
+        <Accordion type="multiple" className="w-full" defaultValue={filterableAttributes.map((a) => a.slug)}>
           {filterableAttributes.map((attr) => (
-            <AccordionItem key={attr.slug} value={attr.slug}>
-              <AccordionTrigger className="text-sm font-medium py-3">
-                {attr.name}
-                {attr.unit && (
-                  <span className="text-muted-foreground font-normal ml-1">
-                    ({attr.unit})
-                  </span>
-                )}
+            <AccordionItem key={attr.id} value={attr.slug} className="border-b last:border-b-0">
+              <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
+                <span>
+                  {attr.name}
+                  {attr.unitSymbol && (
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({attr.unitSymbol})
+                    </span>
+                  )}
+                </span>
               </AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent className="pb-3">
                 {/* Range Filter */}
                 {attr.filterType === "RANGE" && (
                   <RangeFilter
@@ -219,21 +250,11 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
                   />
                 )}
 
-                {/* Checkbox List Filter */}
-                {attr.filterType === "CHECKBOX_LIST" && (
+                {/* Checkbox Filter */}
+                {(attr.filterType === "CHECKBOX" || attr.filterType === "SELECT") && (
                   <CheckboxFilter
                     attr={attr}
                     valueCounts={getValueCounts(attr)}
-                    searchParams={searchParams}
-                    basePath={basePath}
-                    router={router}
-                  />
-                )}
-
-                {/* Toggle Filter */}
-                {attr.filterType === "TOGGLE" && (
-                  <ToggleFilter
-                    attr={attr}
                     searchParams={searchParams}
                     basePath={basePath}
                     router={router}
@@ -243,13 +264,6 @@ export function FilterPanel({ attributes, products, basePath }: FilterPanelProps
             </AccordionItem>
           ))}
         </Accordion>
-
-        {/* No Filterable Attributes */}
-        {filterableAttributes.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No filters available
-          </p>
-        )}
       </div>
     </div>
   );
@@ -263,7 +277,7 @@ function RangeFilter({
   basePath,
   router,
 }: {
-  attr: Attribute;
+  attr: LeafFilterableAttributeView;
   bounds: { min: number; max: number };
   searchParams: URLSearchParams;
   basePath: string;
@@ -279,7 +293,7 @@ function RangeFilter({
           <Label className="text-xs text-muted-foreground">Min</Label>
           <Input
             type="number"
-            placeholder={bounds.min.toString()}
+            placeholder={bounds.min.toFixed(2)}
             value={currentMin}
             onChange={(e) => {
               const params = new URLSearchParams(searchParams.toString());
@@ -288,7 +302,8 @@ function RangeFilter({
               } else {
                 params.delete(`${attr.slug}_min`);
               }
-              router.push(`${basePath}?${params.toString()}`);
+              const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+              router.push(newUrl);
             }}
             className="h-8 text-sm mt-1"
             step="any"
@@ -298,7 +313,7 @@ function RangeFilter({
           <Label className="text-xs text-muted-foreground">Max</Label>
           <Input
             type="number"
-            placeholder={bounds.max.toString()}
+            placeholder={bounds.max.toFixed(2)}
             value={currentMax}
             onChange={(e) => {
               const params = new URLSearchParams(searchParams.toString());
@@ -307,7 +322,8 @@ function RangeFilter({
               } else {
                 params.delete(`${attr.slug}_max`);
               }
-              router.push(`${basePath}?${params.toString()}`);
+              const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+              router.push(newUrl);
             }}
             className="h-8 text-sm mt-1"
             step="any"
@@ -315,7 +331,7 @@ function RangeFilter({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Range: {bounds.min.toFixed(2)} - {bounds.max.toFixed(2)} {attr.unit}
+        Range: {bounds.min.toFixed(2)} - {bounds.max.toFixed(2)} {attr.unitSymbol}
       </p>
     </div>
   );
@@ -329,7 +345,7 @@ function CheckboxFilter({
   basePath,
   router,
 }: {
-  attr: Attribute;
+  attr: LeafFilterableAttributeView;
   valueCounts: Record<string, number>;
   searchParams: URLSearchParams;
   basePath: string;
@@ -348,67 +364,31 @@ function CheckboxFilter({
       [...current, value].forEach((v) => params.append(attr.slug, v));
     }
 
-    router.push(`${basePath}?${params.toString()}`);
+    const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+    router.push(newUrl);
   };
 
+  // Use options from the attribute if available, otherwise use value counts keys
+  const options = attr.options.length > 0 ? attr.options : Object.keys(valueCounts).map((v) => ({ id: v, label: v, value: v }));
+
   return (
-    <div className="space-y-2 max-h-48 overflow-y-auto">
-      {attr.allowedValues.map((value) => (
+    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+      {options.map((option) => (
         <label
-          key={value}
-          className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded"
+          key={option.id}
+          className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1.5 rounded transition-colors"
         >
           <Checkbox
-            checked={selectedValues.includes(value)}
-            onCheckedChange={() => toggleValue(value)}
-            className="data-[state=checked]:bg-[--dht-red] data-[state=checked]:border-[--dht-red]"
+            checked={selectedValues.includes(option.value)}
+            onCheckedChange={() => toggleValue(option.value)}
+            className="data-[state=checked]:bg-(--dht-red) data-[state=checked]:border-(--dht-red)"
           />
-          <span className="text-sm flex-1">{value}</span>
-          <Badge variant="outline" className="text-xs">
-            {valueCounts[value] || 0}
+          <span className="text-sm flex-1">{option.label}</span>
+          <Badge variant="outline" className="text-xs font-normal">
+            {valueCounts[option.value] || 0}
           </Badge>
         </label>
       ))}
-    </div>
-  );
-}
-
-// Toggle Filter Component
-function ToggleFilter({
-  attr,
-  searchParams,
-  basePath,
-  router,
-}: {
-  attr: Attribute;
-  searchParams: URLSearchParams;
-  basePath: string;
-  router: ReturnType<typeof useRouter>;
-}) {
-  const currentValue = searchParams.get(attr.slug) === "true";
-
-  const toggleValue = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    if (currentValue) {
-      params.delete(attr.slug);
-    } else {
-      params.set(attr.slug, "true");
-    }
-    
-    router.push(`${basePath}?${params.toString()}`);
-  };
-
-  return (
-    <div className="flex items-center justify-between">
-      <Label className="text-sm cursor-pointer" onClick={toggleValue}>
-        Yes
-      </Label>
-      <Switch
-        checked={currentValue}
-        onCheckedChange={toggleValue}
-        className="data-[state=checked]:bg-[--dht-red]"
-      />
     </div>
   );
 }

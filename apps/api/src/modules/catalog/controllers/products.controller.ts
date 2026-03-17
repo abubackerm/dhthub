@@ -22,6 +22,7 @@ import {
 } from '../dto';
 import { ProductView } from '../dto/views/product.view';
 import { VariantView } from '../dto/views/variant.view';
+import { ProductImageEntity } from '../entities/product-image.entity';
 import { PaginatedResponseDto } from '@shared/dto';
 
 @Controller('catalog/products')
@@ -109,6 +110,15 @@ export class ProductsController {
     return ProductView.fromEntity(product, variants as any);
   }
 
+  @Get('by-slug/:slug')
+  async findBySlug(@Param('slug') slug: string): Promise<any> {
+    const product = await this.productService.findBySlugWithDetails(slug);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    return product;
+  }
+
   @Get(':id')
   async findById(@Param('id') id: string): Promise<ProductView> {
     const product = await this.productService.findById(id);
@@ -177,5 +187,62 @@ export class ProductsController {
     @Param('variantId') variantId: string,
   ): Promise<void> {
     await this.productService.removeVariant(productId, variantId);
+  }
+
+  @Patch(':productId/variants/:variantId')
+  async updateVariant(
+    @Param('productId') productId: string,
+    @Param('variantId') variantId: string,
+    @Body() dto: CreateVariantDto,
+  ): Promise<VariantView> {
+    const variant = await this.productService.updateVariant(productId, variantId, {
+      sku: dto.sku,
+      name: dto.name,
+      price: dto.price,
+      quantity: dto.quantity,
+      isDefault: dto.isDefault,
+    });
+
+    return VariantView.fromEntity(variant as any);
+  }
+
+  @Post(':productId/variants/:variantId/images')
+  @HttpCode(HttpStatus.CREATED)
+  async addVariantImage(
+    @Param('productId') productId: string,
+    @Param('variantId') variantId: string,
+    @Body() body: { url: string; altText?: string; sortOrder?: number },
+  ): Promise<any> {
+    const image = await this.productService.addVariantImage(
+      productId,
+      variantId,
+      body.url,
+      body.altText,
+      body.sortOrder,
+    );
+    return image;
+  }
+
+  @Patch('images/:imageId')
+  async updateImage(
+    @Param('imageId') imageId: string,
+    @Body() body: { altText?: string; sortOrder?: number; isPrimary?: boolean },
+  ): Promise<any> {
+    const image = await this.productService.updateImage(imageId, body);
+    return image;
+  }
+
+  @Delete('images/:imageId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeImage(@Param('imageId') imageId: string): Promise<void> {
+    await this.productService.removeImage(imageId);
+  }
+
+  @Get(':productId/variants/:variantId/images')
+  async getVariantImages(
+    @Param('variantId') variantId: string,
+  ): Promise<ProductImageEntity[]> {
+    const images = await this.productService.getVariantImages(variantId);
+    return images;
   }
 }

@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseProvider, TransactionClient } from '@core/database/database.provider';
 import { transactionContext } from '@core/database/transaction-context.store';
 import { CategoryEntity } from '../entities/category.entity';
+
+export interface CategoryWithCells extends CategoryEntity {
+  cells: any[];
+}
 
 @Injectable()
 export class CategoryRepository {
@@ -194,5 +198,273 @@ export class CategoryRepository {
 
   async count(where?: Record<string, unknown>): Promise<number> {
     return this.getClient().category.count({ where });
+  }
+
+  async findWithCells(categoryId: string): Promise<CategoryWithCells> {
+    const client = this.getClient();
+    const category = await client.category.findUnique({
+      where: { id: categoryId },
+      include: {
+        cells: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    return category as CategoryEntity & { cells: any[] };
+  }
+
+  async findLeafPageData(categoryId: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    cells: any[];
+    filterableAttributes: any[];
+  }> {
+    const client = this.getClient();
+
+    const category = await client.category.findUnique({
+      where: { id: categoryId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        path: true,
+        imageUrl: true,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const cells = await client.cell.findMany({
+      where: {
+        categoryId,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        products: {
+          where: { status: 'active' },
+          orderBy: { name: 'asc' },
+          include: {
+            variants: {
+              orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+              include: {
+                images: {
+                  where: { isPrimary: true },
+                  take: 1,
+                },
+                attributeValues: {
+                  include: {
+                    attribute: {
+                      include: {
+                        unit: true,
+                      },
+                    },
+                    option: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const filterableAttributes = await client.categoryAttribute.findMany({
+      where: {
+        categoryId,
+        attribute: { isFilterable: true },
+      },
+      include: {
+        attribute: {
+          include: {
+            unit: true,
+            options: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      category,
+      cells,
+      filterableAttributes,
+    };
+  }
+
+  async findConsolidatedLeafData(categoryId: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    leafCategories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      cells: any[];
+      filterableAttributes: any[];
+    }>;
+    filterableAttributes: any[];
+  }> {
+    const client = this.getClient();
+
+    // Get the parent category
+    const category = await client.category.findUnique({
+      where: { id: categoryId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        path: true,
+        imageUrl: true,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    // Find all leaf categories (categories with no children) under this category
+    const leafCategories = await client.category.findMany({
+      where: {
+        path: { startsWith: `${category.path}.` },
+        children: { none: {} },
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+      },
+    });
+
+    // For each leaf category, get its cells and filterable attributes
+    const leafCategoriesWithCells = await Promise.all(
+      leafCategories.map(async (leafCat) => {
+        const cells = await client.cell.findMany({
+          where: {
+            categoryId: leafCat.id,
+            isActive: true,
+          },
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            products: {
+              where: { status: 'active' },
+              orderBy: { name: 'asc' },
+              include: {
+                variants: {
+                  orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+                  include: {
+                    images: {
+                      where: { isPrimary: true },
+                      take: 1,
+                    },
+                    attributeValues: {
+                      include: {
+                        attribute: {
+                          include: {
+                            unit: true,
+                          },
+                        },
+                        option: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const filterableAttributes = await client.categoryAttribute.findMany({
+          where: {
+            categoryId: leafCat.id,
+            attribute: { isFilterable: true },
+          },
+          include: {
+            attribute: {
+              include: {
+                unit: true,
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+          },
+        });
+
+        return {
+          id: leafCat.id,
+          name: leafCat.name,
+          slug: leafCat.slug,
+          description: leafCat.description,
+          cells,
+          filterableAttributes,
+        };
+      })
+    );
+
+    // Get all unique filterable attributes across all leaf categories
+    const allFilterableAttributes = await client.categoryAttribute.findMany({
+      where: {
+        categoryId: {
+          in: leafCategories.map(lc => lc.id),
+        },
+        attribute: { isFilterable: true },
+      },
+      include: {
+        attribute: {
+          include: {
+            unit: true,
+            options: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+      orderBy: {
+        attribute: {
+          sortOrder: 'asc',
+        },
+      },
+    });
+
+    // Deduplicate attributes by attribute ID
+    const uniqueFilterableAttributes = allFilterableAttributes.reduce((acc: any[], attr: any) => {
+      if (!acc.find((a: any) => a.attribute.id === attr.attribute.id)) {
+        acc.push(attr);
+      }
+      return acc;
+    }, [] as any[]);
+
+    return {
+      category,
+      leafCategories: leafCategoriesWithCells,
+      filterableAttributes: uniqueFilterableAttributes,
+    };
   }
 }

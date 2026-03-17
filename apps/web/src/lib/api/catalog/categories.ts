@@ -4,6 +4,8 @@ import type {
   CategoryTreeNode,
   CreateCategoryInput,
   UpdateCategoryInput,
+  LeafPageView,
+  ConsolidatedLeafPageView,
 } from './types';
 
 export async function getCategories(): Promise<Category[]> {
@@ -16,6 +18,14 @@ export async function getCategoryTree(): Promise<CategoryTreeNode[]> {
 
 export async function getCategoryById(id: string): Promise<Category> {
   return apiClient.get<Category>(`/v1/catalog/categories/${id}`);
+}
+
+export async function getLeafPageData(slug: string): Promise<LeafPageView> {
+  return apiClient.get<LeafPageView>(`/v1/catalog/categories/${slug}/leaf-data`);
+}
+
+export async function getConsolidatedLeafData(slug: string): Promise<ConsolidatedLeafPageView> {
+  return apiClient.get<ConsolidatedLeafPageView>(`/v1/catalog/categories/${slug}/consolidated-leaf-data`);
 }
 
 export async function createCategory(

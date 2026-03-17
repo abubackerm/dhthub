@@ -1,6 +1,12 @@
 import { DHTHeader } from "@/app/(home)/components/dht-header";
 import { DHTFooter } from "@/app/(home)/components/dht-footer";
 import { CatalogSidebar } from "@/components/public/CatalogSidebar";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Products - DHT Hub",
+  description: "Browse our extensive collection of industrial products",
+};
 
 export default function ProductsLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -37,7 +37,10 @@ export function ThemeProvider({
     setMounted(true)
   }, [])
 
-  const resolvedTheme = mounted ? getResolvedTheme(theme) : "light"
+  // Check if theme is already set by the inline script
+  // This prevents a flash when the inline script has already applied the correct theme
+  const resolvedTheme = mounted ? getResolvedTheme(theme) : 
+    (typeof window !== "undefined" && document.documentElement.classList.contains('dark') ? 'dark' : 'light')
 
   // Apply resolved theme class to documentElement so theme customizer inline styles apply correctly in dark mode
   React.useEffect(() => {

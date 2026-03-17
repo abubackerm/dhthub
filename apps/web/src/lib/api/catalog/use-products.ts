@@ -15,6 +15,11 @@ import {
   hardDeleteProduct,
   removeVariant,
   addVariant,
+  updateVariant,
+  addVariantImage,
+  updateImage,
+  removeImage,
+  getVariantImages,
   bulkUpdateProducts,
   type ProductView,
   type CreateProductInput,
@@ -171,3 +176,88 @@ export function useAddVariant(): UseMutationResult<
     },
   });
 }
+
+export function useUpdateVariant(): UseMutationResult<
+  VariantView,
+  Error,
+  { productId: string; variantId: string; data: CreateVariantInput }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, variantId, data }) => updateVariant(productId, variantId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Variant updated successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to update variant:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useAddVariantImage(): UseMutationResult<
+  any,
+  Error,
+  { productId: string; variantId: string; data: { url: string; altText?: string; sortOrder?: number } }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, variantId, data }) => addVariantImage(productId, variantId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Image added successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to add image:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useUpdateImage(): UseMutationResult<
+  any,
+  Error,
+  { imageId: string; data: { altText?: string; sortOrder?: number; isPrimary?: boolean } }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ imageId, data }) => updateImage(imageId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Image updated successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to update image:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useRemoveImage(): UseMutationResult<void, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (imageId) => removeImage(imageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Image removed successfully');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to remove image:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+

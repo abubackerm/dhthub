@@ -9,6 +9,7 @@ import type {
   ProductsQueryParams,
   UpdateProductInput,
   VariantView,
+  ProductDetailView,
 } from './types';
 
 export async function getProducts(
@@ -36,6 +37,10 @@ export async function getProductById(id: string): Promise<ProductView> {
 
 export async function getProductBySku(sku: string): Promise<ProductView> {
   return apiClient.get<ProductView>(`/v1/catalog/products/by-sku/${sku}`);
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductDetailView> {
+  return apiClient.get<ProductDetailView>(`/v1/catalog/products/by-slug/${slug}`);
 }
 
 export async function createProduct(data: CreateProductInput): Promise<ProductView> {
@@ -75,4 +80,45 @@ export async function bulkUpdateProducts(
     input,
   );
 }
+
+export async function updateVariant(
+  productId: string,
+  variantId: string,
+  data: CreateVariantInput,
+): Promise<VariantView> {
+  return apiClient.patch<VariantView>(
+    `/v1/catalog/products/${productId}/variants/${variantId}`,
+    data,
+  );
+}
+
+export async function addVariantImage(
+  productId: string,
+  variantId: string,
+  data: { url: string; altText?: string; sortOrder?: number },
+): Promise<any> {
+  return apiClient.post(
+    `/v1/catalog/products/${productId}/variants/${variantId}/images`,
+    data,
+  );
+}
+
+export async function updateImage(
+  imageId: string,
+  data: { altText?: string; sortOrder?: number; isPrimary?: boolean },
+): Promise<any> {
+  return apiClient.patch(`/v1/catalog/products/images/${imageId}`, data);
+}
+
+export async function removeImage(imageId: string): Promise<void> {
+  return apiClient.delete(`/v1/catalog/products/images/${imageId}`);
+}
+
+export async function getVariantImages(
+  productId: string,
+  variantId: string,
+): Promise<any[]> {
+  return apiClient.get(`/v1/catalog/products/${productId}/variants/${variantId}/images`);
+}
+
 

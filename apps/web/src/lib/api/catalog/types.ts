@@ -257,3 +257,150 @@ export interface CellsQueryParams {
   page?: number;
   pageSize?: number;
 }
+
+// ============================================
+// Leaf Page Types
+// ============================================
+
+export interface LeafAttributeValueView {
+  attributeId: string;
+  attributeName: string;
+  attributeSlug: string;
+  dataType: AttributeDataType;
+  unitSymbol: string | null;
+  numberValue: number | null;
+  textValue: string | null;
+  optionValue: string | null;
+  optionLabel: string | null;
+  booleanValue: boolean | null;
+}
+
+export interface LeafVariantView {
+  id: string;
+  sku: string;
+  name: string;
+  price: number | null;
+  quantity: number;
+  isDefault: boolean;
+  attributeValues: LeafAttributeValueView[];
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
+}
+
+export interface LeafProductView {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  variants: LeafVariantView[];
+}
+
+export interface LeafCellView {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sortOrder: number;
+  products: LeafProductView[];
+}
+
+export interface LeafFilterableAttributeView {
+  id: string;
+  name: string;
+  slug: string;
+  dataType: AttributeDataType;
+  filterType: AttributeFilterType;
+  unitSymbol: string | null;
+  options: { id: string; label: string; value: string }[];
+}
+
+export interface LeafPageView {
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    path: string;
+    imageUrl: string | null;
+  };
+  cells: LeafCellView[];
+  filterableAttributes: LeafFilterableAttributeView[];
+}
+
+export interface LeafCategoryView {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  cells: LeafCellView[];
+  filterableAttributes: LeafFilterableAttributeView[];
+}
+
+export interface ConsolidatedLeafPageView {
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    path: string;
+    imageUrl: string | null;
+  };
+  leafCategories: LeafCategoryView[];
+  filterableAttributes: LeafFilterableAttributeView[];
+}
+
+// ============================================
+// Product Detail Types
+// ============================================
+
+export interface ProductDetailVariantView {
+  id: string;
+  sku: string;
+  name: string;
+  price: number | null;
+  compareAtPrice: number | null;
+  quantity: number;
+  isDefault: boolean;
+  sortOrder: number;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
+  attributeValues: {
+    id: string;
+    numberValue: number | null;
+    textValue: string | null;
+    booleanValue: boolean | null;
+    attribute: {
+      id: string;
+      name: string;
+      slug: string;
+      dataType: string;
+      unit: { symbol: string } | null;
+    };
+    option: { id: string; label: string; value: string } | null;
+  }[];
+}
+
+export interface ProductDetailView {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  type: string;
+  status: string;
+  price: number | null;
+  compareAtPrice: number | null;
+  currency: string;
+  quantity: number;
+  isFeatured: boolean;
+  cell: {
+    id: string;
+    name: string;
+    slug: string;
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      path: string;
+    };
+  } | null;
+  variants: ProductDetailVariantView[];
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
+}

@@ -14,14 +14,19 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getLeafPageData,
+  getConsolidatedLeafData,
   type Category,
   type CategoryTreeNode,
   type CreateCategoryInput,
   type UpdateCategoryInput,
+  type LeafPageView,
+  type ConsolidatedLeafPageView,
 } from './';
 
 export const CATEGORIES_QUERY_KEY = ['categories'];
 export const CATEGORY_TREE_QUERY_KEY = ['category-tree'];
+export const LEAF_PAGE_DATA_QUERY_KEY = ['leaf-page-data'];
 
 export function useCategories(): UseQueryResult<Category[], Error> {
   return useQuery({
@@ -46,6 +51,24 @@ export function useCategory(id: string): UseQueryResult<Category, Error> {
     queryKey: ['category', id],
     queryFn: () => getCategoryById(id),
     enabled: !!id,
+  });
+}
+
+export function useLeafPageData(slug: string): UseQueryResult<LeafPageView, Error> {
+  return useQuery({
+    queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, slug],
+    queryFn: () => getLeafPageData(slug),
+    enabled: !!slug,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useConsolidatedLeafData(slug: string): UseQueryResult<ConsolidatedLeafPageView, Error> {
+  return useQuery({
+    queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'consolidated', slug],
+    queryFn: () => getConsolidatedLeafData(slug),
+    enabled: !!slug,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 

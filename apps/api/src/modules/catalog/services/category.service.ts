@@ -8,7 +8,7 @@ import {
   CategoryCircularReferenceError,
   CategoryHasChildrenError,
 } from '@shared/domain/errors';
-import { CategoryRepository } from '../repositories/category.repository';
+import { CategoryRepository, CategoryWithCells } from '../repositories/category.repository';
 import { CategoryEntity } from '../entities/category.entity';
 import { CategoryCreatedEvent, CategoryUpdatedEvent } from '../events';
 
@@ -100,6 +100,55 @@ export class CategoryService extends BaseService {
 
   async findSubtree(parentPath: string): Promise<CategoryEntity[]> {
     return this.categoryRepo.findByParentPath(parentPath);
+  }
+
+  async findWithCells(categoryId: string): Promise<CategoryWithCells> {
+    return this.categoryRepo.findWithCells(categoryId);
+  }
+
+  async getLeafPageData(slug: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    cells: any[];
+    filterableAttributes: any[];
+  } | null> {
+    const category = await this.categoryRepo.findBySlug(slug);
+    if (!category || !category.isActive) {
+      return null;
+    }
+    return this.categoryRepo.findLeafPageData(category.id);
+  }
+
+  async getConsolidatedLeafData(slug: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    leafCategories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      cells: any[];
+      filterableAttributes: any[];
+    }>;
+    filterableAttributes: any[];
+  } | null> {
+    const category = await this.categoryRepo.findBySlug(slug);
+    if (!category || !category.isActive) {
+      return null;
+    }
+    return this.categoryRepo.findConsolidatedLeafData(category.id);
   }
 
   async search(

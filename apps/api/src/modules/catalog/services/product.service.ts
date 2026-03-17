@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseService } from '@shared/domain';
@@ -18,6 +18,7 @@ import { ProductVariantRepository } from '../repositories/product-variant.reposi
 import { ProductImageRepository } from '../repositories/product-image.repository';
 import { ProductEntity, ProductStatus, ProductType } from '../entities/product.entity';
 import { ProductVariantEntity } from '../entities/product-variant.entity';
+import { ProductImageEntity } from '../entities/product-image.entity';
 import {
   ProductCreatedEvent,
   ProductUpdatedEvent,
@@ -140,6 +141,59 @@ export class ProductService extends BaseService {
 
   async findBySlug(slug: string): Promise<ProductEntity | null> {
     return this.productRepo.findBySlug(slug);
+  }
+
+  async findBySlugWithDetails(slug: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    type: string;
+    status: string;
+    price: number | null;
+    compareAtPrice: number | null;
+    currency: string;
+    quantity: number;
+    isFeatured: boolean;
+    cell: {
+      id: string;
+      name: string;
+      slug: string;
+      category: {
+        id: string;
+        name: string;
+        slug: string;
+        path: string;
+      };
+    } | null;
+    variants: {
+      id: string;
+      sku: string;
+      name: string;
+      price: number | null;
+      compareAtPrice: number | null;
+      quantity: number;
+      isDefault: boolean;
+      sortOrder: number;
+      images: { url: string; altText: string | null; isPrimary: boolean }[];
+      attributeValues: {
+        id: string;
+        numberValue: number | null;
+        textValue: string | null;
+        booleanValue: boolean | null;
+        attribute: {
+          id: string;
+          name: string;
+          slug: string;
+          dataType: string;
+          unit: { symbol: string } | null;
+        };
+        option: { id: string; label: string; value: string } | null;
+      }[];
+    }[];
+    images: { url: string; altText: string | null; isPrimary: boolean }[];
+  } | null> {
+    return this.productRepo.findBySlugWithDetails(slug);
   }
 
   async findAll(): Promise<ProductEntity[]> {
@@ -583,5 +637,59 @@ export class ProductService extends BaseService {
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  async addVariantImage(
+    productId: string,
+    variantId: string,
+    url: string,
+    altText?: string,
+    sortOrder?: number,
+  ): Promise<ProductImageEntity> {
+    const product = await this.productRepo.findById(productId);
+    if (!product) {
+      throw new ProductNotFoundError(productId);
+    }
+
+    const variant = await this.variantRepo.findById(variantId);
+    if (!variant) {
+      throw new ProductVariantNotFoundError(variantId);
+    }
+
+    if (variant.productId !== productId) {
+      throw new InvalidProductOperationError(
+        'Variant does not belong to this product',
+        'VARIANT_PRODUCT_MISMATCH',
+      );
+    }
+
+    return this.imageRepo.create({
+      productId,
+      variantId,
+      url,
+      altText: altText ?? null,
+      sortOrder: sortOrder ?? 1,
+      isPrimary: false,
+    });
+  }
+
+  async updateImage(
+    imageId: string,
+    data: { altText?: string; sortOrder?: number; isPrimary?: boolean },
+  ): Promise<ProductImageEntity> {
+    const image = await this.imageRepo.findById(imageId);
+    if (!image) {
+      throw new NotFoundException('Image not found');
+    }
+
+    return this.imageRepo.update(imageId, data);
+  }
+
+  async removeImage(imageId: string): Promise<void> {
+    await this.imageRepo.delete(imageId);
+  }
+
+  async getVariantImages(variantId: string): Promise<ProductImageEntity[]> {
+    return this.imageRepo.findByVariantId(variantId);
   }
 }

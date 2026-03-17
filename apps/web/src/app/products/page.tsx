@@ -1,26 +1,51 @@
-import { mockCategories } from "@/lib/mock-data";
+"use client";
+
 import Link from "next/link";
 import { CategoryIcon } from "@/components/public/CategoryIcon";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Products - DHT Hub",
-  description: "Browse our extensive collection of industrial products",
-};
+import { useCategoryTree } from "@/lib/api/catalog";
+import { getCategoryIconName } from "@/lib/utils/category-icon-map";
 
 export default function ProductsPage() {
-  const topLevelCategories = mockCategories.filter(
-    (cat) => cat.depth === 0 && cat.type === "BRANCH" && cat.isActive
+  const { data: categories = [], isLoading } = useCategoryTree();
+
+  // Filter for top-level (root) categories that are active
+  const topLevelCategories = categories.filter(
+    (cat) => cat.depth === 0 && cat.isActive
   );
+
+  if (isLoading) {
+    return (
+      <div className="catalog-page">
+        {/* Breadcrumb */}
+        <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
+          <Link href="/" className="catalog-breadcrumb__link">Home</Link>
+          <span className="catalog-breadcrumb__sep" aria-hidden="true">
+            &gt;
+          </span>
+          <span className="catalog-breadcrumb__current" aria-current="page">All Categories</span>
+        </nav>
+
+        {/* Loading state */}
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+            <p className="mt-4 text-muted-foreground">Loading categories...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="catalog-page">
       {/* Breadcrumb */}
-      <div className="catalog-breadcrumb">
+      <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Link href="/" className="catalog-breadcrumb__link">Home</Link>
-        <span className="catalog-breadcrumb__sep">&gt;</span>
-        <span className="catalog-breadcrumb__current">All Categories</span>
-      </div>
+        <span className="catalog-breadcrumb__sep" aria-hidden="true">
+          &gt;
+        </span>
+        <span className="catalog-breadcrumb__current" aria-current="page">All Categories</span>
+      </nav>
 
       {/* Each top-level category rendered as a section */}
       {topLevelCategories.map((category) => {
@@ -43,7 +68,7 @@ export default function ProductsPage() {
                 >
                   <div className="catalog-grid__icon">
                     <CategoryIcon
-                      iconName={child.iconName}
+                      iconName={getCategoryIconName(child.name)}
                       className="w-12 h-12 text-gray-600"
                       strokeWidth={1.5}
                     />

@@ -10,6 +10,7 @@ import {
   HttpStatus,
   HttpCode,
   ParseIntPipe,
+  NotFoundException,
 } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
 import { CategoryEntity } from '../entities/category.entity';
@@ -19,7 +20,10 @@ import {
   CategoryQueryDto,
   CategoryView,
   CategoryTreeView,
+  LeafPageView,
+  ConsolidatedLeafPageView,
 } from '../dto';
+import { Cell } from '../../cell/dto/views/cell.view';
 
 @Controller('catalog/categories')
 export class CategoriesController {
@@ -82,6 +86,24 @@ export class CategoriesController {
     return CategoryView.fromEntities(categories);
   }
 
+  @Get(':slug/leaf-data')
+  async getLeafData(@Param('slug') slug: string): Promise<LeafPageView> {
+    const data = await this.categoryService.getLeafPageData(slug);
+    if (!data) {
+      throw new NotFoundException(`Category with slug "${slug}" not found`);
+    }
+    return LeafPageView.fromPrisma(data);
+  }
+
+  @Get(':slug/consolidated-leaf-data')
+  async getConsolidatedLeafData(@Param('slug') slug: string): Promise<ConsolidatedLeafPageView> {
+    const data = await this.categoryService.getConsolidatedLeafData(slug);
+    if (!data) {
+      throw new NotFoundException(`Category with slug "${slug}" not found`);
+    }
+    return ConsolidatedLeafPageView.fromPrisma(data);
+  }
+
   @Get(':id')
   async getById(@Param('id') id: string): Promise<CategoryView> {
     const category = await this.categoryService.findById(id);
@@ -123,6 +145,22 @@ export class CategoriesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string): Promise<void> {
     await this.categoryService.delete(id);
+  }
+
+  @Get(':slug/cells')
+  async getCellsByCategorySlug(@Param('slug') slug: string): Promise<Cell[]> {
+    // Find the category by slug
+    const category = await this.categoryService.findBySlug(slug);
+    if (!category || !category.isActive) {
+      return [];
+    }
+
+    // Use the cell service to get cells for this category
+    // We need to import CellService, but let's create a simpler approach
+    // Get cells through the category relation
+    const categoryWithCells = await this.categoryService.findWithCells(category.id);
+    
+    return categoryWithCells.cells || [];
   }
 }
 
