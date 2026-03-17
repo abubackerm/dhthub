@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import {
   Search,
   Package,
@@ -57,6 +58,7 @@ function getLeafCategories(
 }
 
 export default function ProductsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
 
   const { data: categoryTree, isLoading, isError } = useCategoryTree()
@@ -188,7 +190,7 @@ export default function ProductsPage() {
                   key={category.key || category.id || index}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => {
-                    window.location.href = `/dhthub-admin/products/leaves/${category.id}`
+                    router.push(`/dhthub-admin/products/leaves/${category.id}`)
                   }}
                 >
                   <TableCell className="font-mono text-sm">
@@ -202,7 +204,7 @@ export default function ProductsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        window.location.href = `/dhthub-admin/products/leaves/${category.id}`
+                        router.push(`/dhthub-admin/products/leaves/${category.id}`)
                       }}
                     >
                       <ArrowRight className="h-4 w-4 mr-2" />

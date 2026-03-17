@@ -10,9 +10,7 @@ import { useSidebarConfig } from '@/contexts/sidebar-context'
 import { tweakcnThemes } from '@/config/theme-data'
 import { ThemeTab } from './theme-tab'
 import { LayoutTab } from './layout-tab'
-import { ImportModal } from './import-modal'
 import { cn } from '@/lib/utils'
-import type { ImportedTheme } from '@/types/theme-customizer'
 
 export interface ThemeCustomizerProps {
   open: boolean
@@ -20,55 +18,58 @@ export interface ThemeCustomizerProps {
 }
 
 export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
-  const { applyImportedTheme, isDarkMode, resetTheme, applyRadius, setBrandColorsValues, applyTheme, applyTweakcnTheme } = useThemeManager()
+  const { isDarkMode, setBrandColorsValues, applyTheme, applyTweakcnTheme, applyRadius, resetTheme, loadPersistedConfig, updateBrandColorsFromTheme } = useThemeManager()
   const { config: sidebarConfig, updateConfig: updateSidebarConfig } = useSidebarConfig()
 
   const [activeTab, setActiveTab] = React.useState("theme")
-  const [selectedTheme, setSelectedTheme] = React.useState("default")
+  const [selectedTheme, setSelectedTheme] = React.useState("")
   const [selectedTweakcnTheme, setSelectedTweakcnTheme] = React.useState("")
   const [selectedRadius, setSelectedRadius] = React.useState("0.5rem")
-  const [importModalOpen, setImportModalOpen] = React.useState(false)
-  const [importedTheme, setImportedTheme] = React.useState<ImportedTheme | null>(null)
+  const [initialized, setInitialized] = React.useState(false)
+  const prevDarkMode = React.useRef(isDarkMode)
+
+  React.useEffect(() => {
+    const persisted = loadPersistedConfig()
+    if (persisted) {
+      if (persisted.themeType === 'shadcn' && persisted.themeValue) {
+        setSelectedTheme(persisted.themeValue)
+        setSelectedTweakcnTheme("")
+      } else if (persisted.themeType === 'tweakcn' && persisted.themeValue) {
+        setSelectedTweakcnTheme(persisted.themeValue)
+        setSelectedTheme("")
+      }
+      if (persisted.radius) {
+        setSelectedRadius(persisted.radius)
+      }
+      updateBrandColorsFromTheme(
+        isDarkMode ? (persisted.cssVarsDark ?? {}) : (persisted.cssVarsLight ?? {})
+      )
+    }
+    setInitialized(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleReset = () => {
-    // Complete reset to application defaults
-
-    // 1. Reset all state variables to initial values
-    setSelectedTheme("default")
+    setSelectedTheme("")
     setSelectedTweakcnTheme("")
     setSelectedRadius("0.5rem")
-    setImportedTheme(null) // Clear imported theme
-    setBrandColorsValues({}) // Clear brand colors state
+    setBrandColorsValues({})
 
-    // 2. Completely remove all custom CSS variables
     resetTheme()
-
-    // 3. Reset the radius to default
     applyRadius("0.5rem")
 
-    // 4. Reset sidebar to defaults
     updateSidebarConfig({ variant: "inset", collapsible: "offcanvas", side: "left" })
   }
 
-  const handleImport = (themeData: ImportedTheme) => {
-    setImportedTheme(themeData)
-    // Clear other selections to indicate custom import is active
-    setSelectedTheme("")
-    setSelectedTweakcnTheme("")
-
-    // Apply the imported theme
-    applyImportedTheme(themeData, isDarkMode)
-  }
-
-  const handleImportClick = () => {
-    setImportModalOpen(true)
-  }
-
-  // Re-apply themes when theme mode changes
+  // Re-apply theme only when dark mode actually toggles (not on initial mount,
+  // since the inline <script> in <head> already applied the correct CSS vars).
   React.useEffect(() => {
-    if (importedTheme) {
-      applyImportedTheme(importedTheme, isDarkMode)
-    } else if (selectedTheme) {
+    if (!initialized) return
+    const darkModeChanged = prevDarkMode.current !== isDarkMode
+    prevDarkMode.current = isDarkMode
+    if (!darkModeChanged) return
+
+    if (selectedTheme) {
       applyTheme(selectedTheme, isDarkMode)
     } else if (selectedTweakcnTheme) {
       const selectedPreset = tweakcnThemes.find(t => t.value === selectedTweakcnTheme)?.preset
@@ -76,7 +77,7 @@ export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
         applyTweakcnTheme(selectedPreset, isDarkMode)
       }
     }
-  }, [isDarkMode, importedTheme, selectedTheme, selectedTweakcnTheme, applyImportedTheme, applyTheme, applyTweakcnTheme])
+  }, [isDarkMode, selectedTheme, selectedTweakcnTheme, applyTheme, applyTweakcnTheme, initialized])
 
   return (
     <>
@@ -84,12 +85,6 @@ export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
         <SheetContent
           side={sidebarConfig.side === "left" ? "right" : "left"}
           className="w-[400px] p-0 gap-0 pointer-events-auto [&>button]:hidden overflow-hidden flex flex-col"
-          onInteractOutside={(e) => {
-            // Prevent the sheet from closing when dialog is open
-            if (importModalOpen) {
-              e.preventDefault()
-            }
-          }}
         >
           <SheetHeader className="space-y-0 p-4 pb-2">
             <div className="flex items-center gap-2">
@@ -132,8 +127,6 @@ export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
                   setSelectedTweakcnTheme={setSelectedTweakcnTheme}
                   selectedRadius={selectedRadius}
                   setSelectedRadius={setSelectedRadius}
-                  setImportedTheme={setImportedTheme}
-                  onImportClick={handleImportClick}
                 />
               </TabsContent>
 
@@ -144,12 +137,6 @@ export function ThemeCustomizer({ open, onOpenChange }: ThemeCustomizerProps) {
           </div>
         </SheetContent>
       </Sheet>
-
-      <ImportModal
-        open={importModalOpen}
-        onOpenChange={setImportModalOpen}
-        onImport={handleImport}
-      />
     </>
   )
 }

@@ -209,7 +209,7 @@ export default function LeafsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          window.location.href = `/dhthub-admin/products/leaves/${leaf.id}/cells`
+                          router.push(`/dhthub-admin/products/leaves/${leaf.id}/cells`)
                         }}
                       >
                         <Eye className="h-4 w-4 mr-2" />

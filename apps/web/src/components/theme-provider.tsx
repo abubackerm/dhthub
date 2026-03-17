@@ -24,33 +24,44 @@ function getResolvedTheme(theme: Theme): "dark" | "light" {
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "vite-ui-theme",
+  storageKey = "nextjs-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(
-    () => (typeof window !== "undefined" && localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
-  const [mounted, setMounted] = React.useState(false)
+  const [theme, setTheme] = React.useState<Theme>(() => {
+    if (typeof window === "undefined") return defaultTheme
 
-  // Only set mounted to true after the first client render
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
+    try {
+      const savedTheme = localStorage.getItem(storageKey) as Theme
+      if (savedTheme && ["dark", "light", "system"].includes(savedTheme)) {
+        return savedTheme
+      }
+      return defaultTheme
+    } catch (error) {
+      console.warn("Failed to read theme from localStorage:", error)
+      return defaultTheme
+    }
+  })
 
-  // Check if theme is already set by the inline script
-  // This prevents a flash when the inline script has already applied the correct theme
-  const resolvedTheme = mounted ? getResolvedTheme(theme) : 
-    (typeof window !== "undefined" && document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+  const resolvedTheme = React.useMemo(() => {
+    return getResolvedTheme(theme)
+  }, [theme])
 
-  // Apply resolved theme class to documentElement so theme customizer inline styles apply correctly in dark mode
+  // Only update the class when the resolved theme actually changes after
+  // initial mount. The inline <script> in <head> already set the correct
+  // class before paint, so we skip the first run to avoid a flash.
+  const isFirstRender = React.useRef(true)
   React.useEffect(() => {
     if (typeof window === "undefined") return
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      const root = window.document.documentElement
+      if (root.classList.contains(resolvedTheme)) return
+    }
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
     root.classList.add(resolvedTheme)
   }, [resolvedTheme])
 
-  // Listen for system theme changes when theme is "system"
   React.useEffect(() => {
     if (theme !== "system" || typeof window === "undefined") return
 
