@@ -31,6 +31,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { ImportService, UploadedFile } from '@modules/import/services/import.service';
+import { ImportType } from '@modules/import/entities';
 
 @Controller('catalog/attributes')
 export class AttributesController {
@@ -196,7 +197,10 @@ export class AttributesController {
         originalname: data.filename,
       };
 
-      const result = await this.importModuleService.uploadZip(file, { createdBy });
+      const result = await this.importModuleService.uploadZip(file, { 
+        createdBy,
+        importType: ImportType.ATTRIBUTES,
+      });
       return reply.status(HttpStatus.ACCEPTED).send({
         jobId: result.jobId,
         fileUrl: result.fileUrl,

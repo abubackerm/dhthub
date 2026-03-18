@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ImportJobRepository } from '../repositories/import-job.repository';
-import { ImportJobEntity, ImportJobStatus, ImportMode } from '../entities';
+import { ImportJobEntity, ImportJobStatus, ImportMode, ImportType } from '../entities';
 import { ImportJobNotFoundError } from '../domain/errors/import.errors';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImportJobCreatedEvent } from '../events';
@@ -16,6 +16,7 @@ export interface CreateJobInput {
   mode?: ImportMode;
   warehouseId?: string;
   originalFilePath?: string;
+  importType?: ImportType;
 }
 
 export interface JobMetrics {
@@ -54,6 +55,7 @@ export class ImportJobService {
       mode: input.mode ?? null,
       warehouseId: input.warehouseId ?? null,
       originalFilePath: input.originalFilePath ?? null,
+      importType: input.importType ?? null,
     });
 
     // Emit job created event
@@ -67,6 +69,7 @@ export class ImportJobService {
         job.type,
         job.totalRows,
         job.createdBy,
+        job.importType,
       ),
     );
 

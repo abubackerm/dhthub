@@ -58,7 +58,7 @@ export class AttributesWorkerController {
     try {
       const zipBuffer = fs.readFileSync(filePath);
       extractDir = path.join(process.cwd(), 'uploads', 'import', 'extracted', jobId);
-      const extractedFiles = await this.zipExtractorService.extract(zipBuffer, extractDir);
+      const extractedFiles = await this.zipExtractorService.extract(zipBuffer, extractDir, 'ATTRIBUTES');
 
       this.logger.log(`[processAttributeImport] Extracted files: ${JSON.stringify(extractedFiles)}`);
 

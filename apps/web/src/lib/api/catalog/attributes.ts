@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { API_BASE_URL } from '../client';
 import type {
   AssignAttributeToCategoryInput,
   AttributeOptionView,
@@ -139,7 +140,7 @@ export async function uploadAttributesCsv(
   const formData = new FormData();
   formData.append('file', file);
 
-  const url = new URL(`${apiClient.defaults.baseURL}/v1/catalog/attributes/import`);
+  const url = new URL(`${API_BASE_URL}/v1/catalog/attributes/import`);
   if (options?.validateOnly) {
     url.searchParams.set('validateOnly', 'true');
   }
@@ -161,12 +162,47 @@ export async function uploadAttributesCsv(
   return response.json();
 }
 
+export interface AttributeZipImportResult {
+  jobId: string;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  message: string;
+}
+
+export async function uploadAttributesZip(file: File): Promise<AttributeZipImportResult> {
+  console.log('[uploadAttributesZip] Starting ZIP upload:', file.name)
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/v1/catalog/attributes/import`, {
+    method: 'POST',
+    headers: {
+      // Don't set Content-Type, let FormData set it with boundary
+    },
+    body: formData,
+    credentials: 'include',
+  });
+
+  console.log('[uploadAttributesZip] Response status:', response.status)
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[uploadAttributesZip] Error:', errorText)
+    throw new Error(errorText || 'Upload failed');
+  }
+
+  const result = await response.json();
+  console.log('[uploadAttributesZip] Response:', result)
+  return result;
+}
+
 export async function getAttributeTemplate(): Promise<AttributeTemplate> {
   return apiClient.get<AttributeTemplate>('/v1/catalog/attributes/import/template');
 }
 
 export async function downloadAttributeTemplate(): Promise<Blob> {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/catalog/attributes/import/template/download`, {
+  const response = await fetch(`${API_BASE_URL}/v1/catalog/attributes/import/template/download`, {
     method: 'GET',
     credentials: 'include',
   });

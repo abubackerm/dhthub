@@ -60,10 +60,6 @@ export class AttributeImportDto {
   @IsBoolean()
   isFilterable?: boolean;
 
-  @IsOptional()
-  @IsBoolean()
-  isRequired?: boolean;
-
   rowNumber?: number;
 }
 

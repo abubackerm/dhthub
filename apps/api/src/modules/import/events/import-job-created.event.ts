@@ -7,6 +7,7 @@ export class ImportJobCreatedEvent {
     public readonly type: string,
     public readonly totalRows: number | null,
     public readonly createdBy: string | null,
+    public readonly importType: string | null,
     public readonly occurredAt: Date = new Date(),
   ) {}
 }

@@ -21,10 +21,15 @@ export class AttributeImportProcessorService {
    */
   @OnEvent(IMPORT_EVENTS.JOB_CREATED, { async: true })
   async handleJobCreated(event: ImportJobCreatedEvent): Promise<void> {
-    this.logger.log(`Checking import job: ${event.jobId}, type: ${event.type}`);
+    this.logger.log(`Checking import job: ${event.jobId}, type: ${event.type}, importType: ${event.importType}`);
 
     // Only process ZIP file types with this processor
     if (event.type !== ImportFileType.ZIP) {
+      return;
+    }
+
+    // Only process ATTRIBUTES import types
+    if (event.importType !== 'ATTRIBUTES') {
       return;
     }
 

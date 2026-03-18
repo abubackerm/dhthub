@@ -588,6 +588,11 @@ enum ImportMode {
   UPDATE_ONLY
 }
 
+enum ImportType {
+  CATALOG
+  ATTRIBUTES
+}
+
 model ImportJob {
   id               String           @id @default(uuid())
   fileUrl          String           @map("file_url")
@@ -606,6 +611,7 @@ model ImportJob {
   mode             ImportMode?      @map("mode")
   warehouseId      String?          @map("warehouse_id")
   originalFilePath String?          @map("original_file_path")
+  importType       ImportType?      @map("import_type")
   startedAt        DateTime?        @map("started_at")
   finishedAt       DateTime?        @map("finished_at")
   createdAt        DateTime         @default(now()) @map("created_at")

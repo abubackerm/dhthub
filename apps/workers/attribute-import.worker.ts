@@ -130,26 +130,28 @@ class AttributeImportWorker {
   }
 }
 
-// Create and start worker instance
-const attributeImportWorker = new AttributeImportWorker();
+// Only auto-start if this file is run directly (not when imported via index.ts)
+if (require.main === module) {
+  const attributeImportWorker = new AttributeImportWorker();
 
-// Handle graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down attribute import worker...');
-  await attributeImportWorker.stop();
-  process.exit(0);
-});
+  // Handle graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down attribute import worker...');
+    await attributeImportWorker.stop();
+    process.exit(0);
+  });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down attribute import worker...');
-  await attributeImportWorker.stop();
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down attribute import worker...');
+    await attributeImportWorker.stop();
+    process.exit(0);
+  });
 
-// Start worker
-attributeImportWorker.start().catch((error) => {
-  console.error('Failed to start AttributeImportWorker:', error);
-  process.exit(1);
-});
+  // Start worker
+  attributeImportWorker.start().catch((error) => {
+    console.error('Failed to start AttributeImportWorker:', error);
+    process.exit(1);
+  });
+}
 
 export { AttributeImportWorker };

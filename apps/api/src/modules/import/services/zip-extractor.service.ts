@@ -2,18 +2,24 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ExtractedFiles, ZipValidationResult, REQUIRED_CSV_FILES, OPTIONAL_CSV_FILES } from '../dto';
+import { ExtractedFiles, ZipValidationResult, CATALOG_REQUIRED_CSV_FILES, ATTRIBUTE_REQUIRED_CSV_FILES, OPTIONAL_CSV_FILES } from '../dto';
+
+export type ImportType = 'CATALOG' | 'ATTRIBUTES';
 
 @Injectable()
 export class ZipExtractorService {
   private readonly logger = new Logger(ZipExtractorService.name);
-  private readonly allowedFiles = [...REQUIRED_CSV_FILES, ...OPTIONAL_CSV_FILES];
+  private readonly allowedFiles = [...CATALOG_REQUIRED_CSV_FILES, ...ATTRIBUTE_REQUIRED_CSV_FILES, ...OPTIONAL_CSV_FILES];
 
   /**
    * Extract ZIP file to target directory
    */
-  async extract(zipBuffer: Buffer, targetDir: string): Promise<ExtractedFiles> {
-    this.logger.log(`Extracting ZIP to: ${targetDir}`);
+  async extract(
+    zipBuffer: Buffer,
+    targetDir: string,
+    importType: ImportType = 'CATALOG'
+  ): Promise<ExtractedFiles> {
+    this.logger.log(`Extracting ZIP to: ${targetDir} (importType: ${importType})`);
 
     // Ensure target directory exists
     if (!fs.existsSync(targetDir)) {
@@ -24,9 +30,7 @@ export class ZipExtractorService {
       const zip = new AdmZip(zipBuffer);
       const zipEntries = zip.getEntries();
 
-      const extractedFiles: ExtractedFiles = {
-        variants: '',
-      };
+      const extractedFiles: ExtractedFiles = {};
 
       for (const entry of zipEntries) {
         if (entry.isDirectory) {
@@ -60,10 +64,18 @@ export class ZipExtractorService {
         }
       }
 
-      if (!extractedFiles.variants) {
+      // Validate based on import type
+      if (importType === 'CATALOG' && !extractedFiles.variants) {
         throw new BadRequestException(
           'variants.csv is required but not found in the ZIP archive. ' +
           'Accepted names: variants.csv or variants_template.csv (at root or inside a folder).',
+        );
+      }
+
+      if (importType === 'ATTRIBUTES' && !extractedFiles.attributes) {
+        throw new BadRequestException(
+          'attributes.csv is required but not found in the ZIP archive. ' +
+          'Accepted names: attributes.csv or attributes_template.csv (at root or inside a folder).',
         );
       }
 
@@ -78,12 +90,18 @@ export class ZipExtractorService {
   /**
    * Validate that required files are present in extracted files
    */
-  validateRequiredFiles(files: ExtractedFiles): ZipValidationResult {
+  validateRequiredFiles(files: ExtractedFiles, importType: ImportType = 'CATALOG'): ZipValidationResult {
     const errors: string[] = [];
 
-    // Check required files
-    if (!files.variants || !fs.existsSync(files.variants)) {
-      errors.push('variants.csv is required but not found in the archive');
+    // Check required files based on import type
+    if (importType === 'CATALOG') {
+      if (!files.variants || !fs.existsSync(files.variants)) {
+        errors.push('variants.csv is required but not found in the archive');
+      }
+    } else if (importType === 'ATTRIBUTES') {
+      if (!files.attributes || !fs.existsSync(files.attributes)) {
+        errors.push('attributes.csv is required but not found in the archive');
+      }
     }
 
     const presentFiles: string[] = [];
@@ -100,10 +118,12 @@ export class ZipExtractorService {
       }
     }
 
+    const requiredFiles = importType === 'CATALOG' ? CATALOG_REQUIRED_CSV_FILES : ATTRIBUTE_REQUIRED_CSV_FILES;
+
     return {
       isValid: errors.length === 0,
       errors,
-      requiredFiles: REQUIRED_CSV_FILES,
+      requiredFiles,
       optionalFiles: presentFiles,
     };
   }

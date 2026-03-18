@@ -55,12 +55,14 @@ export class AttributeImportService {
       // Count total rows for progress tracking
       let totalRows = 0;
       if (extractedFiles.attributes) {
-        const stats = require('fs').statSync(extractedFiles.attributes);
-        totalRows += Math.ceil(stats.size / 100); // Rough estimate
+        const { createReadStream } = require('fs');
+        const rowStream = createReadStream(extractedFiles.attributes);
+        totalRows += await this.csvParserService.countRows(rowStream);
       }
       if (extractedFiles.attributeOptions) {
-        const stats = require('fs').statSync(extractedFiles.attributeOptions);
-        totalRows += Math.ceil(stats.size / 100);
+        const { createReadStream } = require('fs');
+        const rowStream = createReadStream(extractedFiles.attributeOptions);
+        totalRows += await this.csvParserService.countRows(rowStream);
       }
 
       await this.importJobService.updateTotalRows(jobId, totalRows);
@@ -71,6 +73,13 @@ export class AttributeImportService {
         extractedFiles.attributeOptions ?? null,
         { validateOnly: false },
       );
+
+      // Update progress with final counts before marking completed
+      await this.importJobService.updateProgress(jobId, {
+        processedRows: result.totalRows,
+        successRows: result.successRows,
+        failedRows: result.failedRows,
+      });
 
       await this.importJobService.markAsCompleted(jobId);
 
@@ -216,7 +225,6 @@ export class AttributeImportService {
       group?: string;
       sortOrder: number;
       isFilterable: boolean;
-      isRequired: boolean;
       filterType?: string;
       unitSymbol?: string;
       rowNumber?: number;
@@ -249,7 +257,6 @@ export class AttributeImportService {
           group: data.group?.trim() || '',
           sortOrder: data.sortOrder ? parseInt(data.sortOrder, 10) : 0,
           isFilterable: data.isFilterable?.toLowerCase() === 'true',
-          isRequired: data.isRequired?.toLowerCase() === 'true',
           filterType: data.filterType?.trim() || '',
           unitSymbol: data.unitSymbol?.trim() || '',
         };
@@ -416,7 +423,7 @@ export class AttributeImportService {
       case 'enum':
         return ['CHECKBOX', 'SELECT'];
       case 'boolean':
-        return ['SELECT'];
+        return [];
       case 'text':
         return [];
       default:
@@ -454,7 +461,6 @@ export class AttributeImportService {
           filterType: attr.filterType as unknown as AttributeFilterType || null,
           unitId: unitId || null,
           isFilterable: attr.isFilterable ?? false,
-          isRequired: attr.isRequired ?? false,
           updatedBy: options.createdBy,
         });
 
@@ -470,7 +476,6 @@ export class AttributeImportService {
           filterType: attr.filterType as unknown as AttributeFilterType || null,
           unitId: unitId || null,
           isFilterable: attr.isFilterable ?? false,
-          isRequired: attr.isRequired ?? false,
           createdBy: options.createdBy,
         });
 
@@ -533,17 +538,26 @@ export class AttributeImportService {
     optionsCsv: string;
   }> {
     const attributesCsv = [
-      'name,slug,dataType,group,sortOrder,isFilterable,filterType,isRequired,unitSymbol',
-      'Thread Size,thread-size,number,Technical Specs,1,true,RANGE,true,mm',
-      'Material,material,enum,Technical Specs,2,true,CHECKBOX,false,',
-      'In Stock,in-stock,boolean,Inventory,3,false,SELECT,false,',
+      'name,slug,dataType,group,sortOrder,isFilterable,filterType,unitSymbol',
+      'Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,',
+      'Material,material,enum,Material,2,true,CHECKBOX,',
+      'Diameter,diameter,number,Dimensions,3,true,RANGE,mm',
+      'Length,length,number,Dimensions,4,true,RANGE,mm',
+      'Finish,finish,enum,Material,5,true,CHECKBOX,',
     ].join('\n');
 
     const optionsCsv = [
       'attributeSlug,label,value,sortOrder',
       'material,Steel,steel,1',
-      'material,Aluminum,aluminum,2',
-      'material,Titanium,titanium,3',
+      'material,Stainless Steel,stainless-steel,2',
+      'material,Aluminum,aluminum,3',
+      'material,Brass,brass,4',
+      'finish,Zinc,zinc,1',
+      'finish,Black Oxide,black-oxide,2',
+      'finish,Plain,plain,3',
+      'thread-size,1/4-20,1/4-20,1',
+      'thread-size,3/8-16,3/8-16,2',
+      'thread-size,1/2-13,1/2-13,3',
     ].join('\n');
 
     return { attributesCsv, optionsCsv };

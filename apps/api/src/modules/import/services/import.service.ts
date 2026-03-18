@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ImportJobService } from './import-job.service';
 import { CsvParserService } from './csv-parser.service';
 import { ImportValidationService, ValidationResult } from './import-validation.service';
-import { ImportFileType, ImportMode } from '../entities';
+import { ImportFileType, ImportMode, ImportType } from '../entities';
 import { InvalidFileFormatError, InvalidImportDataError } from '../domain/errors/import.errors';
 import { Readable } from 'stream';
 import * as fs from 'fs';
@@ -156,6 +156,7 @@ export class ImportService {
       createdBy?: string;
       mode?: ImportMode;
       warehouseId?: string;
+      importType?: ImportType;
     },
   ): Promise<UploadResult> {
     if (!file) {
@@ -203,6 +204,7 @@ export class ImportService {
       mode: options?.mode ?? undefined,
       warehouseId: options?.warehouseId ?? undefined,
       originalFilePath: relativePath.replace(/\\/g, '/'),
+      importType: options?.importType,
     });
 
     this.logger.log(`ZIP upload complete: job ${job.id}`);

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsx catalog-import.worker.ts",
-    "start": "tsx catalog-import.worker.ts"
+    "dev": "tsx index.ts",
+    "start": "tsx index.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.14",

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
@@ -48,6 +49,7 @@ import {
   updateAttribute,
   updateAttributeOption,
   uploadAttributesCsv,
+  uploadAttributesZip,
   downloadAttributeTemplate,
   getAllAttributes,
   useCategoryTree,
@@ -57,6 +59,7 @@ import {
   type CategoryTreeNode,
   type AttributeView,
 } from "@/lib/api/catalog"
+import { getImportJob, type ImportJobView } from "@/lib/api/import"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 import {
   Dialog,
@@ -167,6 +170,19 @@ function getFilterLabel(filterType: AttributeFilterType): string {
       return "Checkbox"
     case "SELECT":
       return "Select"
+  }
+}
+
+function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
+  switch (status) {
+    case "COMPLETED":
+      return "default"
+    case "FAILED":
+      return "destructive"
+    case "CANCELLED":
+      return "secondary"
+    default:
+      return "outline"
   }
 }
 
@@ -293,6 +309,8 @@ export default function AttributesPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [validateOnly, setValidateOnly] = useState(false)
+  const [importJob, setImportJob] = useState<ImportJobView | null>(null)
+  const [isPolling, setIsPolling] = useState(false)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
 
@@ -301,6 +319,33 @@ export default function AttributesPage() {
       setSelectedCategoryId(leafCategories[0].id)
     }
   }, [leafCategories, selectedCategoryId])
+
+  useEffect(() => {
+    if (!isPolling || !importJob) return
+
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getImportJob(importJob.id)
+        setImportJob(updated)
+
+        if (updated.status === "COMPLETED" || updated.status === "FAILED" || updated.status === "CANCELLED") {
+          setIsPolling(false)
+
+          // Auto-refresh attributes list on completion
+          await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
+          if (selectedCategoryId) {
+            await queryClient.invalidateQueries({
+              queryKey: ["category-attributes", selectedCategoryId],
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Failed to poll import job", error)
+      }
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [isPolling, importJob, queryClient, selectedCategoryId])
 
   const selectedCategory = useMemo(
     () => leafCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -482,9 +527,51 @@ export default function AttributesPage() {
 
   const importMutation = useMutation({
     mutationFn: async (payload: { file: File; validateOnly: boolean }) => {
+      console.log('[Import] Starting import:', payload.file.name, 'validateOnly:', payload.validateOnly)
+      
+      if (payload.file.name.endsWith('.zip')) {
+        console.log('[Import] Detected ZIP file, calling uploadAttributesZip')
+        return uploadAttributesZip(payload.file)
+      }
+      console.log('[Import] Detected CSV file, calling uploadAttributesCsv')
       return uploadAttributesCsv(payload.file, { validateOnly: payload.validateOnly })
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, variables) => {
+      console.log('[Import] Success:', result)
+      
+      if ('jobId' in result) {
+        // ZIP upload - async processing - start polling
+        toast.success(`Import job created: ${result.jobId}. Processing will begin shortly.`)
+        
+        const job: ImportJobView = {
+          id: result.jobId,
+          fileUrl: result.fileUrl,
+          fileName: result.fileName,
+          fileSize: result.fileSize,
+          totalRows: result.totalRows,
+          processedRows: 0,
+          successRows: 0,
+          failedRows: 0,
+          lastProcessedRow: 0,
+          type: "ZIP",
+          status: "PENDING",
+          lockedAt: null,
+          lockedBy: null,
+          createdBy: null,
+          startedAt: null,
+          finishedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          duration: null,
+          rowsPerSecond: null,
+        }
+        setImportJob(job)
+        setIsPolling(true)
+        // Don't close dialog - show progress instead
+        return
+      }
+      
+      // CSV upload - immediate results
       if (result.errors.length > 0) {
         toast.error(`Import completed with ${result.errors.length} errors`)
       } else {
@@ -504,6 +591,7 @@ export default function AttributesPage() {
       setValidateOnly(false)
     },
     onError: (error) => {
+      console.error('[Import] Error:', error)
       toast.error(getErrorMessage(error, "Failed to import attributes"))
     },
   })
@@ -1304,7 +1392,15 @@ export default function AttributesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+      <Dialog open={importDialogOpen} onOpenChange={(open) => {
+        setImportDialogOpen(open)
+        if (!open) {
+          setImportFile(null)
+          setValidateOnly(false)
+          setImportJob(null)
+          setIsPolling(false)
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Import Attributes</DialogTitle>
@@ -1336,6 +1432,10 @@ export default function AttributesPage() {
                   const file = e.target.files?.[0]
                   if (file) {
                     setImportFile(file)
+                    // Auto-disable validateOnly for ZIP files
+                    if (file.name.endsWith('.zip')) {
+                      setValidateOnly(false)
+                    }
                   }
                 }}
               />
@@ -1349,14 +1449,66 @@ export default function AttributesPage() {
                 id="validate-only"
                 checked={validateOnly}
                 onCheckedChange={setValidateOnly}
+                disabled={importFile?.name.endsWith('.zip')}
               />
               <Label htmlFor="validate-only">Validate only (don't import)</Label>
             </div>
 
-            {importFile && (
+            {importFile && !importJob && (
               <div className="rounded-md border p-3 text-sm">
                 <div className="font-medium">{importFile.name}</div>
                 <div className="text-muted-foreground">{(importFile.size / 1024).toFixed(2)} KB</div>
+                {importFile.name.endsWith('.zip') && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    ZIP files will be processed asynchronously. Check job status for progress.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {importJob && (
+              <div className="rounded-md border p-4 space-y-3">
+                {/* Status Badge */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Import Status</span>
+                  <Badge variant={getStatusVariant(importJob.status)}>{importJob.status}</Badge>
+                </div>
+
+                {/* Progress Bar */}
+                {(importJob.status === "PROCESSING" || importJob.status === "COMPLETED") && importJob.totalRows !== null && (
+                  <div className="space-y-2">
+                    <Progress 
+                      value={importJob.totalRows > 0 ? (importJob.processedRows / importJob.totalRows) * 100 : 0} 
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{importJob.processedRows} of {importJob.totalRows} rows</span>
+                      <span>{importJob.totalRows > 0 ? ((importJob.processedRows / importJob.totalRows) * 100).toFixed(0) : 0}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Summary */}
+                {importJob.status === "COMPLETED" && (
+                  <div className="text-sm space-y-1">
+                    <div className="text-green-600">Success: {importJob.successRows}</div>
+                    {importJob.failedRows > 0 && (
+                      <div className="text-red-600">Failed: {importJob.failedRows}</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {importJob.status === "FAILED" && (
+                  <div className="text-sm text-red-600">Import failed. Please check your file format.</div>
+                )}
+
+                {/* Processing indicator */}
+                {importJob.status === "PROCESSING" && (
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing...
+                  </div>
+                )}
               </div>
             )}
 
@@ -1380,20 +1532,28 @@ export default function AttributesPage() {
             <Button
               variant="outline"
               onClick={() => {
+                console.log('[Dialog] Cancel clicked')
                 setImportDialogOpen(false)
                 setImportFile(null)
                 setValidateOnly(false)
+                setImportJob(null)
+                setIsPolling(false)
               }}
             >
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={() => {
+                console.log('[Dialog] Import button clicked, importFile:', importFile)
                 if (importFile) {
+                  console.log('[Dialog] Calling importMutation.mutate')
                   importMutation.mutate({ file: importFile, validateOnly })
+                } else {
+                  console.log('[Dialog] No file selected')
                 }
               }}
-              disabled={!importFile || importMutation.isPending}
+              disabled={!importFile || importMutation.isPending || !!importJob}
             >
               {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {validateOnly ? "Validate" : "Import"}

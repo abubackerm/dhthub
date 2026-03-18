@@ -13,6 +13,11 @@ export enum ImportMode {
   UPDATE_ONLY = 'UPDATE_ONLY',
 }
 
+export enum ImportType {
+  CATALOG = 'CATALOG',
+  ATTRIBUTES = 'ATTRIBUTES',
+}
+
 export class ImportJobEntity extends BaseEntity {
   fileUrl: string;
   fileName: string | null;
@@ -31,4 +36,5 @@ export class ImportJobEntity extends BaseEntity {
   mode: ImportMode | null;
   warehouseId: string | null;
   originalFilePath: string | null;
+  importType: ImportType | null;
 }

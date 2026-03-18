@@ -1,6 +1,6 @@
 export interface ExtractedFiles {
   products?: string;
-  variants: string;  // Required
+  variants?: string;  // Required for catalog imports, optional for attribute imports
   images?: string;
   attributes?: string;
   attributeOptions?: string;
@@ -13,5 +13,6 @@ export interface ZipValidationResult {
   optionalFiles: string[];
 }
 
-export const REQUIRED_CSV_FILES = ['variants.csv'];
-export const OPTIONAL_CSV_FILES = ['products.csv', 'images.csv', 'attributes.csv', 'attribute-options.csv'];
+export const CATALOG_REQUIRED_CSV_FILES = ['variants.csv'];
+export const ATTRIBUTE_REQUIRED_CSV_FILES = ['attributes.csv'];
+export const OPTIONAL_CSV_FILES = ['products.csv', 'images.csv', 'attribute-options.csv'];

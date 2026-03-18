@@ -130,26 +130,28 @@ class CatalogImportWorker {
   }
 }
 
-// Create and start worker instance
-const catalogImportWorker = new CatalogImportWorker();
+// Only auto-start if this file is run directly (not when imported via index.ts)
+if (require.main === module) {
+  const catalogImportWorker = new CatalogImportWorker();
 
-// Handle graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down catalog import worker...');
-  await catalogImportWorker.stop();
-  process.exit(0);
-});
+  // Handle graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down catalog import worker...');
+    await catalogImportWorker.stop();
+    process.exit(0);
+  });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down catalog import worker...');
-  await catalogImportWorker.stop();
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down catalog import worker...');
+    await catalogImportWorker.stop();
+    process.exit(0);
+  });
 
-// Start worker
-catalogImportWorker.start().catch((error) => {
-  console.error('Failed to start CatalogImportWorker:', error);
-  process.exit(1);
-});
+  // Start worker
+  catalogImportWorker.start().catch((error) => {
+    console.error('Failed to start CatalogImportWorker:', error);
+    process.exit(1);
+  });
+}
 
 export { CatalogImportWorker };

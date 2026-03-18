@@ -71,12 +71,13 @@ export class TemplatePackService {
    * Generate attributes.csv template
    */
   private generateAttributesTemplate(): string {
-    const headers = ['attribute_slug', 'name', 'type', 'display_order'];
+    const headers = ['name', 'slug', 'dataType', 'group', 'sortOrder', 'isFilterable', 'filterType', 'unitSymbol'];
     const exampleRows = [
-      'diameter,Diameter,number,1',
-      'length,Length,number,2',
-      'material,Material,enum,3',
-      'finish,Finish,enum,4',
+      'Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,',
+      'Material,material,enum,Material,2,true,CHECKBOX,',
+      'Diameter,diameter,number,Dimensions,3,true,RANGE,mm',
+      'Length,length,number,Dimensions,4,true,RANGE,mm',
+      'Finish,finish,enum,Material,5,true,CHECKBOX,',
     ];
 
     return [headers.join(','), ...exampleRows].join('\n');
@@ -86,14 +87,18 @@ export class TemplatePackService {
    * Generate attribute-options.csv template
    */
   private generateAttributeOptionsTemplate(): string {
-    const headers = ['attribute_slug', 'option_value'];
+    const headers = ['attributeSlug', 'label', 'value', 'sortOrder'];
     const exampleRows = [
-      'material,Steel',
-      'material,Stainless Steel',
-      'material,Brass',
-      'finish,Zinc',
-      'finish,Black Oxide',
-      'finish,Plain',
+      'material,Steel,steel,1',
+      'material,Stainless Steel,stainless-steel,2',
+      'material,Aluminum,aluminum,3',
+      'material,Brass,brass,4',
+      'finish,Zinc,zinc,1',
+      'finish,Black Oxide,black-oxide,2',
+      'finish,Plain,plain,3',
+      'thread-size,1/4-20,1/4-20,1',
+      'thread-size,3/8-16,3/8-16,2',
+      'thread-size,1/2-13,1/2-13,3',
     ];
 
     return [headers.join(','), ...exampleRows].join('\n');
@@ -196,29 +201,44 @@ Defines attribute metadata.
 If not provided, attributes will be auto-created from variants.csv columns.
 
 Required columns:
-- attribute_slug: Unique identifier (e.g., diameter)
 - name: Display name
-- type: Data type (number, text, enum, boolean)
-- display_order: Sort order (integer)
+- slug: Unique identifier (lowercase alphanumeric with hyphens)
+- dataType: Data type (number, text, enum, boolean)
+- group: Attribute group (e.g., Material, Dimensions, Technical Specs)
+- sortOrder: Sort order (integer, 0-indexed)
+- isFilterable: Whether attribute can be used for filtering (true/false)
+- filterType: Filter type (RANGE for numbers, CHECKBOX/SELECT for enums)
+- unitSymbol: Unit symbol (only for number types, e.g., mm, in)
+
+Data type restrictions:
+- number: Only RANGE filter type allowed
+- enum: CHECKBOX or SELECT filter type allowed
+- boolean: No filter type allowed (simple toggle)
+- text: No filter type allowed
 
 Example:
-attribute_slug,name,type,display_order
-diameter,Diameter,number,1
-material,Material,enum,3
+name,slug,dataType,group,sortOrder,isFilterable,filterType,unitSymbol
+Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,
+Material,material,enum,Material,2,true,CHECKBOX,
+Diameter,diameter,number,Dimensions,3,true,RANGE,mm
+Length,length,number,Dimensions,4,true,RANGE,mm
 
 attribute-options.csv
 -------------------
 Defines enum values for enum-type attributes.
 
 Required columns:
-- attribute_slug: References attribute_slug from attributes.csv
-- option_value: Enum value
+- attributeSlug: References slug from attributes.csv
+- label: Display label for the option
+- value: Internal value (lowercase alphanumeric with hyphens)
+- sortOrder: Sort order (integer, 0-indexed)
 
 Example:
-attribute_slug,option_value
-material,Steel
-material,Stainless Steel
-finish,Zinc
+attributeSlug,label,value,sortOrder
+material,Steel,steel,1
+material,Stainless Steel,stainless-steel,2
+finish,Zinc,zinc,1
+thread-size,1/4-20,1/4-20,1
 
 VALIDATION RULES
 ----------------
@@ -237,11 +257,18 @@ VALIDATION RULES
    - image_url must be a valid URL
 
 4. attributes.csv:
-   - attribute_slug must be unique
-   - type must be: number, text, enum, or boolean
+   - slug must be unique
+   - dataType must be: number, text, enum, or boolean
+   - isFilterable and filterType must be consistent (filterType requires isFilterable)
+   - number type: only RANGE filter allowed
+   - enum type: CHECKBOX or SELECT filter allowed
+   - boolean type: no filter allowed
+   - text type: no filter allowed
+   - unitSymbol only for number types
 
 5. attribute-options.csv:
-   - attribute_slug must exist in attributes.csv
+   - attributeSlug must exist in attributes.csv (matches slug column)
+   - value must be unique per attribute
 
 IMPORT WORKFLOW
 ----------------
