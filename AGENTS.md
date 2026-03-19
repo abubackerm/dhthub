@@ -83,7 +83,6 @@
 - NestJS `ImportJobService` has `markAsFailed(jobId)` method with only jobId parameter
 - Import job services have different method signatures: ProgressService accepts error, JobService does not
 - Always verify method names and signatures when using services across different contexts
-- Method name `markAsFailed` (ImportProgressService) vs `markAsFailed` (ImportJobService) are different
 
 - Use `forwardRef()` to resolve circular dependencies between modules
 - Circular dependency occurs when ModuleA imports ModuleB and ModuleB imports ModuleA
@@ -110,3 +109,10 @@
 - Multiple CSV files can be bundled in ZIP: products.csv, variants.csv (required), attributes.csv, images.csv
 - When multiple processors listen to the same event (e.g., `JOB_CREATED`), use a discriminator field like `importType` to filter relevant jobs
 - Workers entry point (`apps/workers/index.ts` or package.json script) should start all workers, not just one specific worker
+
+- The `importType` field in `ImportJob` is mandatory for proper job routing to processors
+- `/v1/import/jobs` endpoint must pass `importType: ImportType.CATALOG` to `uploadZip()` call
+- When `importType` is `null`, `CatalogImportProcessorService` skips the job (checks `event.importType !== 'CATALOG'`)
+- Jobs with null `importType` never get enqueued to BullMQ queue,- Global CSS overrides in `globals.css` can take precedence over Tailwind utility classes
+- Example: `.cell-product-table th` in `globals.css` overrides `TableHead` component styling
+- When styles don't apply, check `globals.css` for existing global style that may override component-level styling

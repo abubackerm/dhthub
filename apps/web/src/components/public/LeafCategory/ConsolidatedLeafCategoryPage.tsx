@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MobileFilterToggle } from "./MobileFilterToggle";
 
 import { ChevronRight } from "lucide-react";
+import Image from "next/image";
 
 interface ConsolidatedLeafCategoryPageProps {
   categorySlug: string;
@@ -145,28 +146,6 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
 
   return (
     <div className="catalog-page">
-      {/* Breadcrumb */}
-      <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
-        <Link href="/" className="catalog-breadcrumb__link">Home</Link>
-        <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
-        <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
-        {breadcrumbItems.map((item, i) => (
-          <React.Fragment key={i}>
-            <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
-            {i === breadcrumbItems.length - 1 ? (
-              <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
-            ) : (
-              <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
-            )}
-          </React.Fragment>
-        ))}
-      </nav>
-
-      {/* Branch heading */}
-      <p className="text-sm text-gray-500 mb-6">
-        {totalVariantCount} item{totalVariantCount !== 1 ? "s" : ""} available across {data.leafCategories.length} categor{data.leafCategories.length !== 1 ? "ies" : "y"}
-      </p>
-
       {/* Mobile Filter */}
       {data.filterableAttributes.length > 0 && (
         <div className="lg:hidden mb-4">
@@ -196,11 +175,53 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
               <hr className="my-10 border-t-2 border-gray-300" />
             )}
 
-            {/* h1: Leaf category name */}
-            <h1 className="catalog-page__title">{leafCat.name}</h1>
-            {leafCat.description && (
-              <p className="text-muted-foreground mb-6 max-w-3xl">{leafCat.description}</p>
-            )}
+            {/* h1: Leaf category name with hero background */}
+            <div className="relative overflow-hidden rounded-lg mb-6">
+              <Image
+                src="/images/leaf_hero.png"
+                alt=""
+                fill
+                className="object-cover"
+                priority={leafIndex === 0}
+              />
+              <div className="relative z-10 px-6 py-4">
+                {leafIndex === 0 ? (
+                  <>
+                    {/* First leaf: include breadcrumb and item count */}
+                    <nav className="catalog-breadcrumb--hero" aria-label="Breadcrumb">
+                      <Link href="/" className="catalog-breadcrumb__link">Home</Link>
+                      <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
+                      <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
+                      {breadcrumbItems.map((item, i) => (
+                        <React.Fragment key={i}>
+                          <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
+                          {i === breadcrumbItems.length - 1 ? (
+                            <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
+                          ) : (
+                            <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </nav>
+                    <p className="text-sm text-gray-500 mt-1 mb-3">
+                      {totalVariantCount} item{totalVariantCount !== 1 ? "s" : ""} available across {data.leafCategories.length} categor{data.leafCategories.length !== 1 ? "ies" : "y"}
+                    </p>
+                    <h1 className="catalog-page__title m-0">{leafCat.name}</h1>
+                    {leafCat.description && (
+                      <p className="text-muted-foreground mb-0 mt-1 max-w-3xl">{leafCat.description}</p>
+                    )}
+                  </>
+                ) : (
+                  /* Subsequent leaves: just title and description */
+                  <>
+                    <h1 className="catalog-page__title m-0">{leafCat.name}</h1>
+                    {leafCat.description && (
+                      <p className="text-muted-foreground mb-0 mt-2 max-w-3xl">{leafCat.description}</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
 
             {/* Cells under this leaf */}
             {leafCat.cells.map((cell) => (

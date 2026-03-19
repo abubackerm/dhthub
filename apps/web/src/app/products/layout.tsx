@@ -14,11 +14,6 @@ export default function ProductsLayout({ children }: { children: React.ReactNode
     <div className="min-h-screen flex flex-col">
       <DHTHeader />
 
-      {/* All Categories Tab Bar */}
-      <div className="catalog-tab-bar">
-        <span className="catalog-tab-bar__label">All Categories</span>
-      </div>
-
       {/* Main Layout: Sidebar + Content */}
       <div className="catalog-layout">
         <FilterProvider>

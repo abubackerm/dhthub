@@ -120,12 +120,12 @@ export function CellProductTable({
   // Get sort icon for column
   const getSortIcon = (columnSlug: string) => {
     if (sortColumn !== columnSlug) {
-      return <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground/50" />;
+      return <ChevronsUpDown className="w-3.5 h-3.5 text-white/50" />;
     }
     if (sortDirection === "asc") {
-      return <ChevronUp className="w-3.5 h-3.5 text-(--dht-red)" />;
+      return <ChevronUp className="w-3.5 h-3.5 text-white" />;
     }
-    return <ChevronDown className="w-3.5 h-3.5 text-(--dht-red)" />;
+    return <ChevronDown className="w-3.5 h-3.5 text-white" />;
   };
 
   if (sortedVariants.length === 0) {
@@ -141,13 +141,15 @@ export function CellProductTable({
       <div className="border rounded-md overflow-hidden">
         <Table className="cell-product-table">
           <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
+            <TableRow 
+              className="bg-gradient-to-b from-[#ff3b3b] via-[#e60000_45%,#c40000_55%] to-[#990000] [box-shadow:inset_0_-2px_0_rgba(0,0,0,0.2)] border-b border-[#990000]"
+            >
               <TableHead className="w-[60px] p-2"></TableHead>
-              <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground min-w-[180px] p-2">
+              <TableHead className="font-semibold text-xs uppercase tracking-wide text-white min-w-[180px] p-2">
                 Product
               </TableHead>
               <TableHead
-                className="font-semibold text-xs uppercase tracking-wide text-muted-foreground w-[120px] p-2 cursor-pointer select-none hover:bg-muted/60 transition-colors"
+                className="font-semibold text-xs uppercase tracking-wide text-white w-[120px] p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                 onClick={() => handleSort("sku")}
               >
                 <div className="flex items-center gap-1">
@@ -158,13 +160,13 @@ export function CellProductTable({
               {visibleAttributes.map((attr) => (
                 <TableHead
                   key={attr.id}
-                  className="font-semibold text-xs uppercase tracking-wide text-muted-foreground p-2 cursor-pointer select-none hover:bg-muted/60 transition-colors"
+                  className="font-semibold text-xs uppercase tracking-wide text-white p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                   onClick={() => handleSort(attr.slug)}
                 >
                   <div className="flex items-center gap-1">
                     <span>{attr.name}</span>
                     {attr.unitSymbol && (
-                      <span className="font-normal text-muted-foreground/70">
+                      <span className="font-normal text-white/70">
                         ({attr.unitSymbol})
                       </span>
                     )}
@@ -173,7 +175,7 @@ export function CellProductTable({
                 </TableHead>
               ))}
               <TableHead
-                className="font-semibold text-xs uppercase tracking-wide text-muted-foreground text-right w-[100px] p-2 cursor-pointer select-none hover:bg-muted/60 transition-colors"
+                className="font-semibold text-xs uppercase tracking-wide text-white text-right w-[100px] p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                 onClick={() => handleSort("price")}
               >
                 <div className="flex items-center justify-end gap-1">
@@ -181,7 +183,7 @@ export function CellProductTable({
                   {getSortIcon("price")}
                 </div>
               </TableHead>
-              <TableHead className="font-semibold text-xs uppercase tracking-wide text-muted-foreground text-center w-[70px] p-2">
+              <TableHead className="font-semibold text-xs uppercase tracking-wide text-white text-center w-[70px] p-2">
                 Stock
               </TableHead>
               <TableHead className="w-[80px] p-2"></TableHead>
@@ -195,9 +197,7 @@ export function CellProductTable({
               return (
                 <TableRow
                   key={variant.id}
-                  className={`group cursor-pointer hover:bg-(--dht-red)/5 transition-colors ${
-                    index % 2 === 1 ? "bg-muted/15" : ""
-                  }`}
+                  className="group cursor-pointer transition-colors"
                   onClick={() => router.push(productPath)}
                 >
                   {/* Image Thumbnail */}

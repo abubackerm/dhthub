@@ -17,7 +17,7 @@ import { ImportService, UploadedFile } from '../services/import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImportErrorRepository } from '../repositories/import-error.repository';
 import { ImportStatusView, ImportErrorView, ImportJobWithErrorsView } from '../dto/views';
-import { ImportJobStatus, ImportMode } from '../entities';
+import { ImportJobStatus, ImportMode, ImportType } from '../entities';
 import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
@@ -84,7 +84,7 @@ export class ImportController {
     // Route to appropriate upload method based on file type
     const isZip = file.filename.endsWith('.zip');
     const result = isZip
-      ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId })
+      ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId, importType: ImportType.CATALOG })
       : await this.importService.uploadCsv(file, { createdBy, mode, warehouseId });
 
     return {
