@@ -263,8 +263,8 @@ export class CategoryRepository {
             variants: {
               orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
               include: {
-                images: {
-                  where: { isPrimary: true },
+                variantImages: {
+                  orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
                   take: 1,
                 },
                 attributeValues: {
@@ -378,11 +378,11 @@ export class CategoryRepository {
               include: {
                 variants: {
                   orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
-                  include: {
-                    images: {
-                      where: { isPrimary: true },
-                      take: 1,
-                    },
+              include: {
+                variantImages: {
+                  orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
+                  take: 1,
+                },
                     attributeValues: {
                       include: {
                         attribute: {

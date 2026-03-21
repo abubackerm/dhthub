@@ -173,4 +173,17 @@ export class ProductVariantRepository {
       where: { id: { in: ids } },
     });
   }
+
+  async getSkuMap(): Promise<Map<string, string>> {
+    const variants = await this.getClient().productVariant.findMany({
+      select: { id: true, sku: true }
+    });
+    
+    const skuMap = new Map<string, string>();
+    for (const v of variants) {
+      skuMap.set(v.sku, v.id);
+    }
+    
+    return skuMap;
+  }
 }

@@ -276,6 +276,79 @@ export class ImportController {
   }
 
   /**
+   * Upload image ZIP file and create import job
+   * POST /v1/import/images
+   */
+  @Post('images')
+  async uploadImages(@Req() req: FastifyRequest) {
+    const data = await req.file();
+    if (!data) {
+      throw new BadRequestException(
+        'No file provided. Send a multipart/form-data request with a "file" field.',
+      );
+    }
+
+    const buffer = await data.toBuffer();
+    const file: UploadedFile = {
+      fieldname: data.fieldname,
+      filename: data.filename,
+      encoding: data.encoding,
+      mimetype: data.mimetype,
+      buffer,
+      size: buffer.length,
+      originalname: data.filename,
+    };
+
+    // Validate it's a ZIP file
+    if (!file.filename.endsWith('.zip')) {
+      throw new BadRequestException('Only ZIP files are supported for image uploads');
+    }
+
+    const fields = data.fields as Record<string, any>;
+    const createdBy = fields?.createdBy?.value as string | undefined;
+
+    const result = await this.importService.uploadZip(file, {
+      createdBy,
+      mode: ImportMode.UPSERT,
+      importType: ImportType.IMAGES,
+    });
+
+    return {
+      jobId: result.jobId,
+      fileUrl: result.fileUrl,
+      fileName: result.fileName,
+      fileSize: result.fileSize,
+    };
+  }
+
+  /**
+   * Get image import job status
+   * GET /v1/import/images/:jobId/status
+   */
+  @Get('images/:jobId/status')
+  async getImageImportStatus(@Param('jobId') id: string): Promise<ImportStatusView> {
+    const job = await this.importJobService.findById(id);
+    const metrics = await this.importJobService.getMetrics(id);
+
+    const view = {
+      ...this.jobToView(job),
+      duration: metrics.duration,
+      rowsPerSecond: metrics.rowsPerSecond,
+    };
+
+    // For image imports, map row counts to file counts
+    // The UI expects totalFiles, processedFiles, successFiles, failedFiles
+    // but ImportJob stores these as totalRows, processedRows, successRows, failedRows
+    return {
+      ...view,
+      totalFiles: job.totalRows || 0,
+      processedFiles: job.processedRows || 0,
+      successFiles: job.successRows || 0,
+      failedFiles: job.failedRows || 0,
+    } as any;
+  }
+
+  /**
    * Convert ImportJob entity to ImportStatusView
    */
   private jobToView(job: any): ImportStatusView {

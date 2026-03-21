@@ -16,9 +16,9 @@ import {
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductVariantRepository } from '../repositories/product-variant.repository';
 import { ProductImageRepository } from '../repositories/product-image.repository';
+import { VariantImageRepository } from '../repositories/variant-image.repository';
 import { ProductEntity, ProductStatus, ProductType } from '../entities/product.entity';
 import { ProductVariantEntity } from '../entities/product-variant.entity';
-import { ProductImageEntity } from '../entities/product-image.entity';
 import {
   ProductCreatedEvent,
   ProductUpdatedEvent,
@@ -44,6 +44,7 @@ export class ProductService extends BaseService {
     private readonly productRepo: ProductRepository,
     private readonly variantRepo: ProductVariantRepository,
     private readonly imageRepo: ProductImageRepository,
+    private readonly variantImageRepo: VariantImageRepository,
     private readonly configService: ConfigService,
     @Optional() private readonly variantAttributeService?: VariantAttributeService,
     @Optional() private readonly cellRepo?: CellRepository,
@@ -645,7 +646,7 @@ export class ProductService extends BaseService {
     url: string,
     altText?: string,
     sortOrder?: number,
-  ): Promise<ProductImageEntity> {
+  ): Promise<any> {
     const product = await this.productRepo.findById(productId);
     if (!product) {
       throw new ProductNotFoundError(productId);
@@ -663,12 +664,12 @@ export class ProductService extends BaseService {
       );
     }
 
-    return this.imageRepo.create({
-      productId,
+    return this.variantImageRepo.create({
       variantId,
-      url,
+      sku: variant.sku,
+      storagePath: url,
       altText: altText ?? null,
-      sortOrder: sortOrder ?? 1,
+      position: sortOrder ?? 1,
       isPrimary: false,
     });
   }
@@ -676,20 +677,20 @@ export class ProductService extends BaseService {
   async updateImage(
     imageId: string,
     data: { altText?: string; sortOrder?: number; isPrimary?: boolean },
-  ): Promise<ProductImageEntity> {
-    const image = await this.imageRepo.findById(imageId);
+  ): Promise<any> {
+    const image = await this.variantImageRepo.findById(imageId);
     if (!image) {
       throw new NotFoundException('Image not found');
     }
 
-    return this.imageRepo.update(imageId, data);
+    return this.variantImageRepo.update(imageId, data);
   }
 
   async removeImage(imageId: string): Promise<void> {
-    await this.imageRepo.delete(imageId);
+    await this.variantImageRepo.delete(imageId);
   }
 
-  async getVariantImages(variantId: string): Promise<ProductImageEntity[]> {
-    return this.imageRepo.findByVariantId(variantId);
+  async getVariantImages(variantId: string): Promise<any[]> {
+    return this.variantImageRepo.findByVariantId(variantId);
   }
 }

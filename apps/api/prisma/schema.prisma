@@ -217,6 +217,7 @@ model ProductVariant {
 
   product         Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
   images          ProductImage[]
+  variantImages   VariantImage[]
   attributeValues VariantAttributeValue[]
   prices          Price[]
   inventoryLevels InventoryLevel[]
@@ -273,6 +274,25 @@ model ProductImage {
   @@index([productId])
   @@index([variantId])
   @@map("product_images")
+}
+
+model VariantImage {
+  id          String   @id @default(cuid())
+  variantId   String   @map("variant_id")
+  sku         String
+  storagePath String   @map("storage_path")
+  position    Int      @map("position")
+  altText     String?  @map("alt_text")
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, position])
+  @@index([sku])
+  @@index([variantId, isPrimary])
+  @@map("variant_images")
 }
 
 // ============================================
@@ -591,6 +611,7 @@ enum ImportMode {
 enum ImportType {
   CATALOG
   ATTRIBUTES
+  IMAGES
 }
 
 model ImportJob {

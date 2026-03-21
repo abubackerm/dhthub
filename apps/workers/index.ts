@@ -19,6 +19,7 @@ export * from './queue.config';
 export { ImportWorker } from './import.worker';
 export { CatalogImportWorker } from './catalog-import.worker';
 export { AttributeImportWorker } from './attribute-import.worker';
+export { ImageImportWorker } from './image-import.worker';
 
 // Start all workers when running this file directly
 if (require.main === module) {
@@ -45,23 +46,27 @@ if (require.main === module) {
   try {
     const { CatalogImportWorker } = require('./catalog-import.worker');
     const { AttributeImportWorker } = require('./attribute-import.worker');
-    
+    const { ImageImportWorker } = require('./image-import.worker');
+
     const catalogWorker = new CatalogImportWorker();
     const attributeWorker = new AttributeImportWorker();
-    
+    const imageWorker = new ImageImportWorker();
+
     workers.push(catalogWorker);
     workers.push(attributeWorker);
-    
+    workers.push(imageWorker);
+
     console.log('All workers initialized');
-    
+
     // Handle graceful shutdown
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
-    
+
     // Start workers
     Promise.all([
       catalogWorker.start(),
       attributeWorker.start(),
+      imageWorker.start(),
     ]).then(() => {
       console.log('All workers started and ready');
     }).catch((error) => {

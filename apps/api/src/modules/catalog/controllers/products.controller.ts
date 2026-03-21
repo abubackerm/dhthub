@@ -22,7 +22,6 @@ import {
 } from '../dto';
 import { ProductView } from '../dto/views/product.view';
 import { VariantView } from '../dto/views/variant.view';
-import { ProductImageEntity } from '../entities/product-image.entity';
 import { PaginatedResponseDto } from '@shared/dto';
 
 @Controller('catalog/products')
@@ -220,7 +219,12 @@ export class ProductsController {
       body.altText,
       body.sortOrder,
     );
-    return image;
+    return {
+      id: image.id,
+      url: image.storagePath,
+      altText: image.altText,
+      isPrimary: image.isPrimary,
+    };
   }
 
   @Patch('images/:imageId')
@@ -229,7 +233,12 @@ export class ProductsController {
     @Body() body: { altText?: string; sortOrder?: number; isPrimary?: boolean },
   ): Promise<any> {
     const image = await this.productService.updateImage(imageId, body);
-    return image;
+    return {
+      id: image.id,
+      url: image.storagePath,
+      altText: image.altText,
+      isPrimary: image.isPrimary,
+    };
   }
 
   @Delete('images/:imageId')
@@ -241,8 +250,13 @@ export class ProductsController {
   @Get(':productId/variants/:variantId/images')
   async getVariantImages(
     @Param('variantId') variantId: string,
-  ): Promise<ProductImageEntity[]> {
+  ): Promise<any[]> {
     const images = await this.productService.getVariantImages(variantId);
-    return images;
+    return images.map(img => ({
+      id: img.id,
+      url: img.storagePath,
+      altText: img.altText,
+      isPrimary: img.isPrimary,
+    }));
   }
 }

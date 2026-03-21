@@ -136,6 +136,7 @@ export interface VariantView {
   price: number | null;
   quantity: number;
   isDefault: boolean;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
   createdAt: string;
   updatedAt: string;
 }

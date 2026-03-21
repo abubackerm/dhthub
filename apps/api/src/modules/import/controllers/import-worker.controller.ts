@@ -2,8 +2,11 @@ import { Controller, Post, Body, Get, Logger, BadRequestException } from '@nestj
 import { ZipExtractorService } from '../services/zip-extractor.service';
 import { CatalogImportService } from '../services/catalog-import.service';
 import { ImportJobService } from '../services/import-job.service';
+import { ImageImportService } from '../services/image-import.service';
+import { ImportJobStatus } from '../entities/import-job-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
+import unzipper from 'unzipper';
 
 /**
  * ImportWorkerController - Internal API for BullMQ workers
@@ -20,6 +23,7 @@ export class ImportWorkerController {
     private readonly zipExtractorService: ZipExtractorService,
     private readonly catalogImportService: CatalogImportService,
     private readonly importJobService: ImportJobService,
+    private readonly imageImportService: ImageImportService,
   ) {}
 
   /**
@@ -83,5 +87,116 @@ export class ImportWorkerController {
   @Get('health')
   health() {
     return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  /**
+   * Worker API: Process image import (called by BullMQ worker)
+   * POST /v1/import/worker/process-images
+   */
+  @Post('process-images')
+  async processImages(@Body() body: { jobId: string; fileUrl: string }) {
+    const { jobId, fileUrl } = body;
+
+    this.logger.log(`[ImageImport] Received request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+
+    // CRITICAL: Check job status FIRST to prevent re-processing
+    const job = await this.importJobService.findById(jobId);
+    this.logger.log(`[ImageImport] Job ${jobId} current status: ${job.status}`);
+
+    if (job.status !== ImportJobStatus.PENDING) {
+      this.logger.log(`[ImageImport] Job ${jobId} already processed (status: ${job.status}), skipping`);
+      return { success: true, jobId, processedCount: 0, skipped: true };
+    }
+
+    // Acquire lock to prevent concurrent processing
+    const locked = await this.importJobService.acquireLock(jobId, `image-worker-${process.pid}`);
+    if (!locked) {
+      this.logger.log(`[ImageImport] Job ${jobId} is locked by another worker, skipping`);
+      return { success: true, jobId, processedCount: 0, skipped: true };
+    }
+
+    this.logger.log(`[ImageImport] Lock acquired for job ${jobId}, starting processing`);
+
+    let actualFileUrl = fileUrl;
+    if (!actualFileUrl) {
+      this.logger.warn(`fileUrl not provided in request, retrieving from database for job ${jobId}`);
+      const job = await this.importJobService.findById(jobId);
+      actualFileUrl = job.fileUrl;
+      this.logger.log(`[processImages] Retrieved fileUrl from database: "${actualFileUrl}"`);
+    }
+
+    if (!actualFileUrl) {
+      throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
+    }
+
+    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+
+    this.logger.log(`[processImages] Resolved file path: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
+    }
+
+    try {
+      // Count total images in ZIP first
+      const totalImages = await this.countImagesInZip(filePath);
+      this.logger.log(`[processImages] Found ${totalImages} images in ZIP`);
+
+      // Set total count and mark job as processing
+      await this.importJobService.updateProgress(jobId, {
+        processedRows: 0,
+        successRows: 0,
+        failedRows: 0,
+      });
+      await this.importJobService.markAsProcessing(jobId, `image-worker-${process.pid}`);
+
+      const processedImages = await this.imageImportService.processImageZip(filePath);
+
+      this.logger.log(`[processImages] Processed ${processedImages.length} images for job ${jobId}`);
+
+      // Update job with actual counts
+      await this.importJobService.updateProgress(jobId, {
+        processedRows: processedImages.length,
+        successRows: processedImages.length,
+        failedRows: 0,
+      });
+
+      // Mark job as completed
+      await this.importJobService.markAsCompleted(jobId);
+
+    this.logger.log(`[ImageImport] Marking job ${jobId} as completed with ${processedImages.length} images`);
+
+    return { success: true, jobId, processedCount: processedImages.length, totalImages };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[ImageImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
+      await this.importJobService.markAsFailed(jobId);
+      throw error;
+    }
+  }
+
+  /**
+   * Count total image files in ZIP without processing them
+   */
+  private async countImagesInZip(zipPath: string): Promise<number> {
+    const directory = await unzipper.Open.file(zipPath);
+    let count = 0;
+
+    for (const file of directory.files) {
+      if (this.isValidImageFile(file.path)) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  /**
+   * Check if file is a valid image
+   */
+  private isValidImageFile(filePath: string): boolean {
+    const ext = path.extname(filePath).toLowerCase();
+    return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext);
   }
 }

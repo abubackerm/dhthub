@@ -2,3 +2,4 @@ export * from './product.entity';
 export * from './product-variant.entity';
 export * from './category.entity';
 export * from './product-image.entity';
+export * from './variant-image.entity';

@@ -120,8 +120,8 @@ export class LeafPageView {
       attributeValues: (variant.attributeValues || []).map((av: any) =>
         LeafPageView.mapAttributeValue(av)
       ),
-      images: (variant.images || []).map((img: any) => ({
-        url: img.url,
+      images: (variant.variantImages || []).map((img: any) => ({
+        url: img.storagePath,
         altText: img.altText,
         isPrimary: img.isPrimary,
       })),

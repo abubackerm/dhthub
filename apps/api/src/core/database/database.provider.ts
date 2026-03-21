@@ -66,6 +66,10 @@ export class DatabaseProvider {
     return this.prisma.productImage;
   }
 
+  get variantImage(): PrismaDelegate<any> {
+    return this.prisma.variantImage;
+  }
+
   get attributeDefinition(): PrismaDelegate<any> {
     return this.prisma.attributeDefinition;
   }

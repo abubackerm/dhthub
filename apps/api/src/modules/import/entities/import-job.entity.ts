@@ -16,6 +16,7 @@ export enum ImportMode {
 export enum ImportType {
   CATALOG = 'CATALOG',
   ATTRIBUTES = 'ATTRIBUTES',
+  IMAGES = 'IMAGES',
 }
 
 export class ImportJobEntity extends BaseEntity {

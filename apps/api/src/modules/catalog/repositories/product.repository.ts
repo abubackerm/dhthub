@@ -134,9 +134,9 @@ export class ProductRepository {
             quantity: true,
             isDefault: true,
             sortOrder: true,
-            images: {
+            variantImages: {
               select: {
-                url: true,
+                storagePath: true,
                 altText: true,
                 isPrimary: true,
               },
@@ -177,7 +177,20 @@ export class ProductRepository {
       },
     });
 
-    return product;
+    if (!product) return null;
+
+    // Transform variantImages to images format with relative URLs for proxy
+    return {
+      ...product,
+      variants: product.variants.map((variant: any) => ({
+        ...variant,
+        images: (variant.variantImages || []).map((img: any) => ({
+          url: img.storagePath,
+          altText: img.altText,
+          isPrimary: img.isPrimary,
+        })),
+      })),
+    };
   }
 
   async findByCategoryId(categoryId: string): Promise<ProductEntity[]> {
@@ -352,7 +365,13 @@ export class ProductRepository {
     const [products, total] = await Promise.all([
       this.getClient().product.findMany({
         where,
-        include: { variants: true },
+        include: {
+          variants: {
+            include: {
+              variantImages: true,
+            },
+          },
+        },
         take: options.limit,
         skip: options.offset,
         orderBy: { createdAt: 'desc' },
