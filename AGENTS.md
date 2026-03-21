@@ -105,7 +105,8 @@
 - Workers enable resource-intensive operations (ZIP extraction, large CSV imports) without blocking API requests
 - Worker controllers provide internal endpoints like `/v1/import/worker/process-catalog` for worker callbacks
 - BullMQ queues configured with retry logic (3 attempts, exponential backoff) and job cleanup policies
-- ZIP extraction uses `adm-zip` library, normalizes filenames (removes `_template` suffix)
+- ZIP extraction uses `adm-zip` library for small files, `unzipper` for streaming large files
+- Use `unzipper.Open.file()` with `for...of` loop for controlled async iteration — NOT `.on("entry", async ...)` which doesn't properly await streams
 - Multiple CSV files can be bundled in ZIP: products.csv, variants.csv (required), attributes.csv, images.csv
 - When multiple processors listen to the same event (e.g., `JOB_CREATED`), use a discriminator field like `importType` to filter relevant jobs
 - Workers entry point (`apps/workers/index.ts` or package.json script) should start all workers, not just one specific worker
