@@ -43,14 +43,15 @@ export function ProductDetailPage({
 }: ProductDetailProps) {
   const router = useRouter();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    product.variants.find((v) => v.isDefault)?.id || product.variants[0]?.id || null
+    (product.variants || []).find((v) => v.isDefault)?.id || (product.variants || [])[0]?.id || null
   );
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   // Get selected variant
   const selectedVariant = useMemo(() => {
-    return product.variants.find((v) => v.id === selectedVariantId) || product.variants[0];
+    const variants = product.variants || [];
+    return variants.find((v) => v.id === selectedVariantId) || variants[0];
   }, [product.variants, selectedVariantId]);
 
   // Build breadcrumb items
@@ -91,16 +92,22 @@ export function ProductDetailPage({
     const images: { url: string; altText: string | null; isPrimary: boolean; variantId: string }[] = [];
 
     // Start with product-level images
-    product.images.forEach((img) => {
-      images.push({ ...img, variantId: "product" });
-    });
+    if (product.images) {
+      product.images.forEach((img) => {
+        images.push({ ...img, variantId: "product" });
+      });
+    }
 
     // Add variant images
-    product.variants.forEach((variant) => {
-      variant.images.forEach((img) => {
-        images.push({ ...img, variantId: variant.id });
+    if (product.variants) {
+      product.variants.forEach((variant) => {
+        if (variant.images) {
+          variant.images.forEach((img) => {
+            images.push({ ...img, variantId: variant.id });
+          });
+        }
       });
-    });
+    }
 
     // If no images, return placeholder
     if (images.length === 0) {
@@ -228,7 +235,7 @@ export function ProductDetailPage({
           </div>
 
           {/* Variant Selector */}
-          {product.variants.length > 1 && (
+          {(product.variants || []).length > 1 && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">Select Variant</Label>
               <Select
@@ -239,7 +246,7 @@ export function ProductDetailPage({
                   <SelectValue placeholder="Choose a variant" />
                 </SelectTrigger>
                 <SelectContent>
-                  {product.variants.map((variant) => (
+                  {(product.variants || []).map((variant) => (
                     <SelectItem key={variant.id} value={variant.id}>
                       <div className="flex items-center gap-2">
                         <span>{variant.name || variant.sku}</span>

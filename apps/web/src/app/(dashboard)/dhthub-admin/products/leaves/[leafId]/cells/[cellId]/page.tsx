@@ -700,14 +700,28 @@ function ProductVariantsDrawer({
             <div>
               <h4 className="text-sm font-semibold mb-3">Variant Thumbnails</h4>
               <div className="grid grid-cols-4 gap-2">
-                {variants.slice(0, 4).map((variant, i) => (
-                  <div
-                    key={variant.id || i}
-                    className="aspect-square bg-muted rounded-md flex items-center justify-center"
-                  >
-                    <Package className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                ))}
+                {variants.slice(0, 4).map((variant, i) => {
+                  const primaryImage = variant.images?.find(img => img.isPrimary) || variant.images?.[0]
+                  return (
+                    <div
+                      key={variant.id || i}
+                      className="aspect-square bg-muted rounded-md overflow-hidden flex items-center justify-center"
+                    >
+                      {primaryImage?.url ? (
+                        <img
+                          src={primaryImage.url}
+                          alt={primaryImage.altText || variant.sku || 'Variant image'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <Package className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>

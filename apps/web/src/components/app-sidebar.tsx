@@ -9,6 +9,7 @@ import {
   Package,
   Upload,
   History,
+  Image as ImageIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
@@ -81,6 +82,11 @@ const allNavGroups = [
         title: "Upload",
         url: "/dhthub-admin/upload",
         icon: Upload,
+      },
+      {
+        title: "Upload Images",
+        url: "/dhthub-admin/upload-images",
+        icon: ImageIcon,
       },
       {
         title: "Upload History",
