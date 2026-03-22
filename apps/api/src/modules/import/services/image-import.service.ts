@@ -7,8 +7,16 @@ import unzipper from 'unzipper';
 import pLimit from 'p-limit';
 import { StorageService } from '@modules/storage/storage.service';
 import { VariantImageRepository } from '@modules/catalog/repositories/variant-image.repository';
+import { ProductImageRepository } from '@modules/catalog/repositories/product-image.repository';
 import { ProductVariantRepository } from '@modules/catalog/repositories/product-variant.repository';
+import { ProductRepository } from '@modules/catalog/repositories/product.repository';
+import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
+import { CategoryImageRepository } from '@modules/catalog/repositories/category-image.repository';
+import { CellRepository } from '@modules/cell/repositories/cell.repository';
+import { CellImageRepository } from '@modules/cell/repositories/cell-image.repository';
 import * as crypto from 'crypto';
+
+export type ImageMappingType = 'sku' | 'cell_sku' | 'product' | 'category';
 
 export interface ImportedImage {
   sku: string;
@@ -18,11 +26,16 @@ export interface ImportedImage {
 }
 
 export interface ProcessedImage {
-  sku: string;
+  sku?: string;
   position: number;
   ext: string;
-  variantId: string;
-  storagePath: string;
+  variantId?: string;
+  storagePath?: string;
+  mappingType: ImageMappingType;
+  cellId?: string;
+  productId?: string;
+  categoryId?: string;
+  imageUrl?: string;
 }
 
 export interface ImageFile {
@@ -43,7 +56,13 @@ export class ImageImportService {
   constructor(
     private readonly storageService: StorageService,
     private readonly variantImageRepository: VariantImageRepository,
+    private readonly productImageRepository: ProductImageRepository,
     private readonly productVariantRepository: ProductVariantRepository,
+    private readonly productRepository: ProductRepository,
+    private readonly categoryRepository: CategoryRepository,
+    private readonly categoryImageRepository: CategoryImageRepository,
+    private readonly cellRepository: CellRepository,
+    private readonly cellImageRepository: CellImageRepository,
   ) {
     this.ensureUploadDirectory();
   }
@@ -257,14 +276,16 @@ export class ImageImportService {
     this.logger.log(`[ImageImport] Starting ZIP processing: ${zipPath}`);
     const results: ProcessedImage[] = [];
 
-    // Preload all SKUs ONCE at the start for O(1) lookups
-    this.logger.log(`[ImageImport] Preloading SKU map from database...`);
-    const skuMap = await this.productVariantRepository.getSkuMap();
-    this.logger.log(`[ImageImport] Loaded ${skuMap.size} SKUs for image processing`);
-
-    // Log some sample SKUs for debugging
-    const sampleSkus = Array.from(skuMap.keys()).slice(0, 5);
-    this.logger.log(`[ImageImport] Sample SKUs in map: ${sampleSkus.join(', ')}`);
+    // Preload all maps ONCE at the start for O(1) lookups
+    this.logger.log(`[ImageImport] Preloading SKU, category, cell SKU, and product maps from database...`);
+    const [skuMap, categoryMap, categorySlugMap, cellSkuMap, productMap] = await Promise.all([
+      this.productVariantRepository.getSkuMap(),
+      this.categoryRepository.getSkuMap(),
+      this.categoryRepository.getSlugMap(),
+      this.cellRepository.getSkuMap(),
+      this.productRepository.getSlugMap(),
+    ]);
+    this.logger.log(`[ImageImport] Loaded ${skuMap.size} variant SKUs, ${categoryMap.size} category SKUs, ${categorySlugMap.size} category slugs, ${cellSkuMap.size} cell SKUs, ${productMap.size} products for image processing`);
 
     // Use unzipper.Open.file() for controlled async iteration
     const directory = await unzipper.Open.file(zipPath);
@@ -273,9 +294,16 @@ export class ImageImportService {
 
     const filePromises: Promise<void>[] = [];
     let processedCount = 0;
+    const processedVariants = new Set<string>();
+    const processedProducts = new Set<string>();
 
     for (const file of directory.files) {
-      if (!this.isValidImageFile(file.path)) continue;
+      if (!this.isValidImageFile(file.path)) {
+        this.logger.debug(`[ImageImport] Skipping invalid image file: ${file.path}`);
+        continue;
+      }
+
+      this.logger.log(`[ImageImport] Processing file: ${file.path}`);
 
       const promise = limit(async () => {
         try {
@@ -283,49 +311,100 @@ export class ImageImportService {
           const filename = path.basename(file.path);
           this.logger.debug(`[ImageImport] Processing file: ${filename} (from path: ${file.path})`);
 
+          // Parse filename to extract SKU and position
           const { sku, position, ext } = this.parseImageFilename(filename);
 
-          // O(1) lookup instead of DB query per file
-          const variantId = skuMap.get(sku);
+          // Detect mapping type from SKU prefix (instead of folder path)
+          const mappingType = this.detectMappingType(sku);
 
-          if (!variantId) {
-            this.logger.warn(`[ImageImport] SKU not found: ${sku} (filename: ${filename})`);
-            return;
+          // Route to appropriate processor based on mapping type
+          if (mappingType === 'sku') {
+            const variantId = skuMap.get(sku);
+            if (!variantId) {
+              this.logger.warn(`[ImageImport] SKU not found: ${sku} (filename: ${filename})`);
+              return;
+            }
+
+            this.logger.log(`[ImageImport] Found variantId ${variantId} for SKU ${sku} (position: ${position})`);
+
+            // Get stream for each file
+            const stream = file.stream();
+            const buffer = await this.streamToBuffer(stream);
+
+            // Generate storage path
+            const storagePath = this.generateStoragePath(sku, position, ext);
+
+            // Upload to SeaweedFS
+            await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
+
+            // Create variant image record
+            const created = await this.variantImageRepository.upsert(
+              variantId,
+              position,
+              storagePath,
+              sku
+            );
+
+            this.logger.log(`[ImageImport] Created/updated variant image: id=${created.id}, variantId=${variantId}, sku=${sku}, position=${position}`);
+
+            results.push({
+              sku,
+              position,
+              ext,
+              variantId,
+              storagePath,
+              mappingType: 'sku',
+            });
+
+            processedVariants.add(variantId);
+          } else if (mappingType === 'category') {
+            // Process category image
+            const result = await this.processCategoryImage(
+              file,
+              sku,
+              position,
+              ext,
+              categoryMap,
+              categorySlugMap
+            );
+
+            if (result) {
+              results.push(result);
+            }
+          } else if (mappingType === 'cell_sku') {
+            // Process cell image by SKU (C- prefix)
+            const result = await this.processCellImage(
+              file,
+              sku,
+              position,
+              ext,
+              cellSkuMap
+            );
+
+            if (result) {
+              results.push(result);
+            }
+          } else if (mappingType === 'product') {
+            // Process product image
+            const result = await this.processProductImage(
+              file,
+              sku,
+              position,
+              ext,
+              productMap
+            );
+
+            if (result) {
+              results.push(result);
+              if (result.productId) {
+                processedProducts.add(result.productId);
+              }
+            }
           }
 
-          this.logger.log(`[ImageImport] Found variantId ${variantId} for SKU ${sku} (position: ${position})`);
-
-          // Get stream for each file
-          const stream = file.stream();
-          const buffer = await this.streamToBuffer(stream);
-
-          // Generate storage path
-          const storagePath = this.generateStoragePath(sku, position, ext);
-
-          // Upload to SeaweedFS
-          await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
-
-          // Create variant image record
-          const created = await this.variantImageRepository.upsert(
-            variantId,
-            position,
-            storagePath,
-            sku
-          );
-
-          this.logger.log(`[ImageImport] Created/updated variant image: id=${created.id}, variantId=${variantId}, sku=${sku}, position=${position}`);
-
-          results.push({
-            sku,
-            position,
-            ext,
-            variantId,
-            storagePath
-          });
-
-          this.logger.debug(`[ImageImport] Processed: ${filename} -> SKU ${sku}, position ${position}`);
+          this.logger.debug(`[ImageImport] Processed: ${filename} -> ${mappingType} ${sku}, position ${position}`);
           processedCount++;
-          
+
           // Log progress every 10 images
           if (processedCount % 10 === 0) {
             this.logger.log(`[ImageImport] Progress: ${processedCount} images processed`);
@@ -333,6 +412,9 @@ export class ImageImportService {
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger.error(`[ImageImport] Failed to process ${file.path}: ${errorMessage}`);
+          if (error instanceof Error && error.stack) {
+            this.logger.debug(`[ImageImport] Stack trace: ${error.stack}`);
+          }
         }
       });
 
@@ -342,9 +424,8 @@ export class ImageImportService {
     await Promise.all(filePromises);
 
     // Ensure each variant has a primary image
-    const processedVariants = new Set(results.map(r => r.variantId));
     this.logger.log(`[ImageImport] Ensuring primary image for ${processedVariants.size} variants`);
-    
+
     for (const variantId of processedVariants) {
       await this.ensurePrimaryImage(variantId);
     }
@@ -421,22 +502,233 @@ export class ImageImportService {
    */
   async ensurePrimaryImage(variantId: string): Promise<void> {
     const images = await this.variantImageRepository.findByVariantId(variantId);
-    
+
     // If no images, nothing to do
     if (images.length === 0) return;
-    
+
     // Check if any image is already primary
     const hasPrimary = images.some(img => img.isPrimary);
-    
+
     if (!hasPrimary) {
       // Set the lowest position as primary
-      const lowestPosition = images.reduce((min, img) => 
+      const lowestPosition = images.reduce((min, img) =>
         img.position < min.position ? img : min
       );
-      
+
       await this.variantImageRepository.update(lowestPosition.id, {
         isPrimary: true
       });
+    }
+  }
+
+  /**
+   * Detect image mapping type from SKU prefix
+   * - CG-* → Category
+   * - C-* → Cell
+   * - Others → ProductVariant (existing behavior)
+   */
+  detectMappingType(sku: string): ImageMappingType {
+    if (sku.startsWith('CG-')) return 'category';
+    if (sku.startsWith('C-')) return 'cell_sku';
+    return 'sku'; // Variant (default)
+  }
+
+  /**
+   * Process cell image from ZIP file
+   */
+  async processCellImage(
+    file: unzipper.File,
+    cellSku: string,
+    position: number,
+    ext: string,
+    cellMap: Map<string, string>
+  ): Promise<ProcessedImage | null> {
+    try {
+      this.logger.log(`[ImageImport] Starting cell image processing: SKU=${cellSku}, position=${position}, ext=${ext}`);
+
+      const cellId = cellMap.get(cellSku);
+
+      if (!cellId) {
+        this.logger.warn(`[ImageImport] Cell SKU not found in map: ${cellSku}. Map contains ${cellMap.size} entries`);
+        return null;
+      }
+
+      this.logger.log(`[ImageImport] Found cellId ${cellId} for SKU ${cellSku}`);
+
+      // Get stream for file
+      this.logger.debug(`[ImageImport] Converting cell file to buffer: ${file.path}`);
+      const stream = file.stream();
+      const buffer = await this.streamToBuffer(stream);
+
+      this.logger.debug(`[ImageImport] Cell buffer size: ${buffer.length} bytes`);
+
+      // Generate storage path for cell image
+      const storagePath = this.generateStoragePath(`cell-${cellSku}`, position, ext);
+      this.logger.log(`[ImageImport] Generated storage path: ${storagePath}`);
+
+      // Upload to SeaweedFS
+      this.logger.log(`[ImageImport] Uploading cell image to SeaweedFS...`);
+      const imageUrl = await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
+      this.logger.log(`[ImageImport] Cell image uploaded to SeaweedFS: ${imageUrl}`);
+
+      // Create or update cell image record
+      const isPrimary = position === 1;
+      this.logger.log(`[ImageImport] Creating/updating cell image record: cellId=${cellId}, position=${position}, isPrimary=${isPrimary}`);
+      const created = await this.cellImageRepository.upsert(
+        cellId,
+        position,
+        imageUrl,
+        cellSku,
+      );
+
+      this.logger.log(`[ImageImport] Successfully created/updated cell image: id=${created.id}, cellId=${cellId}, SKU=${cellSku}, position=${position}, isPrimary=${isPrimary}`);
+
+      return {
+        position,
+        ext,
+        cellId,
+        imageUrl,
+        mappingType: 'cell_sku',
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[ImageImport] Failed to process cell image for SKU ${cellSku}: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  /**
+   * Process product image from ZIP file
+   */
+  async processProductImage(
+    file: unzipper.File,
+    productSlug: string,
+    position: number,
+    ext: string,
+    productMap: Map<string, string>
+  ): Promise<ProcessedImage | null> {
+    try {
+      this.logger.log(`[ImageImport] Starting product image processing: slug=${productSlug}, position=${position}, ext=${ext}`);
+
+      const productId = productMap.get(productSlug);
+
+      if (!productId) {
+        this.logger.warn(`[ImageImport] Product slug not found in map: ${productSlug}. Map contains ${productMap.size} entries`);
+        return null;
+      }
+
+      this.logger.log(`[ImageImport] Found productId ${productId} for slug ${productSlug} (position: ${position})`);
+
+      // Get stream for file
+      this.logger.debug(`[ImageImport] Converting product file to buffer: ${file.path}`);
+      const stream = file.stream();
+      const buffer = await this.streamToBuffer(stream);
+
+      this.logger.debug(`[ImageImport] Product buffer size: ${buffer.length} bytes`);
+
+      // Generate storage path for product image
+      const storagePath = this.generateStoragePath(`product-${productSlug}`, position, ext);
+      this.logger.log(`[ImageImport] Generated storage path: ${storagePath}`);
+
+      // Upload to SeaweedFS
+      this.logger.log(`[ImageImport] Uploading product image to SeaweedFS...`);
+      const imageUrl = await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
+      this.logger.log(`[ImageImport] Product image uploaded to SeaweedFS: ${imageUrl}`);
+
+      // Create or update product image record
+      const isPrimary = position === 1;
+      this.logger.log(`[ImageImport] Creating/updating product image record: productId=${productId}, position=${position}, isPrimary=${isPrimary}`);
+      const created = await this.productImageRepository.upsert(
+        productId,
+        position,
+        imageUrl,
+        isPrimary
+      );
+
+      this.logger.log(`[ImageImport] Successfully created/updated product image: id=${created.id}, productId=${productId}, slug=${productSlug}, position=${position}, isPrimary=${isPrimary}`);
+
+      return {
+        position,
+        ext,
+        productId,
+        imageUrl,
+        mappingType: 'product',
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[ImageImport] Failed to process product image for slug ${productSlug}: ${errorMessage}`);
+      return null;
+    }
+  }
+
+  /**
+   * Process category image from ZIP file
+   */
+  async processCategoryImage(
+    file: unzipper.File,
+    categorySku: string,
+    position: number,
+    ext: string,
+    categoryMap: Map<string, string>,
+    categorySlugMap: Map<string, string>
+  ): Promise<ProcessedImage | null> {
+    try {
+      this.logger.log(`[ImageImport] Starting category image processing: sku=${categorySku}, position=${position}, ext=${ext}`);
+
+      // Try to find by SKU first (CG- prefix), then by slug
+      let categoryId = categoryMap.get(categorySku);
+
+      if (!categoryId) {
+        // Try to find by slug (in case the filename uses slug instead of SKU)
+        categoryId = categorySlugMap.get(categorySku);
+      }
+
+      if (!categoryId) {
+        this.logger.warn(`[ImageImport] Category SKU/slug not found in map: ${categorySku}. SKU map contains ${categoryMap.size} entries, slug map contains ${categorySlugMap.size} entries`);
+        return null;
+      }
+
+      this.logger.log(`[ImageImport] Found categoryId ${categoryId} for SKU ${categorySku} (position: ${position})`);
+
+      // Get stream for file
+      this.logger.debug(`[ImageImport] Converting category file to buffer: ${file.path}`);
+      const stream = file.stream();
+      const buffer = await this.streamToBuffer(stream);
+
+      this.logger.debug(`[ImageImport] Category buffer size: ${buffer.length} bytes`);
+
+      // Generate storage path for category image
+      const storagePath = this.generateStoragePath(`category-${categorySku}`, position, ext);
+      this.logger.log(`[ImageImport] Generated storage path: ${storagePath}`);
+
+      // Upload to SeaweedFS
+      this.logger.log(`[ImageImport] Uploading category image to SeaweedFS...`);
+      const imageUrl = await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
+      this.logger.log(`[ImageImport] Category image uploaded to SeaweedFS: ${imageUrl}`);
+
+      // Create or update category image record
+      const isPrimary = position === 1;
+      this.logger.log(`[ImageImport] Creating/updating category image record: categoryId=${categoryId}, position=${position}, isPrimary=${isPrimary}`);
+      const created = await this.categoryImageRepository.upsert(
+        categoryId,
+        position,
+        imageUrl,
+        categorySku
+      );
+
+      this.logger.log(`[ImageImport] Successfully created/updated category image: id=${created.id}, categoryId=${categoryId}, sku=${categorySku}, position=${position}, isPrimary=${isPrimary}`);
+
+      return {
+        sku: categorySku,
+        position,
+        ext,
+        imageUrl,
+        mappingType: 'category',
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[ImageImport] Failed to process category image for SKU ${categorySku}: ${errorMessage}`);
+      return null;
     }
   }
 

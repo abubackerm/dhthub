@@ -38,6 +38,7 @@ export interface LeafCellView {
   slug: string;
   description: string | null;
   sortOrder: number;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
   products: LeafProductView[];
 }
 
@@ -58,6 +59,7 @@ export class LeafPageView {
     slug: string;
     description: string | null;
     path: string;
+    sku: string | null;
     imageUrl: string | null;
   };
   cells: LeafCellView[];
@@ -71,12 +73,21 @@ export class LeafPageView {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      sku?: string | null;
     };
     cells: any[];
     filterableAttributes: any[];
   }): LeafPageView {
     const view = new LeafPageView();
-    view.category = data.category;
+    view.category = {
+      id: data.category.id,
+      name: data.category.name,
+      slug: data.category.slug,
+      description: data.category.description,
+      path: data.category.path,
+      sku: data.category.sku ?? null,
+      imageUrl: data.category.imageUrl,
+    };
     view.cells = data.cells.map((cell: any) => LeafPageView.mapCell(cell));
     view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
       LeafPageView.mapFilterableAttribute(attr)
@@ -91,6 +102,11 @@ export class LeafPageView {
       slug: cell.slug,
       description: cell.description,
       sortOrder: cell.sortOrder,
+      images: (cell.images || []).map((img: any) => ({
+        url: img.storagePath,
+        altText: img.altText,
+        isPrimary: img.isPrimary,
+      })),
       products: (cell.products || []).map((product: any) =>
         LeafPageView.mapProduct(product)
       ),
@@ -176,6 +192,7 @@ export class ConsolidatedLeafPageView {
     slug: string;
     description: string | null;
     path: string;
+    sku: string | null;
     imageUrl: string | null;
   };
   leafCategories: LeafCategoryView[];
@@ -189,12 +206,21 @@ export class ConsolidatedLeafPageView {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      sku?: string | null;
     };
     leafCategories: any[];
     filterableAttributes: any[];
   }): ConsolidatedLeafPageView {
     const view = new ConsolidatedLeafPageView();
-    view.category = data.category;
+    view.category = {
+      id: data.category.id,
+      name: data.category.name,
+      slug: data.category.slug,
+      description: data.category.description,
+      path: data.category.path,
+      sku: data.category.sku ?? null,
+      imageUrl: data.category.imageUrl,
+    };
     view.leafCategories = data.leafCategories.map((lc: any) => ({
       id: lc.id,
       name: lc.name,

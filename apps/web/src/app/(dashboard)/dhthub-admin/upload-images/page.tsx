@@ -5,7 +5,6 @@ import {
   Upload as UploadIcon,
   CheckCircle2,
   AlertCircle,
-  Download,
   Image as ImageIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -14,7 +13,6 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -141,36 +139,129 @@ export default function UploadImagesPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Upload Product Images</h1>
         <p className="text-muted-foreground">
-          Bulk upload product images using a ZIP file
+          Bulk upload product, category, and cell images using a ZIP file
         </p>
       </div>
 
       <Alert>
         <ImageIcon className="h-4 w-4" />
-        <AlertTitle>Image Upload Format</AlertTitle>
+        <AlertTitle>ZIP Folder Structure</AlertTitle>
         <AlertDescription>
-          <div className="mt-2 space-y-2">
-            <div>
-              <strong className="text-sm font-medium">Filename Format:</strong>
-              <p className="text-sm text-muted-foreground">
-                Images must be named as SKU-POSITION.ext (e.g., 91578A103-1.jpg or 91578A103(1).jpg)
-              </p>
+          <div className="mt-3">
+            <div className="bg-muted/50 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+              <pre className="text-xs">
+{`import.zip
+└── images/
+    ├── CG-XXXXX-1.jpg    # Category (CG- prefix)
+    ├── C-YYYYY-1.jpg     # Cell (C- prefix)
+    └── SKU123-1.jpg      # Variant (no prefix)`}
+              </pre>
             </div>
-            <div>
-              <strong className="text-sm font-medium">Supported Formats:</strong>
-              <p className="text-sm text-muted-foreground">
-                JPG, JPEG, PNG, WEBP, GIF
-              </p>
-            </div>
-            <div>
-              <strong className="text-sm font-medium">Position 1:</strong>
-              <p className="text-sm text-muted-foreground">
-                The image with position 1 will be set as the primary image for the variant
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              All images go in <code>images/</code> folder. Entity type is auto-detected from SKU prefix.
+            </p>
           </div>
         </AlertDescription>
       </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Image Mapping by SKU Prefix</CardTitle>
+          <CardDescription>
+            The system automatically detects entity type from filename's SKU prefix
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h4 className="font-semibold mb-2 text-lg">Category Images (CG- prefix)</h4>
+            <div className="bg-muted/50 p-3 rounded-lg font-mono text-sm mb-3">
+              CG-XXXXX-POSITION.ext
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                CG-A1B2C3-1.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Primary image for category SKU CG-A1B2C3</span>
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                CG-A1B2C3-2.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Second image</span>
+              </div>
+            </div>
+            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground mt-3">
+              <li>Prefix <code>CG-</code> identifies category images</li>
+              <li>Maps to CategoryImage records</li>
+              <li>Position 1 is marked as primary image</li>
+              <li>Multiple positions supported (1, 2, 3, etc.)</li>
+            </ul>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-2 text-lg">Cell Images (C- prefix)</h4>
+            <div className="bg-muted/50 p-3 rounded-lg font-mono text-sm mb-3">
+              C-XXXXX-POSITION.ext
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                C-X9Y8Z7-1.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Primary image for cell SKU C-X9Y8Z7</span>
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                C-X9Y8Z7-2.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Second image</span>
+              </div>
+            </div>
+            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground mt-3">
+              <li>Prefix <code>C-</code> identifies cell images</li>
+              <li>Maps to CellImage records</li>
+              <li>Position 1 is marked as primary image</li>
+              <li>Multiple images per cell supported</li>
+              <li>Requires cell SKU to exist in database</li>
+            </ul>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="font-semibold mb-2 text-lg">Variant Images (no prefix)</h4>
+            <div className="bg-muted/50 p-3 rounded-lg font-mono text-sm mb-3">
+              SKU-POSITION.ext
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                91578A103-1.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Primary image for variant SKU</span>
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                91578A103-2.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Second image</span>
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg font-mono">
+                TSHIRT-S-1.jpg
+                <span className="ml-2 text-muted-foreground text-xs">→ Primary for variant TSHIRT-S</span>
+              </div>
+            </div>
+            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground mt-3">
+              <li>No prefix = variant images (default behavior)</li>
+              <li>Maps SKU to VariantImage records</li>
+              <li>Position 1 is marked as primary image</li>
+              <li>Multiple positions supported (1, 2, 3, etc.)</li>
+              <li>Filename without position defaults to position 1</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <h4 className="font-semibold mb-2 text-sm text-blue-800 dark:text-blue-300">Supported Formats</h4>
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              JPG, JPEG, PNG, WEBP, GIF
+            </p>
+          </div>
+
+          <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3">
+            <h4 className="font-semibold mb-2 text-sm text-green-800 dark:text-green-300">Tip</h4>
+            <p className="text-sm text-green-700 dark:text-green-400">
+              Use the SKU generated when creating entities in your catalog. Images will be automatically routed to the correct entity based on the prefix.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Upload State */}
       {(uploadState === "idle" || uploadState === "uploading") && (

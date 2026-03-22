@@ -16,7 +16,7 @@ import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MobileFilterToggle } from "./MobileFilterToggle";
 
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 
 interface ConsolidatedLeafCategoryPageProps {
@@ -226,11 +226,26 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
             {/* Cells under this leaf */}
             {leafCat.cells.map((cell) => (
               <div key={cell.id} className="cell-section">
-                {/* h2: Cell name */}
-                <h2 className="text-xl font-semibold text-foreground mb-4">{cell.name}</h2>
-                {cell.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{cell.description}</p>
-                )}
+                <div className="flex gap-6 mb-4">
+                  {/* Thumbnail */}
+                  <div className="shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-muted">
+                    {cell.imageUrl ? (
+                      <Image src={cell.imageUrl} alt={cell.name} width={128} height={128} className="object-cover w-full h-full" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <ImageIcon className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Name + Description */}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-semibold text-foreground mb-2">{cell.name}</h2>
+                    {cell.description && (
+                      <p className="text-sm text-muted-foreground">{cell.description}</p>
+                    )}
+                  </div>
+                </div>
 
                 {/* Products under this cell */}
                 {cell.products.map((product) => (
@@ -278,7 +293,7 @@ function ProductSection({
         </Link>
       </h2>
       {product.description && (
-        <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
+        <p className="text-sm text-muted-foreground mb-2 max-w-3xl">{product.description}</p>
       )}
 
       {/* Variants table for this product */}

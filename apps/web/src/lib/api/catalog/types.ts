@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  sku: string | null;
   description: string | null;
   parentId: string | null;
   path: string;
@@ -22,6 +23,7 @@ export interface CategoryTreeNode extends Category {
 export interface CreateCategoryInput {
   name: string;
   slug: string;
+  sku?: string;
   description?: string;
   parentId?: string;
   imageUrl?: string;
@@ -32,6 +34,7 @@ export interface CreateCategoryInput {
 export interface UpdateCategoryInput {
   name?: string;
   slug?: string;
+  sku?: string;
   description?: string;
   parentId?: string;
   imageUrl?: string;
@@ -145,6 +148,7 @@ export interface ProductView {
   id: string;
   name: string;
   slug: string;
+  sku: string | null;
   description: string | null;
   type: ProductType;
   status: ProductStatus;
@@ -158,9 +162,12 @@ export interface ProductView {
   updatedAt: string;
 }
 
+export type Product = ProductView;
+
 export interface CreateProductInput {
   name: string;
   slug?: string;
+  sku?: string;
   description?: string;
   categoryId?: string;
   type?: ProductType;
@@ -172,6 +179,7 @@ export interface CreateProductInput {
 export interface UpdateProductInput {
   name?: string;
   slug?: string;
+  sku?: string;
   description?: string;
   categoryId?: string;
   status?: ProductStatus;
@@ -211,10 +219,12 @@ export interface Cell {
   id: string;
   name: string;
   slug: string;
+  sku: string | null;
   description: string | null;
   sortOrder: number;
   isActive: boolean;
   categoryId: string;
+  imageUrl: string | null;
   category?: Category;
   createdAt: string;
   updatedAt: string;
@@ -233,18 +243,22 @@ export interface CellWithAttributes extends Cell {
 export interface CreateCellInput {
   name: string;
   slug?: string;
+  sku?: string;
   description?: string;
   sortOrder?: number;
   isActive?: boolean;
+  imageUrl?: string;
   categoryId: string;
 }
 
 export interface UpdateCellInput {
   name?: string;
   slug?: string;
+  sku?: string;
   description?: string;
   sortOrder?: number;
   isActive?: boolean;
+  imageUrl?: string;
 }
 
 export interface AssignAttributeToCellInput {
@@ -301,6 +315,7 @@ export interface LeafCellView {
   slug: string;
   description: string | null;
   sortOrder: number;
+  imageUrl: string | null;
   products: LeafProductView[];
 }
 

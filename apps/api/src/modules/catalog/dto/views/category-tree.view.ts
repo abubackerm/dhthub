@@ -16,6 +16,7 @@ export class CategoryTreeView extends CategoryView {
     view.id = entity.id;
     view.name = entity.name;
     view.slug = entity.slug;
+    view.sku = entity.sku;
     view.description = entity.description;
     view.parentId = entity.parentId;
     view.path = entity.path;

@@ -154,6 +154,7 @@ export class CategoryRepository {
     sortOrder?: number;
     isActive?: boolean;
     createdBy?: string;
+    sku?: string | null;
   }): Promise<CategoryEntity> {
     return this.getClient().category.create({
       data: {
@@ -166,6 +167,7 @@ export class CategoryRepository {
         sortOrder: data.sortOrder ?? 0,
         isActive: data.isActive ?? true,
         createdBy: data.createdBy,
+        sku: data.sku ?? null,
       },
     });
   }
@@ -256,6 +258,9 @@ export class CategoryRepository {
       },
       orderBy: { sortOrder: 'asc' },
       include: {
+        images: {
+          orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
+        },
         products: {
           where: { status: 'active' },
           orderBy: { name: 'asc' },
@@ -372,6 +377,9 @@ export class CategoryRepository {
           },
           orderBy: { sortOrder: 'asc' },
           include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
+            },
             products: {
               where: { status: 'active' },
               orderBy: { name: 'asc' },
@@ -466,5 +474,44 @@ export class CategoryRepository {
       leafCategories: leafCategoriesWithCells,
       filterableAttributes: uniqueFilterableAttributes,
     };
+  }
+
+  async getSkuMap(): Promise<Map<string, string>> {
+    const categories = await this.getClient().category.findMany({
+      where: {
+        sku: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const category of categories) {
+      if (category.sku) {
+        map.set(category.sku, category.id);
+      }
+    }
+
+    return map;
+  }
+
+  async getSlugMap(): Promise<Map<string, string>> {
+    const categories = await this.getClient().category.findMany({
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const category of categories) {
+      map.set(category.slug, category.id);
+    }
+
+    return map;
   }
 }

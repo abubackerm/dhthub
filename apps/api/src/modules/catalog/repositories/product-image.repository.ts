@@ -88,4 +88,34 @@ export class ProductImageRepository {
       where: { productId },
     });
   }
+
+  async upsert(
+    productId: string,
+    sortOrder: number,
+    url: string,
+    isPrimary: boolean,
+    altText?: string | null,
+  ): Promise<ProductImageEntity> {
+    return this.getClient().productImage.upsert({
+      where: {
+        productId_sortOrder: {
+          productId,
+          sortOrder,
+        },
+      },
+      update: {
+        url,
+        altText,
+        isPrimary,
+        updatedAt: new Date(),
+      },
+      create: {
+        productId,
+        url,
+        altText,
+        sortOrder,
+        isPrimary,
+      },
+    });
+  }
 }

@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart, Package } from "lucide-react";
 import type {
   LeafProductView,
@@ -141,13 +140,10 @@ export function CellProductTable({
       <div className="border rounded-md overflow-hidden">
         <Table className="cell-product-table">
           <TableHeader>
-            <TableRow 
-              className="bg-gradient-to-b from-[#ff3b3b] via-[#e60000_45%,#c40000_55%] to-[#990000] [box-shadow:inset_0_-2px_0_rgba(0,0,0,0.2)] border-b border-[#990000]"
+            <TableRow
+              className="bg-linear-to-b from-[#ff3b3b] via-[#e60000_45%,#c40000_55%] to-[#990000] [box-shadow:inset_0_-2px_0_rgba(0,0,0,0.2)] border-b border-[#990000]"
             >
               <TableHead className="w-[60px] p-2"></TableHead>
-              <TableHead className="font-semibold text-xs uppercase tracking-wide text-white min-w-[180px] p-2">
-                Product
-              </TableHead>
               <TableHead
                 className="font-semibold text-xs uppercase tracking-wide text-white w-[120px] p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                 onClick={() => handleSort("sku")}
@@ -160,17 +156,19 @@ export function CellProductTable({
               {visibleAttributes.map((attr) => (
                 <TableHead
                   key={attr.id}
-                  className="font-semibold text-xs uppercase tracking-wide text-white p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
+                  className="font-semibold text-xs uppercase tracking-wide text-white p-2 cursor-pointer select-none hover:bg-white/10 transition-colors leading-tight"
                   onClick={() => handleSort(attr.slug)}
                 >
-                  <div className="flex items-center gap-1">
-                    <span>{attr.name}</span>
-                    {attr.unitSymbol && (
-                      <span className="font-normal text-white/70">
-                        ({attr.unitSymbol})
-                      </span>
-                    )}
-                    {getSortIcon(attr.slug)}
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="wrap-break-word">{attr.name}</span>
+                    <div className="flex items-center gap-1">
+                      {attr.unitSymbol && (
+                        <span className="font-normal text-white/70">
+                          ({attr.unitSymbol})
+                        </span>
+                      )}
+                      {getSortIcon(attr.slug)}
+                    </div>
                   </div>
                 </TableHead>
               ))}
@@ -183,16 +181,12 @@ export function CellProductTable({
                   {getSortIcon("price")}
                 </div>
               </TableHead>
-              <TableHead className="font-semibold text-xs uppercase tracking-wide text-white text-center w-[70px] p-2">
-                Stock
-              </TableHead>
               <TableHead className="w-[80px] p-2"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedVariants.map((variant, index) => {
               const productPath = `${basePath}/${variant.productSlug}`;
-              const inStock = variant.quantity > 0;
 
               return (
                 <TableRow
@@ -213,20 +207,6 @@ export function CellProductTable({
                         <Package className="w-5 h-5 text-muted-foreground/40" />
                       )}
                     </div>
-                  </TableCell>
-
-                  {/* Product Name */}
-                  <TableCell className="p-2">
-                    <Link
-                      href={productPath}
-                      className="font-medium text-sm hover:text-(--dht-red) transition-colors line-clamp-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {variant.productName}
-                      {variant.name && variant.name !== variant.productName && (
-                        <span className="text-muted-foreground font-normal"> - {variant.name}</span>
-                      )}
-                    </Link>
                   </TableCell>
 
                   {/* SKU */}
@@ -259,31 +239,12 @@ export function CellProductTable({
                     )}
                   </TableCell>
 
-                  {/* Stock */}
-                  <TableCell className="p-2 text-center">
-                    {inStock ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800"
-                      >
-                        {variant.quantity}
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"
-                      >
-                        Out
-                      </Badge>
-                    )}
-                  </TableCell>
-
                   {/* Add Button */}
                   <TableCell className="p-2">
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 px-2 text-(--dht-red) hover:text-(--dht-red-hover) hover:bg-(--dht-red)/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-8 px-2 text-(--dht-red) hover:text-(--dht-red-hover) hover:bg-(--dht-red)/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         // Add to cart logic would go here

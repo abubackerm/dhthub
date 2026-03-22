@@ -11,6 +11,7 @@ import {
 import { CategoryRepository, CategoryWithCells } from '../repositories/category.repository';
 import { CategoryEntity } from '../entities/category.entity';
 import { CategoryCreatedEvent, CategoryUpdatedEvent } from '../events';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class CategoryService extends BaseService {
@@ -19,6 +20,11 @@ export class CategoryService extends BaseService {
     private readonly categoryRepo: CategoryRepository,
   ) {
     super(eventEmitter);
+  }
+
+  private generateSKU(): string {
+    const randomPart = randomBytes(4).toString('hex').toUpperCase();
+    return `CG-${randomPart}`;
   }
 
   async create(
@@ -30,6 +36,7 @@ export class CategoryService extends BaseService {
     sortOrder?: number,
     isActive?: boolean,
     createdBy?: string,
+    sku?: string,
   ): Promise<CategoryEntity> {
     const existingSlug = await this.categoryRepo.findBySlug(slug);
     if (existingSlug) {
@@ -55,6 +62,7 @@ export class CategoryService extends BaseService {
       sortOrder: sortOrder ?? 0,
       isActive: isActive ?? true,
       createdBy,
+      sku: sku ?? this.generateSKU(),
     });
 
     this.emit(

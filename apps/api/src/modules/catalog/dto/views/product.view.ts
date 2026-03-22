@@ -6,6 +6,7 @@ export class ProductView {
   id: string;
   name: string;
   slug: string;
+  sku: string | null;
   description: string | null;
   type: 'simple' | 'variable';
   status: 'draft' | 'active' | 'archived';
@@ -26,6 +27,7 @@ export class ProductView {
     view.id = entity.id;
     view.name = entity.name;
     view.slug = entity.slug;
+    view.sku = entity.sku;
     view.description = entity.description;
     view.type = entity.type as 'simple' | 'variable';
     view.status = entity.status as 'draft' | 'active' | 'archived';

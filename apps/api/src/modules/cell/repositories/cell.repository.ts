@@ -179,4 +179,52 @@ export class CellRepository {
 
     return { cells, total };
   }
+
+  async getSlugMap(): Promise<Map<string, string>> {
+    const cells = await this.db.cell.findMany({
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const cell of cells) {
+      map.set(cell.slug, cell.id);
+    }
+
+    return map;
+  }
+
+  async findBySku(sku: string) {
+    return this.db.cell.findUnique({
+      where: { sku },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  async getSkuMap(): Promise<Map<string, string>> {
+    const cells = await this.db.cell.findMany({
+      where: {
+        sku: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const cell of cells) {
+      if (cell.sku) {
+        map.set(cell.sku, cell.id);
+      }
+    }
+
+    return map;
+  }
 }

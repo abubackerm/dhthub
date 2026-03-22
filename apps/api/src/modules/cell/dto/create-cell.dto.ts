@@ -11,6 +11,10 @@ export class CreateCellDto {
 
   @IsString()
   @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
 
   @IsInt()
@@ -20,6 +24,10 @@ export class CreateCellDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
 
   @IsString()
   @IsNotEmpty()

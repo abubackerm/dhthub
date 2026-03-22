@@ -32,6 +32,11 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  sku?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(2000)
   description?: string;
 

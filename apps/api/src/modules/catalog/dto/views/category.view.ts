@@ -4,6 +4,7 @@ export class CategoryView {
   id: string;
   name: string;
   slug: string;
+  sku: string | null;
   description: string | null;
   parentId: string | null;
   path: string;
@@ -22,6 +23,7 @@ export class CategoryView {
     view.id = entity.id;
     view.name = entity.name;
     view.slug = entity.slug;
+    view.sku = entity.sku;
     view.description = entity.description;
     view.parentId = entity.parentId;
     view.path = entity.path;

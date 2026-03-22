@@ -4,6 +4,7 @@ import { CreateCellDto } from '../dto/create-cell.dto';
 import { UpdateCellDto } from '../dto/update-cell.dto';
 import { AssignAttributeDto } from '../dto/assign-attribute.dto';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class CellService {
@@ -26,15 +27,28 @@ export class CellService {
       throw new ConflictException('A cell with this slug already exists');
     }
 
+    // Generate SKU if not provided
+    const sku = dto.sku || this.generateSku();
+
+    // Check if SKU already exists
+    if (sku) {
+      const existingSku = await this.cellRepository.findBySku(sku);
+      if (existingSku) {
+        throw new ConflictException('A cell with this SKU already exists');
+      }
+    }
+
     const cellData: Prisma.CellCreateInput = {
       name: dto.name,
       slug,
+      sku,
       description: dto.description,
       sortOrder: dto.sortOrder ?? 0,
       isActive: dto.isActive ?? true,
       category: {
         connect: { id: dto.categoryId },
       },
+      ...(dto.imageUrl && { imageUrl: dto.imageUrl }),
       createdBy: userId,
     };
 
@@ -61,12 +75,22 @@ export class CellService {
       }
     }
 
+    // Check if SKU conflicts with existing cell
+    if (dto.sku && dto.sku !== existingCell.sku) {
+      const conflictSku = await this.cellRepository.findBySku(dto.sku);
+      if (conflictSku) {
+        throw new ConflictException('A cell with this SKU already exists');
+      }
+    }
+
     const updateData: Prisma.CellUpdateInput = {
       ...(dto.name && { name: dto.name }),
       ...(slug && { slug }),
+      ...(dto.sku !== undefined && { sku: dto.sku }),
       ...(dto.description !== undefined && { description: dto.description }),
       ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
       updatedBy: userId,
     };
 
@@ -162,5 +186,10 @@ export class CellService {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  private generateSku(): string {
+    const randomPart = randomBytes(4).toString('hex').toUpperCase();
+    return `C-${randomPart}`;
   }
 }

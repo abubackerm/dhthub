@@ -35,6 +35,7 @@ import {
   useCells,
   useProducts,
   useDeleteProduct,
+  useUpdateProduct,
   useRemoveVariant,
   useUpdateVariant,
   useAddVariantImage,
@@ -44,6 +45,7 @@ import {
   type CategoryTreeNode,
   type Cell,
   type Product,
+  type UpdateProductInput,
 } from "@/lib/api/catalog"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 
@@ -73,6 +75,7 @@ export default function CellProductsPage() {
   console.log('CellProductsPage - productsLoading:', productsLoading)
   console.log('CellProductsPage - productsError:', productsError)
   const deleteProductMutation = useDeleteProduct()
+  const updateProductMutation = useUpdateProduct()
   const removeVariantMutation = useRemoveVariant()
   const updateVariantMutation = useUpdateVariant()
   const addImageMutation = useAddVariantImage()
@@ -83,6 +86,9 @@ export default function CellProductsPage() {
   const [editVariantOpen, setEditVariantOpen] = useState(false)
   const [editingVariant, setEditingVariant] = useState<any>(null)
   const [variantImages, setVariantImages] = useState<any[]>([])
+
+  const [editProductOpen, setEditProductOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   const cell = cells?.find(c => c.id === cellId)
 
@@ -149,6 +155,26 @@ export default function CellProductsPage() {
     setSelectedProduct(product)
     setSelectedVariant(null)
     setVariantDrawerOpen(true)
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product)
+    setEditProductOpen(true)
+  }
+
+  const handleSaveProduct = (data: UpdateProductInput) => {
+    if (editingProduct) {
+      updateProductMutation.mutate(
+        { id: editingProduct.id, data },
+        {
+          onSuccess: () => {
+            setEditProductOpen(false)
+            setEditingProduct(null)
+            toast.success("Product updated successfully")
+          },
+        }
+      )
+    }
   }
 
   const handleDeleteProduct = async (product: Product) => {
@@ -422,7 +448,7 @@ export default function CellProductsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => toast.info(`Edit product: ${product.name}`)}>
+                          <DropdownMenuItem onClick={() => handleEditProduct(product)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
@@ -476,6 +502,15 @@ export default function CellProductsPage() {
         onRemoveImage={handleRemoveImage}
         isUpdating={updateVariantMutation.isPending}
         isAddingImage={addImageMutation.isPending}
+      />
+
+      {/* Edit Product Dialog */}
+      <EditProductDialog
+        open={editProductOpen}
+        onOpenChange={setEditProductOpen}
+        product={editingProduct}
+        onSave={handleSaveProduct}
+        isUpdating={updateProductMutation.isPending}
       />
     </div>
   )
@@ -958,6 +993,163 @@ function EditVariantDialog({
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isUpdating}
+            >
+              {isUpdating ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+interface EditProductDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  product: Product | null
+  onSave: (data: UpdateProductInput) => void
+  isUpdating: boolean
+}
+
+function EditProductDialog({
+  open,
+  onOpenChange,
+  product,
+  onSave,
+  isUpdating,
+}: EditProductDialogProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    sku: '',
+    description: '',
+    status: 'DRAFT' as 'DRAFT' | 'ACTIVE' | 'ARCHIVED',
+    isFeatured: false,
+  })
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name || '',
+        slug: product.slug || '',
+        sku: product.sku || '',
+        description: product.description || '',
+        status: product.status || 'DRAFT',
+        isFeatured: product.isFeatured || false,
+      })
+    }
+  }, [product])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave(formData)
+  }
+
+  if (!open || !product) return null
+
+  const handleClose = () => {
+    onOpenChange(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        onClick={handleClose}
+      />
+
+      <div
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-background rounded-lg shadow-xl transition-all duration-300 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Edit Product</h2>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-md p-2 hover:bg-accent hover:text-accent-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Product name"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Slug</label>
+            <Input
+              value={formData.slug}
+              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+              placeholder="product-slug"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">SKU</label>
+            <Input
+              value={formData.sku}
+              onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+              placeholder="PRODUCT-SKU"
+              className="font-mono"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <textarea
+              className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Product description"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status</label>
+            <select
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'DRAFT' | 'ACTIVE' | 'ARCHIVED' })}
+            >
+              <option value="DRAFT">Draft</option>
+              <option value="ACTIVE">Active</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isFeatured"
+              checked={formData.isFeatured}
+              onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+              className="h-4 w-4"
+            />
+            <label htmlFor="isFeatured" className="text-sm font-medium">
+              Featured product
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"

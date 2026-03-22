@@ -6,6 +6,7 @@ export class CategoryEntity extends BaseEntity {
   description: string | null;
   parentId: string | null;
   path: string;
+  sku: string | null;
   imageUrl: string | null;
   sortOrder: number;
   isActive: boolean;

@@ -98,6 +98,14 @@ export class DatabaseProvider {
     return this.prisma.cellAttribute;
   }
 
+  get cellImage(): PrismaDelegate<any> {
+    return this.prisma.cellImage;
+  }
+
+  get categoryImage(): PrismaDelegate<any> {
+    return this.prisma.categoryImage;
+  }
+
   get price(): PrismaDelegate<any> {
     return this.prisma.price;
   }

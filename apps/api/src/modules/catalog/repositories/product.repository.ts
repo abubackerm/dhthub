@@ -322,7 +322,7 @@ export class ProductRepository {
     offset: number;
   }): Promise<{ products: ProductEntity[]; total: number }> {
     console.log('[ProductRepository] findAllWithSearch called with options:', JSON.stringify(options, null, 2))
-    
+
     const where: any = {};
 
     if (options.search) {
@@ -382,5 +382,21 @@ export class ProductRepository {
     console.log('[ProductRepository] Found products:', products.length, 'total:', total)
 
     return { products, total };
+  }
+
+  async getSlugMap(): Promise<Map<string, string>> {
+    const products = await this.getClient().product.findMany({
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const product of products) {
+      map.set(product.slug, product.id);
+    }
+
+    return map;
   }
 }

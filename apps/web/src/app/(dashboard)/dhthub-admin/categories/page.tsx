@@ -11,6 +11,8 @@ import {
   Settings2,
   PlusCircle,
   Grid3x3,
+  Image as ImageIcon,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -59,14 +61,17 @@ import { CellManagementSheet } from "./components/cell-management-sheet"
 interface CategoryFormData {
   name: string
   slug: string
+  sku: string
   parentId: string
   description: string
   sortOrder: number
+  imageUrl?: string
 }
 
 const initialFormData: CategoryFormData = {
   name: "",
   slug: "",
+  sku: "",
   parentId: "none",
   description: "",
   sortOrder: 0,
@@ -161,10 +166,31 @@ function CategoryTreeItem({
           <Folder className="h-4 w-4 text-amber-500" />
         )}
 
+        {/* Image thumbnail */}
+        {category.imageUrl && (
+          <div className="ml-2 w-8 h-8 rounded border bg-muted overflow-hidden shrink-0">
+            <img
+              src={`/api/v1/storage${category.imageUrl}`}
+              alt={category.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          </div>
+        )}
+
         {/* Name */}
         <span className={`flex-1 ${depth === 0 ? "font-semibold" : ""}`}>
           {category.name}
         </span>
+
+        {/* SKU */}
+        {category.sku && (
+          <span className="text-xs font-mono ml-2 px-2 py-0.5 rounded bg-muted/50">
+            {category.sku}
+          </span>
+        )}
 
         {/* Type badge */}
         <Badge variant={isLeaf ? "default" : "secondary"} className="text-xs">
@@ -268,6 +294,8 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<CategoryTreeNode | null>(null)
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData)
   const [isAddingChild, setIsAddingChild] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
 
   // Cell management state
   const [cellSheetOpen, setCellSheetOpen] = useState(false)
@@ -292,6 +320,8 @@ export default function CategoriesPage() {
     setFormData(initialFormData)
     setIsAddingChild(false)
     setSheetOpen(true)
+    setImageFile(null)
+    setImagePreview("")
   }
 
   const handleEditCategory = (category: CategoryTreeNode) => {
@@ -299,9 +329,11 @@ export default function CategoriesPage() {
     setFormData({
       name: category.name,
       slug: category.slug,
+      sku: category.sku || "",
       parentId: category.parentId || "none",
       description: category.description || "",
       sortOrder: category.sortOrder,
+      imageUrl: category.imageUrl || "",
     })
     setIsAddingChild(false)
     setSheetOpen(true)
@@ -312,6 +344,7 @@ export default function CategoriesPage() {
     setFormData({
       ...initialFormData,
       parentId,
+      sku: "",
     })
     setIsAddingChild(true)
     setSheetOpen(true)
@@ -357,7 +390,7 @@ export default function CategoriesPage() {
     }))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error("Category name is required")
       return
@@ -370,11 +403,41 @@ export default function CategoriesPage() {
       return
     }
 
+    let imageUrl = formData.imageUrl
+
+    // Upload image if provided
+    if (imageFile) {
+      try {
+        const formData = new FormData()
+        formData.append('file', imageFile)
+
+        const uploadResponse = await fetch('/api/v1/storage/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image')
+        }
+
+        const uploadResult = await uploadResponse.json()
+        imageUrl = uploadResult.url
+
+        toast.success('Image uploaded successfully')
+      } catch (error) {
+        toast.error('Failed to upload image')
+        console.error(error)
+        return
+      }
+    }
+
     const baseCategoryData = {
       name: formData.name,
       slug: formData.slug,
       sortOrder: formData.sortOrder,
       isActive: true,
+      ...(formData.sku.trim() ? { sku: formData.sku.toUpperCase() } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
     }
 
     if (editingCategory) {
@@ -405,6 +468,8 @@ export default function CategoriesPage() {
     setFormData(initialFormData)
     setEditingCategory(null)
     setIsAddingChild(false)
+    setImageFile(null)
+    setImagePreview("")
   }
 
   const handleCancel = () => {
@@ -412,6 +477,36 @@ export default function CategoriesPage() {
     setFormData(initialFormData)
     setEditingCategory(null)
     setIsAddingChild(false)
+    setImageFile(null)
+    setImagePreview("")
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error("Image size must be less than 5MB")
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("File must be an image")
+      return
+    }
+
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemoveImage = () => {
+    setImageFile(null)
+    setImagePreview("")
+    setFormData((prev) => ({ ...prev, imageUrl: undefined }))
   }
 
   if (isLoading) {
@@ -559,6 +654,23 @@ export default function CategoriesPage() {
             </div>
 
             <div className="grid gap-2">
+              <Label htmlFor="sku">SKU</Label>
+              <Input
+                id="sku"
+                value={formData.sku}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, sku: e.target.value.toUpperCase() }))
+                }
+                placeholder="e.g., CG-A1B2C3"
+                className="font-mono text-sm"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Category SKU for image mapping (CG- prefix recommended).
+              </p>
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="parent">Parent Category</Label>
               <Select
                 value={formData.parentId}
@@ -616,7 +728,49 @@ export default function CategoriesPage() {
                 Lower numbers appear first
               </p>
             </div>
-          </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="image">Category Image</Label>
+              <div className="flex items-start gap-4">
+                {(imagePreview || formData.imageUrl) ? (
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
+                    <img
+                      src={imagePreview || `/api/v1/storage${formData.imageUrl}`}
+                      alt="Category image preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={handleRemoveImage}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="w-24 h-24 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center shrink-0">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-xs text-muted-foreground">No image</span>
+                  </div>
+                )}
+                <div className="flex-1 space-y-2">
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="cursor-pointer"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
+                  </p>
+                </div>
+              </div>
+            </div>
 
           <SheetFooter className="gap-2 sm:gap-0">
             <Button 
