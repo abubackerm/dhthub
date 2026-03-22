@@ -156,7 +156,9 @@ export interface ProductView {
   price: number | null;
   quantity: number;
   isFeatured: boolean;
+  thumbnailUrl: string | null;
   primaryImageUrl: string | null;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
   variants: VariantView[];
   createdAt: string;
   updatedAt: string;
@@ -174,6 +176,7 @@ export interface CreateProductInput {
   price?: number;
   quantity?: number;
   isFeatured?: boolean;
+  thumbnailUrl?: string;
 }
 
 export interface UpdateProductInput {
@@ -186,6 +189,7 @@ export interface UpdateProductInput {
   price?: number;
   quantity?: number;
   isFeatured?: boolean;
+  thumbnailUrl?: string;
 }
 
 export interface CreateVariantInput {
@@ -225,6 +229,12 @@ export interface Cell {
   isActive: boolean;
   categoryId: string;
   imageUrl: string | null;
+  images: Array<{
+    id: string;
+    storagePath: string;
+    altText: string | null;
+    isPrimary: boolean;
+  }>;
   category?: Category;
   createdAt: string;
   updatedAt: string;
@@ -306,6 +316,7 @@ export interface LeafProductView {
   name: string;
   slug: string;
   description: string | null;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
   variants: LeafVariantView[];
 }
 
@@ -316,6 +327,12 @@ export interface LeafCellView {
   description: string | null;
   sortOrder: number;
   imageUrl: string | null;
+  images?: Array<{
+    id: string;
+    storagePath: string;
+    altText: string | null;
+    isPrimary: boolean;
+  }>;
   products: LeafProductView[];
 }
 

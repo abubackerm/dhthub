@@ -38,4 +38,5 @@ export class ImportJobEntity extends BaseEntity {
   warehouseId: string | null;
   originalFilePath: string | null;
   importType: ImportType | null;
+  strategy: 'skip' | 'replace' | null;
 }

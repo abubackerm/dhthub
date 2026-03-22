@@ -29,6 +29,7 @@ export interface LeafProductView {
   name: string;
   slug: string;
   description: string | null;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
   variants: LeafVariantView[];
 }
 
@@ -102,11 +103,24 @@ export class LeafPageView {
       slug: cell.slug,
       description: cell.description,
       sortOrder: cell.sortOrder,
-      images: (cell.images || []).map((img: any) => ({
-        url: img.storagePath,
-        altText: img.altText,
-        isPrimary: img.isPrimary,
-      })),
+      images: (cell.images || []).map((img: any) => {
+        // Normalize storage path - remove full URL and /catalog prefix if present
+        let storagePath = img.storagePath;
+        if (storagePath.startsWith('http')) {
+          const url = new URL(storagePath);
+          storagePath = url.pathname;
+        }
+        // Remove /catalog prefix if present
+        if (storagePath.startsWith('/catalog')) {
+          storagePath = storagePath.replace('/catalog', '');
+        }
+        return {
+          id: img.id,
+          storagePath,
+          altText: img.altText,
+          isPrimary: img.isPrimary,
+        };
+      }),
       products: (cell.products || []).map((product: any) =>
         LeafPageView.mapProduct(product)
       ),
@@ -119,6 +133,23 @@ export class LeafPageView {
       name: product.name,
       slug: product.slug,
       description: product.description,
+      images: (product.images || []).map((img: any) => {
+        // Normalize image URL - remove full URL and /catalog prefix if present
+        let url = img.url;
+        if (url && url.startsWith('http')) {
+          const parsed = new URL(url);
+          url = parsed.pathname;
+        }
+        // Remove /catalog prefix if present
+        if (url.startsWith('/catalog')) {
+          url = url.replace('/catalog', '');
+        }
+        return {
+          url,
+          altText: img.altText,
+          isPrimary: img.isPrimary,
+        };
+      }),
       variants: (product.variants || []).map((variant: any) =>
         LeafPageView.mapVariant(variant)
       ),
@@ -136,11 +167,23 @@ export class LeafPageView {
       attributeValues: (variant.attributeValues || []).map((av: any) =>
         LeafPageView.mapAttributeValue(av)
       ),
-      images: (variant.variantImages || []).map((img: any) => ({
-        url: img.storagePath,
-        altText: img.altText,
-        isPrimary: img.isPrimary,
-      })),
+      images: (variant.variantImages || []).map((img: any) => {
+        // Normalize image URL - remove full URL and /catalog prefix if present
+        let url = img.storagePath;
+        if (url && url.startsWith('http')) {
+          const parsed = new URL(url);
+          url = parsed.pathname;
+        }
+        // Remove /catalog prefix if present
+        if (url.startsWith('/catalog')) {
+          url = url.replace('/catalog', '');
+        }
+        return {
+          url,
+          altText: img.altText,
+          isPrimary: img.isPrimary,
+        };
+      }),
     };
   }
 

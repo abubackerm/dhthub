@@ -8,6 +8,7 @@ export class ImportJobCreatedEvent {
     public readonly totalRows: number | null,
     public readonly createdBy: string | null,
     public readonly importType: string | null,
+    public readonly strategy: 'skip' | 'replace' | null,
     public readonly occurredAt: Date = new Date(),
   ) {}
 }

@@ -371,6 +371,10 @@ export class ProductRepository {
               variantImages: true,
             },
           },
+          images: {
+            where: { variantId: null },
+            orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+          },
         },
         take: options.limit,
         skip: options.offset,
@@ -395,6 +399,29 @@ export class ProductRepository {
     const map = new Map<string, string>();
     for (const product of products) {
       map.set(product.slug, product.id);
+    }
+
+    return map;
+  }
+
+  async getSkuMap(): Promise<Map<string, string>> {
+    const products = await this.getClient().product.findMany({
+      where: {
+        sku: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        sku: true,
+      },
+    });
+
+    const map = new Map<string, string>();
+    for (const product of products) {
+      if (product.sku) {
+        map.set(product.sku, product.id);
+      }
     }
 
     return map;

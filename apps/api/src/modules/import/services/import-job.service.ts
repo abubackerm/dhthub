@@ -17,6 +17,7 @@ export interface CreateJobInput {
   warehouseId?: string;
   originalFilePath?: string;
   importType?: ImportType;
+  strategy?: 'skip' | 'replace';
 }
 
 export interface JobMetrics {
@@ -56,6 +57,7 @@ export class ImportJobService {
       warehouseId: input.warehouseId ?? null,
       originalFilePath: input.originalFilePath ?? null,
       importType: input.importType ?? null,
+      strategy: input.strategy ?? null,
     });
 
     // Emit job created event
@@ -70,6 +72,7 @@ export class ImportJobService {
         job.totalRows,
         job.createdBy,
         job.importType,
+        job.strategy,
       ),
     );
 

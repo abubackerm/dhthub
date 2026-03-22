@@ -132,6 +132,9 @@ function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: C
     transition,
   }
 
+  // Get primary image URL from images array (map storagePath to url)
+  const imageUrl = cell.images?.find((img) => img.isPrimary)?.storagePath || cell.imageUrl
+
   return (
     <div
       ref={setNodeRef}
@@ -147,16 +150,21 @@ function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: C
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </button>
         <div className="flex items-center gap-3 flex-1">
-          {cell.imageUrl && (
+          {imageUrl ? (
             <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
               <img
-                src={`/api/v1/storage${cell.imageUrl}`}
+                src={imageUrl}
                 alt={cell.name}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                 }}
               />
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+              <ImageIcon className="h-5 w-5 text-muted-foreground mb-1" />
+              <span className="text-[10px] text-muted-foreground">No image</span>
             </div>
           )}
           <div className="flex-1 min-w-0">
@@ -257,7 +265,8 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
       description: cell.description || "",
       sortOrder: cell.sortOrder,
       isActive: cell.isActive,
-      imageUrl: cell.imageUrl || undefined,
+      // Get primary image from images array, fall back to imageUrl
+      imageUrl: cell.images?.find((img) => img.isPrimary)?.storagePath || cell.imageUrl || undefined,
     })
     setShowEditDialog(true)
     setShowAttributeAssign(false)
@@ -496,102 +505,104 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
 
       {/* Create Cell Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Create New Cell</DialogTitle>
             <DialogDescription>
               Add a new cell to this category
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="cell-name">Cell Name *</Label>
-              <Input
-                id="cell-name"
-                value={cellFormData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g., Standard Hardware"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cell-slug">Slug</Label>
-              <Input
-                id="cell-slug"
-                value={cellFormData.slug}
-                onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
-                placeholder="e.g., standard-hardware"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cell-sku">SKU</Label>
-              <Input
-                id="cell-sku"
-                value={cellFormData.sku}
-                onChange={(e) => setCellFormData({ ...cellFormData, sku: e.target.value.toUpperCase() })}
-                placeholder="e.g., C-A1B2C3"
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cell-description">Description</Label>
-              <Textarea
-                id="cell-description"
-                value={cellFormData.description}
-                onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
-                placeholder="Describe this cell..."
-                rows={3}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="cell-active">Active Status</Label>
-              <Switch
-                id="cell-active"
-                checked={cellFormData.isActive}
-                onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cell-image">Cell Image</Label>
-              <div className="flex items-start gap-4">
-                {(imagePreview || cellFormData.imageUrl) ? (
-                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
-                    <img
-                      src={imagePreview || `/api/v1/storage${cellFormData.imageUrl}`}
-                      alt="Cell image preview"
-                      className="w-full h-full object-cover"
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
+            <div className="space-y-4 py-4 pr-4">
+              <div className="space-y-2">
+                <Label htmlFor="cell-name">Cell Name *</Label>
+                <Input
+                  id="cell-name"
+                  value={cellFormData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g., Standard Hardware"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cell-slug">Slug</Label>
+                <Input
+                  id="cell-slug"
+                  value={cellFormData.slug}
+                  onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
+                  placeholder="e.g., standard-hardware"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cell-sku">SKU</Label>
+                <Input
+                  id="cell-sku"
+                  value={cellFormData.sku}
+                  onChange={(e) => setCellFormData({ ...cellFormData, sku: e.target.value.toUpperCase() })}
+                  placeholder="e.g., C-A1B2C3"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cell-description">Description</Label>
+                <Textarea
+                  id="cell-description"
+                  value={cellFormData.description}
+                  onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
+                  placeholder="Describe this cell..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cell-active">Active Status</Label>
+                <Switch
+                  id="cell-active"
+                  checked={cellFormData.isActive}
+                  onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cell-image">Cell Image</Label>
+                <div className="flex items-start gap-4">
+                  {(imagePreview || cellFormData.imageUrl) ? (
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
+                      <img
+                        src={imagePreview || cellFormData.imageUrl}
+                        alt="Cell image preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-xs text-muted-foreground">No image</span>
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      id="cell-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="cursor-pointer"
                     />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={handleRemoveImage}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
+                    </p>
                   </div>
-                ) : (
-                  <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
-                    <span className="text-xs text-muted-foreground">No image</span>
-                  </div>
-                )}
-                <div className="flex-1 space-y-2">
-                  <Input
-                    id="cell-image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
-                  </p>
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button
               type="button"
               variant="outline"
@@ -614,102 +625,104 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
 
       {/* Edit Cell Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Edit Cell</DialogTitle>
             <DialogDescription>
               Update cell details
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-cell-name">Cell Name *</Label>
-              <Input
-                id="edit-cell-name"
-                value={cellFormData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g., Standard Hardware"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cell-slug">Slug</Label>
-              <Input
-                id="edit-cell-slug"
-                value={cellFormData.slug}
-                onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
-                placeholder="e.g., standard-hardware"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cell-sku">SKU</Label>
-              <Input
-                id="edit-cell-sku"
-                value={cellFormData.sku}
-                onChange={(e) => setCellFormData({ ...cellFormData, sku: e.target.value.toUpperCase() })}
-                placeholder="e.g., C-A1B2C3"
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cell-description">Description</Label>
-              <Textarea
-                id="edit-cell-description"
-                value={cellFormData.description}
-                onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
-                placeholder="Describe this cell..."
-                rows={3}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-cell-active">Active Status</Label>
-              <Switch
-                id="edit-cell-active"
-                checked={cellFormData.isActive}
-                onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-cell-image">Cell Image</Label>
-              <div className="flex items-start gap-4">
-                {(imagePreview || cellFormData.imageUrl) ? (
-                  <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
-                    <img
-                      src={imagePreview || `/api/v1/storage${cellFormData.imageUrl}`}
-                      alt="Cell image preview"
-                      className="w-full h-full object-cover"
+          <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
+            <div className="space-y-4 py-4 pr-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-cell-name">Cell Name *</Label>
+                <Input
+                  id="edit-cell-name"
+                  value={cellFormData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g., Standard Hardware"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cell-slug">Slug</Label>
+                <Input
+                  id="edit-cell-slug"
+                  value={cellFormData.slug}
+                  onChange={(e) => setCellFormData({ ...cellFormData, slug: e.target.value })}
+                  placeholder="e.g., standard-hardware"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cell-sku">SKU</Label>
+                <Input
+                  id="edit-cell-sku"
+                  value={cellFormData.sku}
+                  onChange={(e) => setCellFormData({ ...cellFormData, sku: e.target.value.toUpperCase() })}
+                  placeholder="e.g., C-A1B2C3"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cell-description">Description</Label>
+                <Textarea
+                  id="edit-cell-description"
+                  value={cellFormData.description}
+                  onChange={(e) => setCellFormData({ ...cellFormData, description: e.target.value })}
+                  placeholder="Describe this cell..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-cell-active">Active Status</Label>
+                <Switch
+                  id="edit-cell-active"
+                  checked={cellFormData.isActive}
+                  onCheckedChange={(checked) => setCellFormData({ ...cellFormData, isActive: checked })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cell-image">Cell Image</Label>
+                <div className="flex items-start gap-4">
+                  {(imagePreview || cellFormData.imageUrl) ? (
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
+                      <img
+                        src={imagePreview || cellFormData.imageUrl}
+                        alt="Cell image preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-xs text-muted-foreground">No image</span>
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      id="edit-cell-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="cursor-pointer"
                     />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={handleRemoveImage}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
+                    </p>
                   </div>
-                ) : (
-                  <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
-                    <span className="text-xs text-muted-foreground">No image</span>
-                  </div>
-                )}
-                <div className="flex-1 space-y-2">
-                  <Input
-                    id="edit-cell-image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
-                  </p>
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button
               type="button"
               variant="outline"

@@ -42,6 +42,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
       productId: string;
       productName: string;
       productSlug: string;
+      productImages: LeafProductView["images"];
       cellId: string;
       cellName: string;
       categoryId: string;
@@ -56,6 +57,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
               productId: product.id,
               productName: product.name,
               productSlug: product.slug,
+              productImages: product.images,
               cellId: cell.id,
               cellName: cell.name,
               categoryId: leafCat.id,
@@ -229,13 +231,28 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
                 <div className="flex gap-6 mb-4">
                   {/* Thumbnail */}
                   <div className="shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-muted">
-                    {cell.imageUrl ? (
-                      <Image src={cell.imageUrl} alt={cell.name} width={128} height={128} className="object-cover w-full h-full" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <ImageIcon className="w-8 h-8" />
-                      </div>
-                    )}
+                    {(() => {
+                      const imageUrl = cell.images && cell.images.length > 0
+                        ? cell.images.find((img) => img.isPrimary)?.storagePath || cell.images[0]?.storagePath
+                        : cell.imageUrl;
+                      if (!imageUrl) {
+                        return (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <ImageIcon className="w-8 h-8" />
+                          </div>
+                        );
+                      }
+                      // Use regular img tag for localhost URLs to avoid Next.js optimization issues
+                      const isLocalhost = imageUrl.includes('localhost');
+                      if (isLocalhost) {
+                        return (
+                          <img src={imageUrl} alt={cell.name} className="object-contain w-full h-full" />
+                        );
+                      }
+                      return (
+                        <Image src={imageUrl} alt={cell.name} width={128} height={128} className="object-contain w-full h-full" />
+                      );
+                    })()}
                   </div>
 
                   {/* Name + Description */}

@@ -44,7 +44,7 @@ export function CellProductTable({
 
   // Flatten all variants with product info for the table
   const flatVariants = useMemo(() => {
-    const variants: Array<LeafVariantView & { productId: string; productName: string; productSlug: string }> = [];
+    const variants: Array<LeafVariantView & { productId: string; productName: string; productSlug: string; productImages: LeafProductView["images"] }> = [];
     products.forEach((product) => {
       product.variants.forEach((variant) => {
         variants.push({
@@ -52,6 +52,7 @@ export function CellProductTable({
           productId: product.id,
           productName: product.name,
           productSlug: product.slug,
+          productImages: product.images,
         });
       });
     });
@@ -197,15 +198,21 @@ export function CellProductTable({
                   {/* Image Thumbnail */}
                   <TableCell className="p-2">
                     <div className="w-10 h-10 bg-muted rounded flex items-center justify-center overflow-hidden">
-                      {variant.images.find((img) => img.isPrimary)?.url ? (
-                        <img
-                          src={variant.images.find((img) => img.isPrimary)?.url}
-                          alt={variant.name || variant.productName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="w-5 h-5 text-muted-foreground/40" />
-                      )}
+                      {(() => {
+                        const variantImage = variant.images.find((img) => img.isPrimary)?.url || variant.images[0]?.url;
+                        const productImage = variant.productImages?.find((img) => img.isPrimary)?.url || variant.productImages?.[0]?.url;
+                        const imageUrl = variantImage || productImage;
+                        if (!imageUrl) {
+                          return <Package className="w-5 h-5 text-muted-foreground/40" />;
+                        }
+                        return (
+                          <img
+                            src={imageUrl}
+                            alt={variant.name || variant.productName}
+                            className="w-full h-full object-cover"
+                          />
+                        );
+                      })()}
                     </div>
                   </TableCell>
 

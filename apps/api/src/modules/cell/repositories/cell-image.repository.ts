@@ -37,6 +37,12 @@ export class CellImageRepository {
     });
   }
 
+  async findBySkuAndPosition(sku: string, position: number): Promise<CellImageEntity | null> {
+    return this.getClient().cellImage.findFirst({
+      where: { sku, position },
+    });
+  }
+
   async findById(id: string): Promise<CellImageEntity | null> {
     return this.getClient().cellImage.findUnique({
       where: { id },

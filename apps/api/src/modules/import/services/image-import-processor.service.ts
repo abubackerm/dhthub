@@ -45,6 +45,7 @@ export class ImageImportProcessorService {
           fileName: event.fileName,
           fileSize: event.fileSize,
           workerId: `image-worker-${process.pid}`,
+          strategy: event.strategy,
         },
         {
           jobId: `image-${event.jobId}`,

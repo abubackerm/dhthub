@@ -59,42 +59,31 @@ export default async function proxy(request: NextRequest) {
 
   // Proxy SeaweedFS images to Next.js frontend
   if (pathname.startsWith("/product-images/")) {
-    try {
-      const storageUrl = process.env.SEAWEDFS_FILER_URL || "http://localhost:8888";
-      const bucketName = "catalog";
-      const objectKey = pathname.startsWith("/") ? pathname.slice(1) : pathname;
-      
-      // Construct SeaweedFS Filer URL (HTTP endpoint, no auth required)
-      const seaweedfsUrl = `${storageUrl}/buckets/${bucketName}/${objectKey}`;
-      
-      // Fetch the image from SeaweedFS and proxy it
-      // Only forward necessary headers, not cookies/auth headers that SeaweedFS rejects
-      const response = await fetch(seaweedfsUrl, {
-        headers: {
-          'Accept': request.headers.get('accept') || 'image/*',
-        },
-      });
-      
-      if (!response.ok) {
-        return new NextResponse(`Failed to fetch image: ${response.statusText}`, { status: response.status });
-      }
-      
-      const imageBuffer = await response.arrayBuffer();
-      
-      // Get content type from response or default to image/jpeg
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      
-      return new NextResponse(imageBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=31536000", // 1 year
-        },
-      });
-    } catch (error) {
-      console.error("Error proxying SeaweedFS image:", error);
-      return new NextResponse("Failed to load image", { status: 500 });
+    const storageUrl = process.env.SEAWEDFS_FILER_URL || "http://localhost:8888";
+
+    const objectKey = pathname.startsWith("/")
+      ? pathname.slice(1)
+      : pathname;
+
+    const seaweedfsUrl = `${storageUrl}/buckets/catalog/${objectKey}`;
+
+    const response = await fetch(seaweedfsUrl, {
+      headers: {
+        Accept: request.headers.get("accept") || "image/*",
+      },
+    });
+
+    if (!response.ok) {
+      return new Response("Image not found", { status: 404 });
     }
+
+    return new Response(response.body, {
+      headers: {
+        "Content-Type":
+          response.headers.get("content-type") || "image/jpeg",
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
   }
 
   if (

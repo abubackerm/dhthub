@@ -225,6 +225,7 @@ export class ProductService extends BaseService {
       quantity: number;
       cellId: string | null;
       isFeatured: boolean;
+      thumbnailUrl: string | null;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
     }>,
@@ -271,6 +272,7 @@ export class ProductService extends BaseService {
       quantity: number;
       cellId: string | null;
       isFeatured: boolean;
+      thumbnailUrl: string | null;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
     }>,

@@ -11,6 +11,9 @@ export class CellRepository {
       where: { id },
       include: {
         category: true,
+        images: {
+          orderBy: { position: 'asc' },
+        },
       },
     });
   }
@@ -35,6 +38,9 @@ export class CellRepository {
       },
       include: {
         category: true,
+        images: {
+          orderBy: { position: 'asc' },
+        },
       },
       orderBy: {
         sortOrder: 'asc',
@@ -164,6 +170,9 @@ export class CellRepository {
         take,
         include: {
           category: true,
+          images: {
+            orderBy: { position: 'asc' },
+          },
           _count: {
             select: {
               products: true,

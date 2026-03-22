@@ -53,6 +53,7 @@ export class ImportJobRepository {
     warehouseId?: string | null;
     originalFilePath?: string | null;
     importType?: ImportType | null;
+    strategy?: 'skip' | 'replace' | null;
   }): Promise<ImportJobEntity> {
     return this.getClient().importJob.create({
       data: {
@@ -71,6 +72,7 @@ export class ImportJobRepository {
         warehouseId: data.warehouseId ?? null,
         originalFilePath: data.originalFilePath ?? null,
         importType: data.importType ?? null,
+        strategy: data.strategy ?? null,
       },
     });
   }

@@ -139,6 +139,7 @@ export class ProductsController {
       price: dto.price,
       quantity: dto.quantity,
       isFeatured: dto.isFeatured,
+      thumbnailUrl: dto.thumbnailUrl,
     });
 
     return ProductView.fromEntity(product);

@@ -114,6 +114,26 @@
 - The `importType` field in `ImportJob` is mandatory for proper job routing to processors
 - `/v1/import/jobs` endpoint must pass `importType: ImportType.CATALOG` to `uploadZip()` call
 - When `importType` is `null`, `CatalogImportProcessorService` skips the job (checks `event.importType !== 'CATALOG'`)
-- Jobs with null `importType` never get enqueued to BullMQ queue,- Global CSS overrides in `globals.css` can take precedence over Tailwind utility classes
+- Jobs with null `importType` never get enqueued to BullMQ queue
+- Global CSS overrides in `globals.css` can take precedence over Tailwind utility classes
 - Example: `.cell-product-table th` in `globals.css` overrides `TableHead` component styling
 - When styles don't apply, check `globals.css` for existing global style that may override component-level styling
+
+- SKU-based image storage uses hash-based paths with MD5 of full SKU (not first 3 chars)
+- Preload SKU maps in-memory for O(1) lookups during batch imports (100x faster than per-item DB queries)
+- Workers must listen to correct queue names (e.g., `image-processing` not `catalog-import`) to prevent infinite loops
+- Always use `@@unique([variantId, position])` for primary image queries in Prisma schema
+- Frontend should use `variant.images.find((img) => img.isPrimary)?.url` for primary image display
+- Frontend should fall back to `product.images` if `variant.images` is empty for backward compatibility
+- API server requires restart for TypeScript changes (doesn't hot-reload middleware or proxy)
+- Workers require separate restart for queue configuration changes to take effect
+- Always validate job status and implement idempotency checks before processing
+- Use BullMQ's exponential backoff for retries with comprehensive logging prefixes like `[ImageImport]`
+- SKU prefixes: Categories use `CG-{8 chars}`, Cells use `C-{8 chars}`, Products use `P-{8 chars}`
+- Always convert `storagePath` to `url` in controllers/views for frontend compatibility
+
+- Postgres MCP is invoked via `CallMcpTool` with server `user-postgres-mcp`, tool `execute_sql`, and argument `{ "sql": "..." }`
+- Tool schema located at `mcps/user-postgres-mcp/tools/execute_sql.json`
+- Database uses snake_case column names (e.g., `category_id`, `created_at`) even though Prisma maps to camelCase
+- Example: `CallMcpTool({ server: "user-postgres-mcp", toolName: "execute_sql", arguments: { sql: "SELECT * FROM cells LIMIT 5;" } })`
+- Tables are lowercase (e.g., `cells`, not `Cell`) — check `information_schema.tables` if unsure of table names

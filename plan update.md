@@ -1,30 +1,71 @@
-Minor things to add/fix:
-1. Phase 6 (Data Migration) — make it mandatory, not optional
+1. ADD Content-Type passthrough (IMPORTANT)
 
-Your products currently have categoryId
-Even in dev, you need the migration script to avoid breaking existing data
-Move it to Phase 1.7 right after the Prisma migration
+Right now you only set cache header.
 
-2. Cell slug auto-generation
+👉 You MUST forward the original content type.
 
-Plan doesn't mention who generates the slug
-Should be auto-generated from name in the service, with manual override option in DTO
-Add this to create-cell.dto.ts notes
+✅ Add this in proxy response
+return new Response(response.body, {
+  headers: {
+    "Content-Type": response.headers.get("content-type") || "image/jpeg",
+    "Cache-Control": "public, max-age=31536000, immutable",
+  },
+});
+❗ Why this matters
 
-3. isActive filter on public endpoints
+Without it:
 
-Public endpoint GET /v1/catalog/categories/:slug/cells should only return active cells
-Admin endpoint should return all (with isActive status shown)
-Not explicitly mentioned in the plan
+PNG may render incorrectly ❌
+WebP may fail ❌
+Browsers may mis-handle images ❌
+⚠️ 2. ADD 404 fallback (VERY IMPORTANT)
 
-4. Attribute displayOrder on the Cell page
+Currently missing.
 
-CellAttribute has displayOrder — this controls column order in the SKU table
-Make sure the public Cell endpoint returns attributes sorted by displayOrder
-Worth explicitly noting in Phase 3.2
+✅ Add this before returning response
+if (!response.ok) {
+  return new Response("Image not found", { status: 404 });
+}
+❗ Why
+prevents broken streams
+avoids weird frontend errors
+helps debugging
+🚀 3.  STRONGLY RECOMMENDED
+Add request passthrough headers
+const response = await fetch(seaweedfsUrl, {
+  headers: {
+    Accept: request.headers.get("accept") || "image/*",
+  },
+});
 
-5. Search module (Phase 4.2)
+👉 Ensures correct format negotiation (important later for WebP)
 
-Currently indexes Category → Product
-After change it needs to traverse Cell → Category → Product
-Make sure Meilisearch document includes both cellId and categoryId for filtering
+🔥 Final Updated Proxy (BEST VERSION)
+if (pathname.startsWith("/product-images/")) {
+  const storageUrl =
+    process.env.SEAWEDFS_FILER_URL || "http://localhost:8888";
+
+  const objectKey = pathname.startsWith("/")
+    ? pathname.slice(1)
+    : pathname;
+
+  const seaweedfsUrl = `${storageUrl}/${objectKey}`;
+
+  const response = await fetch(seaweedfsUrl, {
+    headers: {
+      Accept: request.headers.get("accept") || "image/*",
+    },
+  });
+
+  if (!response.ok) {
+    return new Response("Image not found", { status: 404 });
+  }
+
+  return new Response(response.body, {
+    headers: {
+      "Content-Type":
+        response.headers.get("content-type") || "image/jpeg",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+}

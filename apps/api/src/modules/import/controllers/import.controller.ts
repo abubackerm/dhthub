@@ -306,11 +306,13 @@ export class ImportController {
 
     const fields = data.fields as Record<string, any>;
     const createdBy = fields?.createdBy?.value as string | undefined;
+    const strategy = fields?.strategy?.value as 'skip' | 'replace' | undefined;
 
     const result = await this.importService.uploadZip(file, {
       createdBy,
       mode: ImportMode.UPSERT,
       importType: ImportType.IMAGES,
+      strategy: strategy || 'replace',
     });
 
     return {

@@ -176,6 +176,7 @@ model Product {
   quantity       Int           @default(0)
   cellId         String?       @map("cell_id")
   isFeatured     Boolean       @default(false) @map("is_featured")
+  thumbnailUrl   String?       @map("thumbnail_url")
   metadata       Json?
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
@@ -678,6 +679,7 @@ model ImportJob {
   warehouseId      String?          @map("warehouse_id")
   originalFilePath String?          @map("original_file_path")
   importType       ImportType?      @map("import_type")
+  strategy         String?          @db.VarChar(10)
   startedAt        DateTime?        @map("started_at")
   finishedAt       DateTime?        @map("finished_at")
   createdAt        DateTime         @default(now()) @map("created_at")

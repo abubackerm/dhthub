@@ -210,6 +210,11 @@ export class CategoryRepository {
         cells: {
           where: { isActive: true },
           orderBy: { sortOrder: 'asc' },
+          include: {
+            images: {
+              orderBy: { position: 'asc' },
+            },
+          },
         },
       },
     });
@@ -265,6 +270,10 @@ export class CategoryRepository {
           where: { status: 'active' },
           orderBy: { name: 'asc' },
           include: {
+            images: {
+              orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+              take: 1,
+            },
             variants: {
               orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
               include: {
@@ -384,6 +393,10 @@ export class CategoryRepository {
               where: { status: 'active' },
               orderBy: { name: 'asc' },
               include: {
+                images: {
+                  orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+                  take: 1,
+                },
                 variants: {
                   orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
               include: {

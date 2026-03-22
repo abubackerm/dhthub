@@ -26,6 +26,12 @@ export class VariantImageRepository {
     });
   }
 
+  async findBySkuAndPosition(sku: string, position: number): Promise<VariantImageEntity | null> {
+    return this.getClient().variantImage.findFirst({
+      where: { sku, position },
+    });
+  }
+
   async findById(id: string): Promise<VariantImageEntity | null> {
     return this.getClient().variantImage.findUnique({
       where: { id },

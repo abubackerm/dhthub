@@ -61,4 +61,9 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   isFeatured?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  thumbnailUrl?: string;
 }

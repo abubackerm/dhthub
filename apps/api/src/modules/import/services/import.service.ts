@@ -157,6 +157,7 @@ export class ImportService {
       mode?: ImportMode;
       warehouseId?: string;
       importType?: ImportType;
+      strategy?: 'skip' | 'replace';
     },
   ): Promise<UploadResult> {
     if (!file) {

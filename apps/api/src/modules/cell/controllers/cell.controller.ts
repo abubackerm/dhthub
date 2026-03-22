@@ -16,6 +16,7 @@ import { CreateCellDto } from '../dto/create-cell.dto';
 import { UpdateCellDto } from '../dto/update-cell.dto';
 import { AssignAttributeDto } from '../dto/assign-attribute.dto';
 import { AuthGuard, RolesGuard, Roles } from '@modules/auth';
+import { CellView } from '../dto/views/cell.view';
 
 // Admin Controller
 @Controller('admin/cells')
@@ -58,9 +59,12 @@ export class CellAdminController {
       activeOnly: activeOnly === 'true',
     });
 
+    // Map cells through CellView to transform storagePath to url
+    const mappedCells = CellView.fromPrismaArray(result.cells);
+
     // Transform to match frontend's expected PaginatedResponse format
     return {
-      data: result.cells,
+      data: mappedCells,
       meta: {
         total: result.total,
         limit: parsedTake,
@@ -71,7 +75,9 @@ export class CellAdminController {
 
   @Get(':id')
   getById(@Param('id') id: string) {
-    return this.cellService.findById(id);
+    const cell = this.cellService.findById(id);
+    // Map through CellView to transform storagePath to url
+    return CellView.fromPrisma(cell);
   }
 
   @Patch(':id')

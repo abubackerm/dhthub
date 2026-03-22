@@ -415,13 +415,29 @@ export default function CellProductsPage() {
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        {product.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-1">
-                            {product.description}
-                          </div>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                          {product.thumbnailUrl || product.primaryImageUrl ? (
+                            <img
+                              src={product.thumbnailUrl || product.primaryImageUrl || ''}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                              }}
+                            />
+                          ) : null}
+                          <Package className={`h-5 w-5 text-muted-foreground ${product.thumbnailUrl || product.primaryImageUrl ? 'hidden' : ''}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{product.name}</div>
+                          {product.description && (
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {product.description}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
@@ -1035,6 +1051,7 @@ function EditProductDialog({
     description: '',
     status: 'DRAFT' as 'DRAFT' | 'ACTIVE' | 'ARCHIVED',
     isFeatured: false,
+    thumbnailUrl: '',
   })
 
   useEffect(() => {
@@ -1046,6 +1063,7 @@ function EditProductDialog({
         description: product.description || '',
         status: product.status || 'DRAFT',
         isFeatured: product.isFeatured || false,
+        thumbnailUrl: product.thumbnailUrl || '',
       })
     }
   }, [product])
@@ -1121,6 +1139,38 @@ function EditProductDialog({
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Product description"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Thumbnail</label>
+            <div className="flex items-start gap-4">
+              <div className="w-20 h-20 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0 border">
+                {product.primaryImageUrl || formData.thumbnailUrl ? (
+                  <img
+                    src={formData.thumbnailUrl || product.primaryImageUrl || ''}
+                    alt="Thumbnail preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                    }}
+                  />
+                ) : null}
+                <Package className={`h-8 w-8 text-muted-foreground ${product.primaryImageUrl || formData.thumbnailUrl ? 'hidden' : ''}`} />
+              </div>
+              <div className="flex-1">
+                <Input
+                  value={formData.thumbnailUrl}
+                  onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
+                  placeholder={product.primaryImageUrl ? "Using primary image" : "https://example.com/image.jpg"}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {product.primaryImageUrl && !formData.thumbnailUrl
+                    ? "Leave empty to use the primary product image"
+                    : "Enter a custom thumbnail URL or leave empty to use primary image"}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

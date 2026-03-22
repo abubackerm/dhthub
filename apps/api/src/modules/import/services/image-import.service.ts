@@ -18,6 +18,11 @@ import * as crypto from 'crypto';
 
 export type ImageMappingType = 'sku' | 'cell_sku' | 'product' | 'category';
 
+export enum ImageUploadStrategy {
+  SKIP = 'skip',
+  REPLACE = 'replace',
+}
+
 export interface ImportedImage {
   sku: string;
   originalUrl: string;
@@ -272,24 +277,36 @@ export class ImageImportService {
   /**
    * Process image ZIP file using streaming
    */
-  async processImageZip(zipPath: string): Promise<ProcessedImage[]> {
-    this.logger.log(`[ImageImport] Starting ZIP processing: ${zipPath}`);
+  async processImageZip(
+    zipPath: string,
+    strategy: ImageUploadStrategy = ImageUploadStrategy.REPLACE
+  ): Promise<{
+    processed: ProcessedImage[];
+    skipped: Array<{ sku: string; reason: string }>;
+    total: number;
+  }> {
+    this.logger.log(`[ImageImport] Starting ZIP processing: ${zipPath}, strategy: ${strategy}`);
     const results: ProcessedImage[] = [];
+    const skipped: Array<{ sku: string; reason: string }> = [];
 
     // Preload all maps ONCE at the start for O(1) lookups
     this.logger.log(`[ImageImport] Preloading SKU, category, cell SKU, and product maps from database...`);
-    const [skuMap, categoryMap, categorySlugMap, cellSkuMap, productMap] = await Promise.all([
+    const [skuMap, categoryMap, categorySlugMap, cellSkuMap, productMap, productSkuMap] = await Promise.all([
       this.productVariantRepository.getSkuMap(),
       this.categoryRepository.getSkuMap(),
       this.categoryRepository.getSlugMap(),
       this.cellRepository.getSkuMap(),
       this.productRepository.getSlugMap(),
+      this.productRepository.getSkuMap(),
     ]);
-    this.logger.log(`[ImageImport] Loaded ${skuMap.size} variant SKUs, ${categoryMap.size} category SKUs, ${categorySlugMap.size} category slugs, ${cellSkuMap.size} cell SKUs, ${productMap.size} products for image processing`);
+    this.logger.log(`[ImageImport] Loaded ${skuMap.size} variant SKUs, ${categoryMap.size} category SKUs, ${categorySlugMap.size} category slugs, ${cellSkuMap.size} cell SKUs, ${productMap.size} product slugs, ${productSkuMap.size} product SKUs for image processing`);
 
     // Use unzipper.Open.file() for controlled async iteration
     const directory = await unzipper.Open.file(zipPath);
-    this.logger.log(`[ImageImport] ZIP contains ${directory.files.length} total files`);
+
+    // Count only valid image files (exclude folders and non-image files)
+    const imageFiles = directory.files.filter(f => this.isValidImageFile(f.path));
+    this.logger.log(`[ImageImport] ZIP contains ${imageFiles.length} images (${directory.files.length} total entries including folders)`);
     const limit = pLimit(this.concurrencyLimit);
 
     const filePromises: Promise<void>[] = [];
@@ -297,11 +314,7 @@ export class ImageImportService {
     const processedVariants = new Set<string>();
     const processedProducts = new Set<string>();
 
-    for (const file of directory.files) {
-      if (!this.isValidImageFile(file.path)) {
-        this.logger.debug(`[ImageImport] Skipping invalid image file: ${file.path}`);
-        continue;
-      }
+    for (const file of imageFiles) {
 
       this.logger.log(`[ImageImport] Processing file: ${file.path}`);
 
@@ -312,27 +325,52 @@ export class ImageImportService {
           this.logger.debug(`[ImageImport] Processing file: ${filename} (from path: ${file.path})`);
 
           // Parse filename to extract SKU and position
-          const { sku, position, ext } = this.parseImageFilename(filename);
+          const { sku, fullSku, position, ext, hasPositionSuffix } = this.parseImageFilename(filename);
 
-          // Detect mapping type from SKU prefix (instead of folder path)
-          const mappingType = this.detectMappingType(sku);
+          // Try full SKU first (e.g., OWC-RK-SS-001), then fall back to parsed SKU
+          // This handles SKUs that contain numbers like "OWC-RK-SS-001"
+          let lookupSku = fullSku;
+          let finalPosition = 1; // Default position when using full SKU
 
-          // Route to appropriate processor based on mapping type
-          if (mappingType === 'sku') {
-            const variantId = skuMap.get(sku);
-            if (!variantId) {
-              this.logger.warn(`[ImageImport] SKU not found: ${sku} (filename: ${filename})`);
-              return;
+          // First try: Look up the full SKU (without any position extraction)
+          let variantId = skuMap.get(fullSku);
+          let categoryId = categoryMap.get(fullSku) || categorySlugMap.get(fullSku);
+          let cellId = cellSkuMap.get(fullSku);
+          let productId = productSkuMap.get(fullSku) || productMap.get(fullSku);
+
+          // If full SKU not found and we have a position suffix, try the parsed SKU
+          if (!variantId && !categoryId && !cellId && !productId && hasPositionSuffix) {
+            lookupSku = sku;
+            finalPosition = position;
+            variantId = skuMap.get(sku);
+            categoryId = categoryMap.get(sku) || categorySlugMap.get(sku);
+            cellId = cellSkuMap.get(sku);
+            productId = productSkuMap.get(sku) || productMap.get(sku);
+          }
+
+          const effectivePosition = finalPosition;
+
+          // Route to appropriate processor based on which map matched
+          if (variantId) {
+            this.logger.log(`[ImageImport] Found variantId ${variantId} for SKU ${lookupSku} (position: ${effectivePosition})`);
+
+            // Check if image already exists for skip strategy
+            if (strategy === ImageUploadStrategy.SKIP) {
+              const existing = await this.variantImageRepository.findBySkuAndPosition(lookupSku, effectivePosition);
+              if (existing) {
+                this.logger.log(`[ImageImport] Skipping existing variant image: SKU=${lookupSku}, position=${effectivePosition} (strategy=skip)`);
+                skipped.push({ sku: lookupSku, reason: 'Existing image at same position' });
+                processedCount++;
+                return;
+              }
             }
-
-            this.logger.log(`[ImageImport] Found variantId ${variantId} for SKU ${sku} (position: ${position})`);
 
             // Get stream for each file
             const stream = file.stream();
             const buffer = await this.streamToBuffer(stream);
 
             // Generate storage path
-            const storagePath = this.generateStoragePath(sku, position, ext);
+            const storagePath = this.generateStoragePath(lookupSku, effectivePosition, ext);
 
             // Upload to SeaweedFS
             await this.uploadToSeaweedFS(storagePath, buffer, this.getContentType(ext));
@@ -340,16 +378,16 @@ export class ImageImportService {
             // Create variant image record
             const created = await this.variantImageRepository.upsert(
               variantId,
-              position,
+              effectivePosition,
               storagePath,
-              sku
+              lookupSku
             );
 
-            this.logger.log(`[ImageImport] Created/updated variant image: id=${created.id}, variantId=${variantId}, sku=${sku}, position=${position}`);
+            this.logger.log(`[ImageImport] Created/updated variant image: id=${created.id}, variantId=${variantId}, sku=${lookupSku}, position=${effectivePosition}`);
 
             results.push({
-              sku,
-              position,
+              sku: lookupSku,
+              position: effectivePosition,
               ext,
               variantId,
               storagePath,
@@ -357,41 +395,48 @@ export class ImageImportService {
             });
 
             processedVariants.add(variantId);
-          } else if (mappingType === 'category') {
+          } else if (categoryId) {
             // Process category image
             const result = await this.processCategoryImage(
               file,
-              sku,
-              position,
+              lookupSku,
+              effectivePosition,
               ext,
               categoryMap,
-              categorySlugMap
+              categorySlugMap,
+              strategy,
+              skipped
             );
 
             if (result) {
               results.push(result);
             }
-          } else if (mappingType === 'cell_sku') {
-            // Process cell image by SKU (C- prefix)
+          } else if (cellId) {
+            // Process cell image by SKU
             const result = await this.processCellImage(
               file,
-              sku,
-              position,
+              lookupSku,
+              effectivePosition,
               ext,
-              cellSkuMap
+              cellSkuMap,
+              strategy,
+              skipped
             );
 
             if (result) {
               results.push(result);
             }
-          } else if (mappingType === 'product') {
+          } else if (productId) {
             // Process product image
             const result = await this.processProductImage(
               file,
-              sku,
-              position,
+              lookupSku,
+              effectivePosition,
               ext,
-              productMap
+              productMap,
+              productSkuMap,
+              strategy,
+              skipped
             );
 
             if (result) {
@@ -400,9 +445,13 @@ export class ImageImportService {
                 processedProducts.add(result.productId);
               }
             }
+          } else {
+            this.logger.warn(`[ImageImport] SKU not found in any map: ${lookupSku} (filename: ${filename}, fullSku: ${fullSku})`);
+            this.logger.debug(`[ImageImport] Map sizes: variants=${skuMap.size}, categories=${categoryMap.size}, category slugs=${categorySlugMap.size}, cells=${cellSkuMap.size}, product skus=${productSkuMap.size}, product slugs=${productMap.size}`);
+            skipped.push({ sku: lookupSku, reason: 'SKU not found in database' });
           }
 
-          this.logger.debug(`[ImageImport] Processed: ${filename} -> ${mappingType} ${sku}, position ${position}`);
+          this.logger.debug(`[ImageImport] Processed: ${filename} -> SKU ${lookupSku}, position ${effectivePosition}`);
           processedCount++;
 
           // Log progress every 10 images
@@ -430,8 +479,12 @@ export class ImageImportService {
       await this.ensurePrimaryImage(variantId);
     }
 
-    this.logger.log(`[ImageImport] ZIP processing complete: ${results.length} images processed from ${directory.files.length} total files`);
-    return results;
+    this.logger.log(`[ImageImport] ZIP processing complete: ${results.length} images processed, ${skipped.length} skipped from ${imageFiles.length} image files`);
+    return {
+      processed: results,
+      skipped,
+      total: imageFiles.length,
+    };
   }
 
   /**
@@ -441,34 +494,33 @@ export class ImageImportService {
    * - SKU-POSITION.ext
    * - SKU(POSITION).ext
    * - SKU (POSITION).ext (with space)
+   *
+   * Returns both fullSku (entire filename without extension) and parsed sku/position
+   * for fallback lookup when the full SKU doesn't match.
    */
-  parseImageFilename(filename: string): { sku: string; position: number; ext: string } {
+  parseImageFilename(filename: string): { sku: string; fullSku: string; position: number; ext: string; hasPositionSuffix: boolean } {
     // Normalize (remove spaces)
     filename = filename.replace(/\s+/g, "");
 
-    // First try: SKU with position (e.g., SKU-1.ext or SKU(1).ext)
-    const match = filename.match(
-      /^(.+?)(?:-(\d+)|\((\d+)\))\.(jpg|jpeg|png|webp|gif)$/i
-    );
+    // Extract extension first
+    const extMatch = filename.match(/\.(jpg|jpeg|png|webp|gif)$/i);
+    if (!extMatch) {
+      throw new Error(`Invalid filename format: ${filename}`);
+    }
+    const ext = extMatch[1].toLowerCase();
+    const fullSku = filename.substring(0, filename.length - extMatch[0].length);
 
-    if (match) {
-      const sku = match[1];
-      const position = parseInt(match[2] || match[3], 10);
-      const ext = match[4].toLowerCase();
-      return { sku, position, ext };
+    // Check for position suffix: -DIGITS or (DIGITS) at the end
+    const positionMatch = fullSku.match(/^(.+?)(?:-(\d+)|\((\d+)\))$/);
+
+    if (positionMatch) {
+      const sku = positionMatch[1];
+      const position = parseInt(positionMatch[2] || positionMatch[3], 10);
+      return { sku, fullSku, position, ext, hasPositionSuffix: true };
     }
 
-    // Second try: SKU without position (e.g., SKU.jpg)
-    const matchNoPosition = filename.match(/^(.+?)\.(jpg|jpeg|png|webp|gif)$/i);
-
-    if (matchNoPosition) {
-      const sku = matchNoPosition[1];
-      const position = 1; // Default to position 1 for images without position
-      const ext = matchNoPosition[2].toLowerCase();
-      return { sku, position, ext };
-    }
-
-    throw new Error(`Invalid filename format: ${filename}`);
+    // No position suffix found - use full SKU with default position 1
+    return { sku: fullSku, fullSku, position: 1, ext, hasPositionSuffix: false };
   }
 
   /**
@@ -522,18 +574,6 @@ export class ImageImportService {
   }
 
   /**
-   * Detect image mapping type from SKU prefix
-   * - CG-* → Category
-   * - C-* → Cell
-   * - Others → ProductVariant (existing behavior)
-   */
-  detectMappingType(sku: string): ImageMappingType {
-    if (sku.startsWith('CG-')) return 'category';
-    if (sku.startsWith('C-')) return 'cell_sku';
-    return 'sku'; // Variant (default)
-  }
-
-  /**
    * Process cell image from ZIP file
    */
   async processCellImage(
@@ -541,7 +581,9 @@ export class ImageImportService {
     cellSku: string,
     position: number,
     ext: string,
-    cellMap: Map<string, string>
+    cellMap: Map<string, string>,
+    strategy: ImageUploadStrategy,
+    skipped: Array<{ sku: string; reason: string }>
   ): Promise<ProcessedImage | null> {
     try {
       this.logger.log(`[ImageImport] Starting cell image processing: SKU=${cellSku}, position=${position}, ext=${ext}`);
@@ -550,7 +592,18 @@ export class ImageImportService {
 
       if (!cellId) {
         this.logger.warn(`[ImageImport] Cell SKU not found in map: ${cellSku}. Map contains ${cellMap.size} entries`);
+        skipped.push({ sku: cellSku, reason: 'SKU not found in database' });
         return null;
+      }
+
+      // Check if image already exists for skip strategy
+      if (strategy === ImageUploadStrategy.SKIP) {
+        const existing = await this.cellImageRepository.findBySkuAndPosition(cellSku, position);
+        if (existing) {
+          this.logger.log(`[ImageImport] Skipping existing cell image: SKU=${cellSku}, position=${position} (strategy=skip)`);
+          skipped.push({ sku: cellSku, reason: 'Existing image at same position' });
+          return null;
+        }
       }
 
       this.logger.log(`[ImageImport] Found cellId ${cellId} for SKU ${cellSku}`);
@@ -602,22 +655,43 @@ export class ImageImportService {
    */
   async processProductImage(
     file: unzipper.File,
-    productSlug: string,
+    productIdentifier: string,
     position: number,
     ext: string,
-    productMap: Map<string, string>
+    productMap: Map<string, string>,
+    productSkuMap: Map<string, string>,
+    strategy: ImageUploadStrategy,
+    skipped: Array<{ sku: string; reason: string }>
   ): Promise<ProcessedImage | null> {
     try {
-      this.logger.log(`[ImageImport] Starting product image processing: slug=${productSlug}, position=${position}, ext=${ext}`);
+      this.logger.log(`[ImageImport] Starting product image processing: identifier=${productIdentifier}, position=${position}, ext=${ext}`);
 
-      const productId = productMap.get(productSlug);
+      // Try to find by SKU first (P- prefix), then by slug
+      let productId = productSkuMap.get(productIdentifier);
 
       if (!productId) {
-        this.logger.warn(`[ImageImport] Product slug not found in map: ${productSlug}. Map contains ${productMap.size} entries`);
+        // Try to find by slug (in case the filename uses slug instead of SKU)
+        productId = productMap.get(productIdentifier);
+      }
+
+      if (!productId) {
+        this.logger.warn(`[ImageImport] Product SKU/slug not found in map: ${productIdentifier}. SKU map contains ${productSkuMap.size} entries, slug map contains ${productMap.size} entries`);
+        skipped.push({ sku: productIdentifier, reason: 'SKU not found in database' });
         return null;
       }
 
-      this.logger.log(`[ImageImport] Found productId ${productId} for slug ${productSlug} (position: ${position})`);
+      // Check if image already exists for skip strategy
+      if (strategy === ImageUploadStrategy.SKIP) {
+        const existing = await this.productImageRepository.findByProductId(productId);
+        const existingAtPosition = existing.find(img => img.sortOrder === position);
+        if (existingAtPosition) {
+          this.logger.log(`[ImageImport] Skipping existing product image: productId=${productId}, position=${position} (strategy=skip)`);
+          skipped.push({ sku: productIdentifier, reason: 'Existing image at same position' });
+          return null;
+        }
+      }
+
+      this.logger.log(`[ImageImport] Found productId ${productId} for identifier ${productIdentifier} (position: ${position})`);
 
       // Get stream for file
       this.logger.debug(`[ImageImport] Converting product file to buffer: ${file.path}`);
@@ -627,7 +701,7 @@ export class ImageImportService {
       this.logger.debug(`[ImageImport] Product buffer size: ${buffer.length} bytes`);
 
       // Generate storage path for product image
-      const storagePath = this.generateStoragePath(`product-${productSlug}`, position, ext);
+      const storagePath = this.generateStoragePath(`product-${productIdentifier}`, position, ext);
       this.logger.log(`[ImageImport] Generated storage path: ${storagePath}`);
 
       // Upload to SeaweedFS
@@ -645,7 +719,7 @@ export class ImageImportService {
         isPrimary
       );
 
-      this.logger.log(`[ImageImport] Successfully created/updated product image: id=${created.id}, productId=${productId}, slug=${productSlug}, position=${position}, isPrimary=${isPrimary}`);
+      this.logger.log(`[ImageImport] Successfully created/updated product image: id=${created.id}, productId=${productId}, identifier=${productIdentifier}, position=${position}, isPrimary=${isPrimary}`);
 
       return {
         position,
@@ -656,7 +730,7 @@ export class ImageImportService {
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`[ImageImport] Failed to process product image for slug ${productSlug}: ${errorMessage}`);
+      this.logger.error(`[ImageImport] Failed to process product image for identifier ${productIdentifier}: ${errorMessage}`);
       return null;
     }
   }
@@ -670,7 +744,9 @@ export class ImageImportService {
     position: number,
     ext: string,
     categoryMap: Map<string, string>,
-    categorySlugMap: Map<string, string>
+    categorySlugMap: Map<string, string>,
+    strategy: ImageUploadStrategy,
+    skipped: Array<{ sku: string; reason: string }>
   ): Promise<ProcessedImage | null> {
     try {
       this.logger.log(`[ImageImport] Starting category image processing: sku=${categorySku}, position=${position}, ext=${ext}`);
@@ -685,10 +761,22 @@ export class ImageImportService {
 
       if (!categoryId) {
         this.logger.warn(`[ImageImport] Category SKU/slug not found in map: ${categorySku}. SKU map contains ${categoryMap.size} entries, slug map contains ${categorySlugMap.size} entries`);
+        skipped.push({ sku: categorySku, reason: 'SKU not found in database' });
         return null;
       }
 
       this.logger.log(`[ImageImport] Found categoryId ${categoryId} for SKU ${categorySku} (position: ${position})`);
+
+      // Check if image already exists for skip strategy
+      if (strategy === ImageUploadStrategy.SKIP) {
+        const existing = await this.categoryImageRepository.findByCategoryId(categoryId);
+        const existingAtPosition = existing.find(img => img.position === position);
+        if (existingAtPosition) {
+          this.logger.log(`[ImageImport] Skipping existing category image: categoryId=${categoryId}, position=${position} (strategy=skip)`);
+          skipped.push({ sku: categorySku, reason: 'Existing image at same position' });
+          return null;
+        }
+      }
 
       // Get stream for file
       this.logger.debug(`[ImageImport] Converting category file to buffer: ${file.path}`);

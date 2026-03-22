@@ -2,7 +2,7 @@ import { Controller, Post, Body, Get, Logger, BadRequestException } from '@nestj
 import { ZipExtractorService } from '../services/zip-extractor.service';
 import { CatalogImportService } from '../services/catalog-import.service';
 import { ImportJobService } from '../services/import-job.service';
-import { ImageImportService } from '../services/image-import.service';
+import { ImageImportService, ImageUploadStrategy } from '../services/image-import.service';
 import { ImportJobStatus } from '../entities/import-job-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -94,10 +94,10 @@ export class ImportWorkerController {
    * POST /v1/import/worker/process-images
    */
   @Post('process-images')
-  async processImages(@Body() body: { jobId: string; fileUrl: string }) {
-    const { jobId, fileUrl } = body;
+  async processImages(@Body() body: { jobId: string; fileUrl: string; strategy?: 'skip' | 'replace' }) {
+    const { jobId, fileUrl, strategy } = body;
 
-    this.logger.log(`[ImageImport] Received request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+    this.logger.log(`[ImageImport] Received request: jobId=${jobId}, fileUrl="${fileUrl}", strategy="${strategy || 'replace'}"`);
 
     // CRITICAL: Check job status FIRST to prevent re-processing
     const job = await this.importJobService.findById(jobId);
@@ -151,23 +151,24 @@ export class ImportWorkerController {
       });
       await this.importJobService.markAsProcessing(jobId, `image-worker-${process.pid}`);
 
-      const processedImages = await this.imageImportService.processImageZip(filePath);
+      const uploadStrategy: ImageUploadStrategy = strategy === 'skip' ? ImageUploadStrategy.SKIP : ImageUploadStrategy.REPLACE;
+      const result = await this.imageImportService.processImageZip(filePath, uploadStrategy);
 
-      this.logger.log(`[processImages] Processed ${processedImages.length} images for job ${jobId}`);
+      this.logger.log(`[processImages] Processed ${result.processed.length} images, skipped ${result.skipped.length} for job ${jobId}`);
 
       // Update job with actual counts
       await this.importJobService.updateProgress(jobId, {
-        processedRows: processedImages.length,
-        successRows: processedImages.length,
+        processedRows: result.processed.length,
+        successRows: result.processed.length,
         failedRows: 0,
       });
 
       // Mark job as completed
       await this.importJobService.markAsCompleted(jobId);
 
-    this.logger.log(`[ImageImport] Marking job ${jobId} as completed with ${processedImages.length} images`);
+    this.logger.log(`[ImageImport] Marking job ${jobId} as completed with ${result.processed.length} processed, ${result.skipped.length} skipped`);
 
-    return { success: true, jobId, processedCount: processedImages.length, totalImages };
+    return { success: true, jobId, processedCount: result.processed.length, skippedCount: result.skipped.length, totalImages: result.total };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[ImageImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);

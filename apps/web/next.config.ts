@@ -17,8 +17,15 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      // Allow localhost for development (API images) - unoptimized
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8333',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
+    unoptimized: false,
   },
 
   // Headers for better security and performance

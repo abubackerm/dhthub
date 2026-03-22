@@ -26,5 +26,6 @@ export class ProductEntity extends BaseEntity {
   quantity: number;
   cellId: string | null;
   isFeatured: boolean;
+  thumbnailUrl: string | null;
   metadata: Record<string, unknown> | null;
 }

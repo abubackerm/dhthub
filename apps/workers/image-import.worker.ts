@@ -9,6 +9,7 @@ interface ImageImportJobData {
   fileName?: string;
   fileSize?: number;
   workerId: string;
+  strategy?: 'skip' | 'replace';
 }
 
 /**
@@ -66,14 +67,14 @@ class ImageImportWorker {
       return;
     }
 
-    const { jobId, fileUrl, fileName } = job.data;
+    const { jobId, fileUrl, fileName, strategy } = job.data;
 
-    this.logger.log(`[ImageImportWorker] Starting processing for job ${jobId} (file: ${fileName})`);
+    this.logger.log(`[ImageImportWorker] Starting processing for job ${jobId} (file: ${fileName}, strategy: ${strategy || 'replace'})`);
     job.updateProgress(10);
 
     try {
       // Call API to process image import
-      const response = await this.callApi('/v1/import/worker/process-images', { jobId, fileUrl });
+      const response = await this.callApi('/v1/import/worker/process-images', { jobId, fileUrl, strategy });
 
       job.updateProgress(100);
       this.logger.log(`[ImageImportWorker] Job ${jobId} completed successfully. Processed ${response.processedCount} images`);
