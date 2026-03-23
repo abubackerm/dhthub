@@ -60,7 +60,7 @@ class CatalogImportWorker {
    */
   private async processJob(job: BullJob<CatalogImportJobData>): Promise<void> {
     // Only process catalog import jobs, skip image import jobs
-    if (job.name !== 'process-catalog') {
+    if (job.name !== 'process-catalog-import') {
       this.logger.debug(`Skipping job ${job.id} with name ${job.name} (not a catalog import job)`);
       return;
     }

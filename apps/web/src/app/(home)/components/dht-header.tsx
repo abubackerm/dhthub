@@ -3,9 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, CircleUser } from "lucide-react";
+import { Menu, X, CircleUser, ShoppingCart, ChevronDown, LogOut } from "lucide-react";
 import { SignInDialog } from "@/components/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
     { href: "/", label: "Home" },
@@ -21,6 +28,10 @@ export function DHTHeader() {
     const { data: session } = authClient.useSession();
 
     const isAuthenticated = !!session?.user;
+
+    const handleLogout = async () => {
+        await authClient.signOut();
+    };
 
     return (
         <header className="sticky top-0 z-50 bg-(--dht-darker) shadow-sm">
@@ -49,14 +60,46 @@ export function DHTHeader() {
                                 {link.label}
                             </Link>
                         ))}
+                        
+                        {/* Cart Icon */}
+                        <Link
+                            href="/cart"
+                            className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
+                        >
+                            <ShoppingCart className="h-5 w-5" />
+                        </Link>
+
+                        {/* Auth Section */}
                         {isAuthenticated ? (
-                            <Link
-                                href="/settings/account"
-                                className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
-                            >
-                                <CircleUser className="h-5 w-5" />
-                                <span>{session?.user?.name || "Profile"}</span>
-                            </Link>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors focus:outline-none"
+                                    >
+                                        <CircleUser className="h-5 w-5" />
+                                        <span>{session?.user?.name || "Profile"}</span>
+                                        <ChevronDown className="h-4 w-4" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/account/profile" className="w-full cursor-pointer">
+                                            Profile
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/account/orders" className="w-full cursor-pointer">
+                                            Orders
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                                        <LogOut className="h-4 w-4 mr-2" />
+                                        Logout
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : (
                             <button
                                 type="button"
@@ -92,15 +135,46 @@ export function DHTHeader() {
                                     {link.label}
                                 </Link>
                             ))}
+                            
+                            {/* Mobile Cart Icon */}
+                            <Link
+                                href="/cart"
+                                className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
+                                onClick={() => setMobileMenuOpen(false)}
+                            >
+                                <ShoppingCart className="h-5 w-5" />
+                                <span>Cart</span>
+                            </Link>
+
+                            {/* Mobile Auth Section */}
                             {isAuthenticated ? (
-                                <Link
-                                    href="/settings/account"
-                                    className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    <CircleUser className="h-5 w-5" />
-                                    <span>{session?.user?.name || "Profile"}</span>
-                                </Link>
+                                <>
+                                    <Link
+                                        href="/account/profile"
+                                        className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                        <CircleUser className="h-5 w-5" />
+                                        <span>{session?.user?.name || "Profile"}</span>
+                                    </Link>
+                                    <Link
+                                        href="/account/orders"
+                                        className="text-white hover:text-(--dht-red) font-medium transition-colors"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                        Orders
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleLogout();
+                                            setMobileMenuOpen(false);
+                                        }}
+                                        className="text-left text-white hover:text-(--dht-red) font-medium transition-colors"
+                                    >
+                                        Logout
+                                    </button>
+                                </>
                             ) : (
                                 <button
                                     type="button"

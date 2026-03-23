@@ -28,8 +28,8 @@ export class CatalogImportProcessorService {
       return;
     }
 
-    // Only process CATALOG import types
-    if (event.importType !== 'CATALOG') {
+    // Only process CATALOG import types (handle null importType as well)
+    if (!event.importType || event.importType !== 'CATALOG') {
       return;
     }
 

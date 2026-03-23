@@ -28,8 +28,8 @@ export class AttributeImportProcessorService {
       return;
     }
 
-    // Only process ATTRIBUTES import types
-    if (event.importType !== 'ATTRIBUTES') {
+    // Only process ATTRIBUTES import types (handle null importType as well)
+    if (!event.importType || event.importType !== 'ATTRIBUTES') {
       return;
     }
 

@@ -90,6 +90,11 @@ export class CatalogImportService {
         const result = await this.step1_importProducts(extractedFiles.products, jobId);
         context.productMap = result.productMap;
         this.logger.log(`Products step: ${result.success} success, ${result.failed} failed`);
+      } else {
+        // If no products.csv, load existing products from database for variant lookup
+        this.logger.log(`Step 1: Loading existing products from database for variant import`);
+        context.productMap = await this.loadExistingProducts();
+        this.logger.log(`Loaded ${Object.keys(context.productMap).length} existing products from database`);
       }
 
       // Step 2: Import attributes (if provided)
@@ -143,6 +148,36 @@ export class CatalogImportService {
     }
     const stream = fs.createReadStream(extractedFiles.variants, { encoding: 'utf8' });
     return this.csvParserService.countRows(stream);
+  }
+
+  /**
+   * Load existing products from database for variant import
+   */
+  private async loadExistingProducts(): Promise<ProductMap> {
+    const productMap: ProductMap = {};
+
+    const products = await this.db.product.findMany({
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        cell: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    });
+
+    for (const product of products) {
+      productMap[product.slug] = {
+        id: product.id,
+        name: product.name,
+        cellSlug: product.cell?.slug || '',
+      };
+    }
+
+    return productMap;
   }
 
   /**
