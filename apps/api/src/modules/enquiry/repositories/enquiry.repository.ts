@@ -9,6 +9,10 @@ export interface EnquiryWithItems extends EnquiryEntity {
     id: string;
     enquiryId: string;
     variantId: string;
+    productId: string;
+    sku: string;
+    price: number | null;
+    total: number | null;
     qty: number;
     createdAt: Date;
     updatedAt: Date;
@@ -16,6 +20,22 @@ export interface EnquiryWithItems extends EnquiryEntity {
     updatedBy: string | null;
     variant: ProductVariantEntity;
   }>;
+}
+
+export interface EnquiryItemWithProduct {
+  id: string;
+  enquiryId: string;
+  variantId: string;
+  productId: string;
+  sku: string;
+  price: number | null;
+  total: number | null;
+  qty: number;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  updatedBy: string | null;
+  variant: ProductVariantEntity;
 }
 
 @Injectable()
@@ -143,6 +163,133 @@ export class EnquiryRepository {
   async countByUserId(userId: string): Promise<number> {
     return this.getClient().enquiry.count({
       where: { userId },
+    });
+  }
+
+  async generateEnquiryNumber(): Promise<string> {
+    const count = await this.getClient().enquiry.count();
+    const paddedNumber = (count + 1).toString().padStart(6, '0');
+    return `ENQ-${paddedNumber}`;
+  }
+
+  async createWithCustomer(
+    data: {
+      userId: string;
+      enquiryNumber: string;
+      customerName: string;
+      companyName?: string | null;
+      email: string;
+      phone?: string | null;
+      status?: EnquiryStatus;
+      notes?: string | null;
+      createdBy?: string;
+    },
+  ): Promise<EnquiryEntity> {
+    return this.getClient().enquiry.create({
+      data: {
+        userId: data.userId,
+        enquiryNumber: data.enquiryNumber,
+        customerName: data.customerName,
+        companyName: data.companyName ?? null,
+        email: data.email,
+        phone: data.phone ?? null,
+        status: data.status ?? EnquiryStatus.SUBMITTED,
+        notes: data.notes ?? null,
+        createdBy: data.createdBy,
+      },
+    });
+  }
+
+  async findAllWithFilters(
+    filters?: {
+      status?: EnquiryStatus;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<{ enquiries: EnquiryEntity[]; total: number }> {
+    const where: any = {};
+
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+
+    if (filters?.search) {
+      where.OR = [
+        { enquiryNumber: { contains: filters.search, mode: 'insensitive' } },
+        { customerName: { contains: filters.search, mode: 'insensitive' } },
+        { companyName: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const [enquiries, total] = await Promise.all([
+      this.getClient().enquiry.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.getClient().enquiry.count({ where }),
+    ]);
+
+    return { enquiries, total };
+  }
+
+  async updateQuote(
+    id: string,
+    updatedBy?: string,
+  ): Promise<EnquiryEntity> {
+    return this.getClient().enquiry.update({
+      where: { id },
+      data: {
+        status: EnquiryStatus.QUOTED,
+        updatedBy,
+      },
+    });
+  }
+
+  async markAsPaid(
+    id: string,
+    updatedBy?: string,
+  ): Promise<EnquiryEntity> {
+    return this.getClient().enquiry.update({
+      where: { id },
+      data: {
+        status: EnquiryStatus.PAID,
+        updatedBy,
+      },
+    });
+  }
+
+  async confirmOrder(
+    id: string,
+    updatedBy?: string,
+  ): Promise<EnquiryEntity> {
+    return this.getClient().enquiry.update({
+      where: { id },
+      data: {
+        status: EnquiryStatus.CONFIRMED,
+        updatedBy,
+      },
+    });
+  }
+
+  async setGrandTotal(
+    id: string,
+    grandTotal: number,
+    updatedBy?: string,
+  ): Promise<EnquiryEntity> {
+    return this.getClient().enquiry.update({
+      where: { id },
+      data: {
+        grandTotal,
+        updatedBy,
+      },
     });
   }
 }

@@ -19,6 +19,7 @@ import type {
   LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
+import { useAddToCart } from "@/lib/api/cart";
 
 interface CellProductTableProps {
   products: LeafProductView[];
@@ -35,6 +36,7 @@ export function CellProductTable({
 }: CellProductTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const addToCart = useAddToCart();
 
   // Get visible attributes for table columns (all filterable attributes are shown)
   const visibleAttributes = useMemo(
@@ -254,7 +256,9 @@ export function CellProductTable({
                       className="h-8 px-2 text-(--dht-red) hover:text-(--dht-red-hover) hover:bg-(--dht-red)/10"
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Add to cart logic would go here
+                        if (variant.id) {
+                          addToCart.mutate({ variantId: variant.id, qty: 1 });
+                        }
                       }}
                     >
                       <ShoppingCart className="w-4 h-4" />

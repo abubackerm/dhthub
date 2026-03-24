@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Star, ShoppingCart, Heart } from "lucide-react"
+import { useAddToCart } from "@/lib/api/cart"
 
 interface Product {
   id: string
@@ -23,6 +24,8 @@ interface ProductGridProps {
 }
 
 export function ProductGrid({ products }: ProductGridProps) {
+  const addToCart = useAddToCart();
+
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {products.map((product) => (
@@ -122,6 +125,11 @@ export function ProductGrid({ products }: ProductGridProps) {
               className="w-full bg-[var(--dht-red)] hover:bg-[var(--dht-red-hover)] text-white"
               disabled={!product.inStock}
               variant={product.inStock ? "default" : "outline"}
+              onClick={() => {
+                if (product.id) {
+                  addToCart.mutate({ variantId: product.id, qty: 1 });
+                }
+              }}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               {product.inStock ? "Add to Cart" : "Out of Stock"}

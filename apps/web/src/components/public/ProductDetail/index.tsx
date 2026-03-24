@@ -27,6 +27,7 @@ import {
   Plus,
 } from "lucide-react";
 import type { ProductDetailView, CategoryTreeNode } from "@/lib/api/catalog/types";
+import { useAddToCart } from "@/lib/api/cart";
 
 interface ProductDetailProps {
   product: ProductDetailView;
@@ -42,6 +43,7 @@ export function ProductDetailPage({
   pathSlugs,
 }: ProductDetailProps) {
   const router = useRouter();
+  const addToCart = useAddToCart();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     (product.variants || []).find((v) => v.isDefault)?.id || (product.variants || [])[0]?.id || null
   );
@@ -343,7 +345,12 @@ export function ProductDetailPage({
 
             <Button
               className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white h-12 text-lg"
-              disabled={!inStock}
+              disabled={!inStock || !selectedVariantId}
+              onClick={() => {
+                if (selectedVariantId) {
+                  addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
+                }
+              }}
             >
               <ShoppingCart className="w-5 h-5 mr-2" />
               Add to Cart

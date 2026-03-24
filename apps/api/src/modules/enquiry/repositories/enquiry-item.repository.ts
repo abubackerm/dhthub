@@ -109,4 +109,89 @@ export class EnquiryItemRepository {
       where: { enquiryId },
     });
   }
+
+  async createWithDetails(
+    data: {
+      enquiryId: string;
+      variantId: string;
+      productId: string;
+      sku: string;
+      qty: number;
+      createdBy?: string;
+    },
+  ): Promise<EnquiryItemEntity> {
+    return this.getClient().enquiryItem.create({
+      data: {
+        enquiryId: data.enquiryId,
+        variantId: data.variantId,
+        productId: data.productId,
+        sku: data.sku,
+        qty: data.qty,
+        createdBy: data.createdBy,
+      },
+      include: {
+        variant: true,
+      },
+    });
+  }
+
+  async createManyWithDetails(
+    items: Array<{
+      enquiryId: string;
+      variantId: string;
+      productId: string;
+      sku: string;
+      qty: number;
+      createdBy?: string;
+    }>,
+  ): Promise<{ count: number }> {
+    return this.getClient().enquiryItem.createMany({
+      data: items.map((item) => ({
+        enquiryId: item.enquiryId,
+        variantId: item.variantId,
+        productId: item.productId,
+        sku: item.sku,
+        qty: item.qty,
+        createdBy: item.createdBy,
+      })),
+    });
+  }
+
+  async updatePrice(
+    id: string,
+    price: number,
+    total: number,
+    updatedBy?: string,
+  ): Promise<EnquiryItemEntity> {
+    return this.getClient().enquiryItem.update({
+      where: { id },
+      data: {
+        price,
+        total,
+        updatedBy,
+      },
+    });
+  }
+
+  async batchUpdatePrices(
+    updates: Array<{
+      id: string;
+      price: number;
+      total: number;
+    }>,
+    updatedBy?: string,
+  ): Promise<void> {
+    await Promise.all(
+      updates.map((update) =>
+        this.getClient().enquiryItem.update({
+          where: { id: update.id },
+          data: {
+            price: update.price,
+            total: update.total,
+            updatedBy,
+          },
+        }),
+      ),
+    );
+  }
 }

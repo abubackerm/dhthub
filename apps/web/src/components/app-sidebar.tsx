@@ -10,6 +10,7 @@ import {
   Upload,
   History,
   Image as ImageIcon,
+  ShoppingCart,
 } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
@@ -30,6 +31,7 @@ import { authClient } from "@/lib/auth-client"
 const adminOnlyLabels = new Set([
   "Catalog Setup",
   "Products",
+  "Orders",
 ])
 
 const adminOnlyItems = new Set(["Users"])
@@ -42,6 +44,16 @@ const allNavGroups = [
         title: "Dashboard",
         url: "/dhthub-admin",
         icon: LayoutDashboard,
+      },
+    ],
+  },
+  {
+    label: "Orders",
+    items: [
+      {
+        title: "All Orders",
+        url: "/dhthub-admin/orders",
+        icon: ShoppingCart,
       },
     ],
   },

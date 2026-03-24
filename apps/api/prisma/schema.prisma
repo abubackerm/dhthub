@@ -754,23 +754,36 @@ model CartItem {
 
 enum EnquiryStatus {
   SUBMITTED
-  UNDER_REVIEW
-  RESPONDED
-  CLOSED
+  IN_PROGRESS
+  QUOTED
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  PAYMENT_PENDING
+  PAID
+  PROCESSING
+  IN_TRANSIT
+  DELIVERED
 }
 
 model Enquiry {
-  id        String        @id @default(cuid())
-  userId    String        @map("user_id")
-  status    EnquiryStatus @default(SUBMITTED)
-  notes     String?
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
+  id            String        @id @default(cuid())
+  enquiryNumber String?       @unique @map("enquiry_number")
+  userId        String        @map("user_id")
+  customerName  String        @map("customer_name")
+  companyName   String?       @map("company_name")
+  email         String
+  phone         String?
+  status        EnquiryStatus @default(SUBMITTED)
+  grandTotal    Decimal?      @map("grand_total") @db.Decimal(12,2)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
   items     EnquiryItem[]
 
   @@index([userId])
   @@index([status])
+  @@index([enquiryNumber])
   @@map("enquiries")
 }
 
@@ -778,6 +791,10 @@ model EnquiryItem {
   id        String   @id @default(cuid())
   enquiryId String   @map("enquiry_id")
   variantId String   @map("variant_id")
+  productId String  @map("product_id")
+  sku       String
+  price     Decimal? @db.Decimal(12,2)
+  total     Decimal? @db.Decimal(12,2)
   qty       Int
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -787,5 +804,6 @@ model EnquiryItem {
 
   @@index([enquiryId])
   @@index([variantId])
+  @@index([productId])
   @@map("enquiry_items")
 }

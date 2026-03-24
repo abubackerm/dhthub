@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart } from "lucide-react";
 import { Attribute, Product } from "@/lib/mock-data";
 import { useMemo, useCallback } from "react";
+import { useAddToCart } from "@/lib/api/cart";
 
 interface ProductTableProps {
   products: Product[];
@@ -33,6 +34,7 @@ export function ProductTable({
 }: ProductTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const addToCart = useAddToCart();
 
   // Get visible attributes for table columns
   const visibleAttributes = useMemo(
@@ -206,7 +208,9 @@ export function ProductTable({
                     className="bg-[--dht-red] hover:bg-[--dht-red-hover] text-white"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Add to cart logic would go here
+                      if (product.id) {
+                        addToCart.mutate({ variantId: product.id, qty: 1 });
+                      }
                     }}
                   >
                     <ShoppingCart className="w-4 h-4 mr-1" />

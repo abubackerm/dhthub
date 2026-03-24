@@ -47,6 +47,12 @@ export class EnquiryController {
     return this.enquiryService.findById(id, userId);
   }
 
+  @Post(':id/confirm')
+  async confirmOrder(@Req() req: any, @Param('id') id: string): Promise<EnquiryView> {
+    const userId = req.user.id;
+    return this.enquiryService.confirmOrder(id, userId);
+  }
+
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string,
