@@ -24,11 +24,13 @@ import { CatalogAttributesModule } from '../catalog-attributes/catalog-attribute
 import { PricingModule } from '../pricing/pricing.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { StorageModule } from '../storage/storage.module';
+import { AuditModule } from '@shared/audit';
 
 @Module({
   imports: [
     CoreModule,
     EventEmitterModule,
+    AuditModule,
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',

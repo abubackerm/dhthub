@@ -47,7 +47,7 @@ export class AttributesController {
   async create(@Body() dto: CreateAttributeDto): Promise<AttributeView> {
     const attribute = await this.attributeService.create({
       name: dto.name,
-      slug: dto.slug,
+      slug: dto.slug, // Can be undefined - service will auto-generate
       dataType: dto.dataType as any,
       group: dto.group ?? null,
       sortOrder: dto.sortOrder ?? 0,
@@ -172,6 +172,7 @@ export class AttributesController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
     @Query('validateOnly') validateOnly?: string,
+    @Query('conflictMode') conflictMode?: string,
   ) {
     const data = await req.file();
     if (!data) {
@@ -220,12 +221,10 @@ export class AttributesController {
 
     try {
       const baseName = path.basename(filename).toLowerCase();
-      if (baseName === 'attributes.csv') {
+      // Accept any CSV file as attributes file
+      if (baseName.endsWith('.csv')) {
         attributesFile = path.join(tmpDir, 'attributes.csv');
         fs.writeFileSync(attributesFile, buffer);
-      } else if (baseName === 'attribute-options.csv') {
-        optionsFile = path.join(tmpDir, 'attribute-options.csv');
-        fs.writeFileSync(optionsFile, buffer);
       }
 
       const result = await this.importService.importFromFiles(
@@ -234,10 +233,11 @@ export class AttributesController {
         {
           validateOnly: validateOnly === 'true',
           createdBy,
+          conflictMode: conflictMode as any,
         },
       );
 
-      return result;
+      return reply.status(HttpStatus.OK).send(result);
     } finally {
       try {
         if (fs.existsSync(tmpDir)) {
@@ -254,20 +254,15 @@ export class AttributesController {
     const template = await this.importService.generateTemplate();
 
     return {
-      filename: 'attribute-templates.zip',
+      filename: 'attributes-template.csv',
       headers: {
-        attributes: ['name', 'slug', 'dataType', 'group', 'sortOrder', 'isFilterable', 'filterType', 'isRequired', 'unitSymbol'],
-        options: ['attributeSlug', 'label', 'value', 'sortOrder'],
+        attributes: ['name', 'dataType', 'group', 'isFilterable', 'filterType', 'unitSymbol'],
       },
-      description: 'Download attribute templates for bulk import. Include attributes.csv and optionally attribute-options.csv.',
+      description: 'Download attribute template for bulk import. Only attributes.csv is needed - slug and sortOrder are auto-generated.',
       files: {
         attributes: {
           filename: 'attributes.csv',
           content: template.attributesCsv,
-        },
-        options: {
-          filename: 'attribute-options.csv',
-          content: template.optionsCsv,
         },
       },
     };
@@ -277,18 +272,9 @@ export class AttributesController {
   async downloadTemplate(@Res() reply: FastifyReply) {
     const template = await this.importService.generateTemplate();
 
-    // Create ZIP file
-    const AdmZip = require('adm-zip');
-    const zip = new AdmZip();
-
-    zip.addFile('attributes.csv', template.attributesCsv);
-    zip.addFile('attribute-options.csv', template.optionsCsv);
-
-    const zipBuffer = zip.toBuffer();
-
     reply
-      .type('application/zip')
-      .header('Content-Disposition', 'attachment; filename="attribute-templates.zip"')
-      .send(zipBuffer);
+      .type('text/csv')
+      .header('Content-Disposition', 'attachment; filename="attributes-template.csv"')
+      .send(template.attributesCsv);
   }
 }

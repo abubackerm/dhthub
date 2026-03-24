@@ -11,31 +11,47 @@ import {
   ShoppingBag,
   ArrowRight,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCart, useUpdateCartItem, useRemoveFromCart } from "@/lib/api/cart";
 import { createEnquiryFromCart } from "@/lib/api/enquiry";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useState } from "react";
 
 export default function CartPage() {
   const { data: cart, isLoading, error } = useCart();
   const updateCartItem = useUpdateCartItem();
   const removeFromCart = useRemoveFromCart();
   const queryClient = useQueryClient();
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   const submitCart = useMutation({
     mutationFn: async () => {
       return createEnquiryFromCart({});
     },
     onSuccess: (enquiry) => {
-      toast.success("Cart submitted as enquiry");
+      toast.success(`Enquiry ${enquiry.enquiryNumber} submitted successfully!`);
+      setIsConfirmDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       window.location.href = `/account/orders/${enquiry.id}`;
     },
     onError: (error: Error) => {
       console.error("Failed to submit cart:", error);
       toast.error("Failed to submit cart");
+      setIsConfirmDialogOpen(false);
     },
   });
+
+  const handleSubmitEnquiry = () => {
+    setIsConfirmDialogOpen(true);
+  };
 
   const handleQuantityChange = (itemId: string, newQty: number) => {
     if (newQty < 1) return;
@@ -96,15 +112,15 @@ export default function CartPage() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-3">
             {cart.items.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-lg shadow-sm p-6 flex gap-6"
+                className="bg-white rounded-lg shadow-sm p-4 flex items-center gap-4"
               >
                 {/* Product Image */}
                 {item.image && (
-                  <div className="w-32 h-32 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
+                  <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
                     <img
                       src={item.image}
                       alt={item.productName}
@@ -117,87 +133,88 @@ export default function CartPage() {
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/products/${item.variantId}`}
-                    className="text-lg font-semibold hover:text-(--dht-red) transition-colors"
+                    className="font-semibold hover:text-(--dht-red) transition-colors line-clamp-1"
                   >
                     {item.productName}
                   </Link>
-                  {item.variantName && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {item.variantName}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-1">
-                    SKU: {item.sku}
-                  </p>
-
-                  {/* Quantity Controls */}
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 rounded-none"
-                        onClick={() =>
-                          handleQuantityChange(item.id, item.qty - 1)
-                        }
-                        disabled={item.qty <= 1}
-                      >
-                        <Minus className="w-4 h-4" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value);
-                          if (value >= 1 && value <= 10000) {
-                            handleQuantityChange(item.id, value);
-                          }
-                        }}
-                        className="w-16 h-10 rounded-none border-0 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="1"
-                        max="10000"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 rounded-none"
-                        onClick={() =>
-                          handleQuantityChange(item.id, item.qty + 1)
-                        }
-                        disabled={item.qty >= 10000}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-
-                    {/* Stock Status */}
-                    {!item.isAvailable && (
-                      <span className="text-sm text-red-600 font-medium">
-                        Out of Stock
-                      </span>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
+                    <span className="line-clamp-1">
+                      {item.variantName || item.sku}
+                    </span>
+                    {item.variantName && item.sku && (
+                      <span className="text-muted-foreground/50">•</span>
                     )}
-                    {item.availableStock < item.qty && item.isAvailable && (
-                      <span className="text-sm text-orange-600 font-medium">
-                        Only {item.availableStock} available
-                      </span>
+                    {item.sku && (
+                      <span>SKU: {item.sku}</span>
                     )}
                   </div>
                 </div>
 
-                {/* Remove Button */}
-                <div className="flex flex-col items-end justify-between">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                    onClick={() => handleRemoveItem(item.id)}
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
+                {/* Quantity and Stock Status */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      onClick={() =>
+                        handleQuantityChange(item.id, item.qty - 1)
+                      }
+                      disabled={item.qty <= 1}
+                    >
+                      <Minus className="w-3 h-3" />
+                    </Button>
+                    <Input
+                      type="number"
+                      value={item.qty}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (value >= 1 && value <= 10000) {
+                          handleQuantityChange(item.id, value);
+                        }
+                      }}
+                      className="w-14 h-8 rounded-none border-0 text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="1"
+                      max="10000"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      onClick={() =>
+                        handleQuantityChange(item.id, item.qty + 1)
+                      }
+                      disabled={item.qty >= 10000}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* Stock Status */}
+                  {!item.isAvailable && (
+                    <span className="text-xs text-red-600 font-medium whitespace-nowrap">
+                      Out of Stock
+                    </span>
+                  )}
+                  {item.availableStock < item.qty && item.isAvailable && (
+                    <span className="text-xs text-orange-600 font-medium whitespace-nowrap">
+                      Only {item.availableStock} left
+                    </span>
+                  )}
                 </div>
+
+                {/* Remove Button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-red-600 hover:bg-red-50 h-8 w-8 shrink-0"
+                  onClick={() => handleRemoveItem(item.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -225,7 +242,7 @@ export default function CartPage() {
 
               <Button
                 className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) h-12 text-base"
-                onClick={() => submitCart.mutate()}
+                onClick={handleSubmitEnquiry}
                 disabled={submitCart.isPending}
               >
                 {submitCart.isPending ? "Submitting..." : "Submit as Enquiry"}
@@ -245,6 +262,37 @@ export default function CartPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Enquiry Submission</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to submit {cart?.itemCount || 0} item{cart?.itemCount !== 1 ? 's' : ''} as an enquiry?
+              <br />
+              <br />
+              Our team will review your enquiry and provide a quote with pricing details.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmDialogOpen(false)}
+              disabled={submitCart.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-(--dht-red) hover:bg-(--dht-red-hover)"
+              onClick={() => submitCart.mutate()}
+              disabled={submitCart.isPending}
+            >
+              {submitCart.isPending ? "Submitting..." : "Confirm & Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

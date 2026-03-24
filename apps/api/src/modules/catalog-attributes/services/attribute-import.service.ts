@@ -13,6 +13,7 @@ export interface AttributeImportSummary {
   totalRows: number;
   successRows: number;
   failedRows: number;
+  skippedAttributes: string[];
   createdAttributes: string[];
   updatedAttributes: string[];
   createdOptions: number;
@@ -26,6 +27,7 @@ export interface AttributeImportSummary {
 
 export interface ImportOptions {
   validateOnly?: boolean;
+  conflictMode?: 'skip' | 'replace' | 'add_anyway';
   createdBy?: string;
 }
 
@@ -42,6 +44,37 @@ export class AttributeImportService {
     private readonly optionRepo: AttributeOptionRepository,
     private readonly importJobService: ImportJobService,
   ) {}
+
+  /**
+   * Generate a slug from a name
+   */
+  private generateSlugFromName(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'attribute';
+  }
+
+  /**
+   * Generate a unique slug, adding a suffix if needed
+   */
+  private async generateUniqueSlug(baseName: string): Promise<string> {
+    const baseSlug = this.generateSlugFromName(baseName);
+    let slug = baseSlug;
+    let suffix = 1;
+
+    while (true) {
+      const existing = await this.attributeRepo.findBySlug(slug);
+      if (!existing) {
+        return slug;
+      }
+      slug = `${baseSlug}-${suffix}`;
+      suffix++;
+    }
+  }
 
   /**
    * Process attribute import from extracted files (called by worker)
@@ -110,6 +143,7 @@ export class AttributeImportService {
       totalRows: 0,
       successRows: 0,
       failedRows: 0,
+      skippedAttributes: [],
       createdAttributes: [],
       updatedAttributes: [],
       createdOptions: 0,
@@ -155,6 +189,11 @@ export class AttributeImportService {
       const attributeMap = new Map<string, string>();
       for (const attr of attributeResult.valid) {
         const result = await this.upsertAttribute(attr, options);
+        if (result.skipped) {
+          // Skip tracking - track skipped attribute by slug
+          summary.skippedAttributes.push(attr.name);
+          continue;
+        }
         if (result.success) {
           attributeMap.set(attr.slug, result.attributeId!);
           if (result.created) {
@@ -244,40 +283,48 @@ export class AttributeImportService {
       slug: string;
       errors: string[];
     }> = [];
-    const slugSet = new Set<string>();
-    const duplicateSlugs: string[] = [];
+    const nameSet = new Set<string>();
+    const duplicateNames: string[] = [];
 
     try {
       for await (const { rowNumber, data } of this.csvParserService.parseStream(stream)) {
+        const name = data.name?.trim() || '';
+        
+        // Check for duplicate names within the file
+        if (nameSet.has(name.toLowerCase())) {
+          duplicateNames.push(name);
+          continue;
+        }
+        nameSet.add(name.toLowerCase());
+
         const attr: any = {
           rowNumber,
-          name: data.name?.trim() || '',
-          slug: data.slug?.trim() || '',
+          name,
+          slug: '', // Will be auto-generated
           dataType: data.dataType?.trim() || '',
           group: data.group?.trim() || '',
-          sortOrder: data.sortOrder ? parseInt(data.sortOrder, 10) : 0,
+          sortOrder: 0, // Will be auto-assigned alphabetically
           isFilterable: data.isFilterable?.toLowerCase() === 'true',
           filterType: data.filterType?.trim() || '',
           unitSymbol: data.unitSymbol?.trim() || '',
         };
 
-        // Check for duplicate slugs
-        if (slugSet.has(attr.slug)) {
-          duplicateSlugs.push(attr.slug);
-          continue;
-        }
-        slugSet.add(attr.slug);
-
         // Validate
         const errors = this.validateAttribute(attr);
         if (errors.length > 0) {
-          invalid.push({ rowNumber, slug: attr.slug, errors });
+          invalid.push({ rowNumber, slug: attr.name, errors });
         } else {
           valid.push(attr);
         }
       }
 
-      return { valid, invalid, duplicateSlugs };
+      // Sort alphabetically by name and assign sortOrder
+      valid.sort((a, b) => a.name.localeCompare(b.name));
+      valid.forEach((attr, index) => {
+        attr.sortOrder = index + 1;
+      });
+
+      return { valid, invalid, duplicateSlugs: duplicateNames };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to parse attributes CSV: ${errorMessage}`);
@@ -350,11 +397,7 @@ export class AttributeImportService {
       errors.push('name is required');
     }
 
-    if (!attr.slug || attr.slug.length === 0) {
-      errors.push('slug is required');
-    } else if (!/^[a-z0-9-]+$/.test(attr.slug)) {
-      errors.push('slug must be lowercase alphanumeric with hyphens only');
-    }
+    // Slug is auto-generated, no validation needed
 
     if (!attr.dataType) {
       errors.push('dataType is required');
@@ -437,11 +480,8 @@ export class AttributeImportService {
   private async upsertAttribute(
     attr: any,
     options: ImportOptions,
-  ): Promise<{ success: boolean; created: boolean; attributeId?: string; error?: string }> {
+  ): Promise<{ success: boolean; created: boolean; skipped: boolean; attributeId?: string; error?: string }> {
     try {
-      // Check if attribute exists by slug
-      const existing = await this.attributeRepo.findBySlug(attr.slug);
-
       // Resolve unit symbol to unit ID
       let unitId: string | undefined;
       if (attr.unitSymbol) {
@@ -451,25 +491,60 @@ export class AttributeImportService {
         }
       }
 
-      if (existing) {
-        // Update existing
-        await this.attributeDefinitionService.update(existing.id, {
-          name: attr.name,
-          dataType: attr.dataType as unknown as AttributeDataType,
-          group: attr.group || null,
-          sortOrder: attr.sortOrder ?? 0,
-          filterType: attr.filterType as unknown as AttributeFilterType || null,
-          unitId: unitId || null,
-          isFilterable: attr.isFilterable ?? false,
-          updatedBy: options.createdBy,
-        });
+      // Check if attribute exists by name
+      const existingByName = await this.attributeRepo.findAll();
+      const existing = existingByName.find(a => a.name.toLowerCase() === attr.name.toLowerCase());
 
-        return { success: true, created: false, attributeId: existing.id };
+      const conflictMode = options.conflictMode || 'replace';
+
+      if (existing) {
+        // Handle conflict based on conflictMode
+        switch (conflictMode) {
+          case 'skip':
+            // Skip existing attribute without updating
+            return { success: false, created: false, skipped: true, attributeId: existing.id };
+
+          case 'replace':
+            // Update existing attribute
+            await this.attributeDefinitionService.update(existing.id, {
+              name: attr.name,
+              dataType: attr.dataType as unknown as AttributeDataType,
+              group: attr.group || null,
+              sortOrder: attr.sortOrder ?? 0,
+              filterType: attr.filterType as unknown as AttributeFilterType || null,
+              unitId: unitId || null,
+              isFilterable: attr.isFilterable ?? false,
+              updatedBy: options.createdBy,
+            });
+
+            return { success: true, created: false, skipped: false, attributeId: existing.id };
+
+          case 'add_anyway':
+            // Always create new, generate unique slug
+            const slug = await this.generateUniqueSlug(attr.name);
+            const created = await this.attributeDefinitionService.create({
+              name: attr.name,
+              slug,
+              dataType: attr.dataType as unknown as AttributeDataType,
+              group: attr.group || null,
+              sortOrder: attr.sortOrder ?? 0,
+              filterType: attr.filterType as unknown as AttributeFilterType || null,
+              unitId: unitId || null,
+              isFilterable: attr.isFilterable ?? false,
+              createdBy: options.createdBy,
+            });
+
+            return { success: true, created: true, skipped: false, attributeId: created.id };
+
+          default:
+            throw new BadRequestException(`Invalid conflict mode: ${conflictMode}`);
+        }
       } else {
-        // Create new
+        // Attribute doesn't exist, create new
+        const slug = await this.generateUniqueSlug(attr.name);
         const created = await this.attributeDefinitionService.create({
           name: attr.name,
-          slug: attr.slug,
+          slug,
           dataType: attr.dataType as unknown as AttributeDataType,
           group: attr.group || null,
           sortOrder: attr.sortOrder ?? 0,
@@ -479,12 +554,12 @@ export class AttributeImportService {
           createdBy: options.createdBy,
         });
 
-        return { success: true, created: true, attributeId: created.id };
+        return { success: true, created: true, skipped: false, attributeId: created.id };
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to upsert attribute ${attr.slug}: ${errorMessage}`);
-      return { success: false, created: false, error: errorMessage };
+      this.logger.error(`Failed to upsert attribute ${attr.name}: ${errorMessage}`);
+      return { success: false, created: false, skipped: false, error: errorMessage };
     }
   }
 
@@ -531,35 +606,21 @@ export class AttributeImportService {
   }
 
   /**
-   * Generate CSV template
+   * Generate CSV template (only attributes.csv - options are managed separately)
    */
   async generateTemplate(): Promise<{
     attributesCsv: string;
-    optionsCsv: string;
   }> {
     const attributesCsv = [
-      'name,slug,dataType,group,sortOrder,isFilterable,filterType,unitSymbol',
-      'Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,',
-      'Material,material,enum,Material,2,true,CHECKBOX,',
-      'Diameter,diameter,number,Dimensions,3,true,RANGE,mm',
-      'Length,length,number,Dimensions,4,true,RANGE,mm',
-      'Finish,finish,enum,Material,5,true,CHECKBOX,',
+      'name,dataType,group,isFilterable,filterType,unitSymbol',
+      'Thread Size,enum,Technical Specs,true,CHECKBOX,',
+      'Material,enum,Material,true,CHECKBOX,',
+      'Diameter,number,Dimensions,true,RANGE,mm',
+      'Length,number,Dimensions,true,RANGE,mm',
+      'Finish,enum,Material,true,CHECKBOX,',
+      'Color,text,Appearance,false,,',
     ].join('\n');
 
-    const optionsCsv = [
-      'attributeSlug,label,value,sortOrder',
-      'material,Steel,steel,1',
-      'material,Stainless Steel,stainless-steel,2',
-      'material,Aluminum,aluminum,3',
-      'material,Brass,brass,4',
-      'finish,Zinc,zinc,1',
-      'finish,Black Oxide,black-oxide,2',
-      'finish,Plain,plain,3',
-      'thread-size,1/4-20,1/4-20,1',
-      'thread-size,3/8-16,3/8-16,2',
-      'thread-size,1/2-13,1/2-13,3',
-    ].join('\n');
-
-    return { attributesCsv, optionsCsv };
+    return { attributesCsv };
   }
 }

@@ -148,6 +148,36 @@ export async function createImportJob(
   return response.json();
 }
 
+export interface ImportJobsQueryParams {
+  status?: string;
+  createdBy?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getImportJobs(
+  params?: ImportJobsQueryParams,
+): Promise<ImportJobListResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.status) {
+    queryParams.set('status', params.status);
+  }
+  if (params?.createdBy) {
+    queryParams.set('createdBy', params.createdBy);
+  }
+  if (params?.limit != null) {
+    queryParams.set('limit', String(params.limit));
+  }
+  if (params?.offset != null) {
+    queryParams.set('offset', String(params.offset));
+  }
+
+  const query = queryParams.toString();
+  const endpoint = `/v1/import/jobs${query ? `?${query}` : ''}`;
+
+  return apiClient.get<ImportJobListResponse>(endpoint);
+}
+
 export async function getImportJob(id: string): Promise<ImportJobView> {
   return apiClient.get<ImportJobView>(`/v1/import/jobs/${id}`);
 }
@@ -217,4 +247,6 @@ export async function downloadTemplatePack() {
     content: string;
   }>(endpoint);
 }
+
+export * from './use-import-jobs';
 

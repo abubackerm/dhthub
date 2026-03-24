@@ -16,8 +16,6 @@ export interface EnquiryWithItems extends EnquiryEntity {
     qty: number;
     createdAt: Date;
     updatedAt: Date;
-    createdBy: string | null;
-    updatedBy: string | null;
     variant: ProductVariantEntity;
   }>;
 }
@@ -33,8 +31,6 @@ export interface EnquiryItemWithProduct {
   qty: number;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string | null;
-  updatedBy: string | null;
   variant: ProductVariantEntity;
 }
 
@@ -100,7 +96,7 @@ export class EnquiryRepository {
       userId: string;
       status?: EnquiryStatus;
       notes?: string | null;
-      createdBy?: string;
+      _createdBy?: string;
     },
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.create({
@@ -108,7 +104,6 @@ export class EnquiryRepository {
         userId: data.userId,
         status: data.status ?? EnquiryStatus.SUBMITTED,
         notes: data.notes ?? null,
-        createdBy: data.createdBy,
       },
     });
   }
@@ -116,13 +111,12 @@ export class EnquiryRepository {
   async updateStatus(
     id: string,
     status: EnquiryStatus,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.update({
       where: { id },
       data: {
         status,
-        updatedBy,
       },
     });
   }
@@ -182,7 +176,7 @@ export class EnquiryRepository {
       phone?: string | null;
       status?: EnquiryStatus;
       notes?: string | null;
-      createdBy?: string;
+      _createdBy?: string;
     },
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.create({
@@ -195,7 +189,6 @@ export class EnquiryRepository {
         phone: data.phone ?? null,
         status: data.status ?? EnquiryStatus.SUBMITTED,
         notes: data.notes ?? null,
-        createdBy: data.createdBy,
       },
     });
   }
@@ -242,39 +235,36 @@ export class EnquiryRepository {
 
   async updateQuote(
     id: string,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.update({
       where: { id },
       data: {
         status: EnquiryStatus.QUOTED,
-        updatedBy,
       },
     });
   }
 
   async markAsPaid(
     id: string,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.update({
       where: { id },
       data: {
         status: EnquiryStatus.PAID,
-        updatedBy,
       },
     });
   }
 
   async confirmOrder(
     id: string,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.update({
       where: { id },
       data: {
         status: EnquiryStatus.CONFIRMED,
-        updatedBy,
       },
     });
   }
@@ -282,13 +272,12 @@ export class EnquiryRepository {
   async setGrandTotal(
     id: string,
     grandTotal: number,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryEntity> {
     return this.getClient().enquiry.update({
       where: { id },
       data: {
         grandTotal,
-        updatedBy,
       },
     });
   }

@@ -132,8 +132,38 @@
 - SKU prefixes: Categories use `CG-{8 chars}`, Cells use `C-{8 chars}`, Products use `P-{8 chars}`
 - Always convert `storagePath` to `url` in controllers/views for frontend compatibility
 
+- Worker entry point must start all workers simultaneously (e.g., `tsx index.ts` or `pnpm --filter workers dev`)
+- Running individual worker files directly bypasses the index that starts all workers, causing some workers to never run and leaving jobs stuck in PENDING
+- Both CatalogImportWorker and AttributeImportWorker should be started together via the index, not run independently
+
+- Import type specific file requirements in ZIP validation
+- Catalog imports require `variants.csv` (or `variants_template.csv`) plus optional `attributes.csv` and `images.csv`
+- Attribute imports only require `attributes.csv` and optionally `attribute-options.csv` - they do NOT need `variants.csv`
+- ZIP validation must check `importType` discriminator and apply correct file requirements per import type
+- Attribute import jobs failing with "variants.csv is required" when importType is ATTRIBUTES indicates validation logic error
+
+- Authenticated endpoints can use optional DTOs with session-based defaults
+- For `/v1/enquiries/from-cart`, create separate `CreateEnquiryFromCartDto` with all optional fields
+- Service should fall back to authenticated user's name/email from session when DTO fields are not provided
+- This allows frontend to send empty object `{}` while still populating required customer data
+
+- Enquiry status values must match database enum exactly
+- Database statuses: SUBMITTED, IN_PROGRESS, QUOTED, AWAITING_CONFIRMATION, CONFIRMED, PAYMENT_PENDING, PAID, PROCESSING, IN_TRANSIT, DELIVERED
+- Local StatusTimeline components must use correct database values, not non-existent ones like "COMPLETED" or "CLOSED"
+- Shared admin StatusTimeline component already has correct values
+
 - Postgres MCP is invoked via `CallMcpTool` with server `user-postgres-mcp`, tool `execute_sql`, and argument `{ "sql": "..." }`
 - Tool schema located at `mcps/user-postgres-mcp/tools/execute_sql.json`
 - Database uses snake_case column names (e.g., `category_id`, `created_at`) even though Prisma maps to camelCase
 - Example: `CallMcpTool({ server: "user-postgres-mcp", toolName: "execute_sql", arguments: { sql: "SELECT * FROM cells LIMIT 5;" } })`
 - Tables are lowercase (e.g., `cells`, not `Cell`) — check `information_schema.tables` if unsure of table names
+
+- Worker entry point (`apps/workers/index.ts` or package.json script) must start all workers simultaneously
+- Running individual workers directly bypasses the index that starts all workers, causing some workers to never run and leaving jobs stuck in PENDING
+- Both CatalogImportWorker and AttributeImportWorker should be started together via `tsx index.ts`, not run independently
+
+- Import type specific file requirements in ZIP validation
+- Catalog imports require `variants.csv` (or `variants_template.csv`) plus optional `attributes.csv` and `images.csv`
+- Attribute imports only require `attributes.csv` and optionally `attribute-options.csv` - they do NOT need `variants.csv`
+- ZIP validation must check `importType` discriminator and apply correct file requirements per import type
+- Attribute import jobs failing with "variants.csv is required" when importType is ATTRIBUTES indicates validation logic error

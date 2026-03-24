@@ -631,6 +631,27 @@ model InventoryMovement {
 }
 
 // ============================================
+// SHARED MODULE - Audit Trail System
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  performedBy String  @map("performed_by")
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  @@index([entityType, entityId])
+  @@index([performedBy])
+  @@index([occurredAt])
+  @@map("audit_logs")
+}
+
+// ============================================
 // IMPORT MODULE - Bulk Product Import Management
 // ============================================
 

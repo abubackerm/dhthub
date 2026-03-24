@@ -103,6 +103,7 @@ export interface AttributeImportResult {
   totalRows: number;
   successRows: number;
   failedRows: number;
+  skippedAttributes: string[];
   createdAttributes: string[];
   updatedAttributes: string[];
   createdOptions: number;
@@ -135,7 +136,7 @@ export interface AttributeTemplate {
 
 export async function uploadAttributesCsv(
   file: File,
-  options?: { validateOnly?: boolean },
+  options?: { validateOnly?: boolean; conflictMode?: 'skip' | 'replace' | 'add_anyway' },
 ): Promise<AttributeImportResult> {
   const formData = new FormData();
   formData.append('file', file);
@@ -143,6 +144,9 @@ export async function uploadAttributesCsv(
   const url = new URL(`${API_BASE_URL}/v1/catalog/attributes/import`);
   if (options?.validateOnly) {
     url.searchParams.set('validateOnly', 'true');
+  }
+  if (options?.conflictMode) {
+    url.searchParams.set('conflictMode', options.conflictMode);
   }
 
   const response = await fetch(url.toString(), {
@@ -170,12 +174,20 @@ export interface AttributeZipImportResult {
   message: string;
 }
 
-export async function uploadAttributesZip(file: File): Promise<AttributeZipImportResult> {
+export async function uploadAttributesZip(
+  file: File,
+  options?: { conflictMode?: 'skip' | 'replace' | 'add_anyway' },
+): Promise<AttributeZipImportResult> {
   console.log('[uploadAttributesZip] Starting ZIP upload:', file.name)
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/v1/catalog/attributes/import`, {
+  const url = new URL(`${API_BASE_URL}/v1/catalog/attributes/import`);
+  if (options?.conflictMode) {
+    url.searchParams.set('conflictMode', options.conflictMode);
+  }
+
+  const response = await fetch(url.toString(), {
     method: 'POST',
     headers: {
       // Don't set Content-Type, let FormData set it with boundary

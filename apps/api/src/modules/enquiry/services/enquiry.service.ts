@@ -11,7 +11,7 @@ import { EnquiryRepository, EnquiryItemRepository, EnquiryWithItems } from '../r
 import { CartRepository } from '../../cart/repositories/cart.repository';
 import { ProductVariantRepository, ProductRepository } from '../../catalog/repositories';
 import { EnquiryView, EnquiryItemView } from '../dto/views';
-import { CreateEnquiryDto, UpdateEnquiryStatusDto, QuoteEnquiryDto, AdminListEnquiriesDto } from '../dto';
+import { CreateEnquiryDto, CreateEnquiryFromCartDto, UpdateEnquiryStatusDto, QuoteEnquiryDto, AdminListEnquiriesDto } from '../dto';
 import { EnquiryStatus } from '../entities';
 import { EnquiryCreatedEvent, EnquiryStatusUpdatedEvent } from '../events';
 
@@ -28,7 +28,7 @@ export class EnquiryService extends BaseService {
     super(eventEmitter);
   }
 
-  async createFromCart(userId: string, dto: CreateEnquiryDto): Promise<EnquiryView> {
+  async createFromCart(userId: string, dto: CreateEnquiryFromCartDto, user?: any): Promise<EnquiryView> {
     const cart = await this.cartRepo.findByUserIdWithItems(userId);
 
     if (!cart) {
@@ -43,14 +43,22 @@ export class EnquiryService extends BaseService {
       throw new EnquiryCannotBeModifiedError(cart.id, 'Cannot create enquiry from empty cart');
     }
 
+    // Use user's email and name if not provided in DTO
+    const customerName = dto.customerName || user?.name || user?.email?.split('@')[0] || 'Customer';
+    const email = dto.email || user?.email;
+
+    if (!email) {
+      throw new EnquiryCannotBeModifiedError(userId, 'Email is required to create enquiry');
+    }
+
     const enquiryNumber = await this.enquiryRepo.generateEnquiryNumber();
 
     const enquiry = await this.enquiryRepo.createWithCustomer({
       userId,
       enquiryNumber,
-      customerName: dto.customerName,
+      customerName,
       companyName: dto.companyName,
-      email: dto.email,
+      email,
       phone: dto.phone,
       notes: dto.notes,
     });

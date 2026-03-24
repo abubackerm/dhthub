@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Eye, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, Eye, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -48,18 +49,18 @@ import {
   removeAttributeFromCategory,
   updateAttribute,
   updateAttributeOption,
+  getAllAttributes,
+  useCategoryTree,
   uploadAttributesCsv,
   uploadAttributesZip,
   downloadAttributeTemplate,
-  getAllAttributes,
-  useCategoryTree,
   type AttributeDataType,
   type AttributeFilterType,
   type CategoryAttributeView,
   type CategoryTreeNode,
   type AttributeView,
+  type ImportJobView,
 } from "@/lib/api/catalog"
-import { getImportJob, type ImportJobView } from "@/lib/api/import"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 import {
   Dialog,
@@ -75,7 +76,6 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs"
-import { Upload } from "lucide-react"
 
 type SheetMode = "create" | "edit" | "view"
 type FilterTypeValue = Exclude<AttributeFilterType, null> | "NONE"
@@ -289,6 +289,7 @@ function AttributeDetails({
 export default function AttributesPage() {
   const queryClient = useQueryClient()
   const { confirm } = useConfirmDialog()
+  const router = useRouter()
   const {
     data: categoryTree = [],
     isLoading: categoriesLoading,
@@ -306,46 +307,19 @@ export default function AttributesPage() {
   const [sheetMode, setSheetMode] = useState<SheetMode>("create")
   const [activeAttribute, setActiveAttribute] = useState<CategoryAttributeView | AttributeView | null>(null)
   const [formData, setFormData] = useState<AttributeFormData>(initialFormData)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [validateOnly, setValidateOnly] = useState(false)
-  const [importJob, setImportJob] = useState<ImportJobView | null>(null)
+  const [importJob, setImportJob] = useState<any>(null)
   const [isPolling, setIsPolling] = useState(false)
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
 
   useEffect(() => {
     if (!selectedCategoryId && leafCategories.length > 0) {
       setSelectedCategoryId(leafCategories[0].id)
     }
   }, [leafCategories, selectedCategoryId])
-
-  useEffect(() => {
-    if (!isPolling || !importJob) return
-
-    const interval = setInterval(async () => {
-      try {
-        const updated = await getImportJob(importJob.id)
-        setImportJob(updated)
-
-        if (updated.status === "COMPLETED" || updated.status === "FAILED" || updated.status === "CANCELLED") {
-          setIsPolling(false)
-
-          // Auto-refresh attributes list on completion
-          await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
-          if (selectedCategoryId) {
-            await queryClient.invalidateQueries({
-              queryKey: ["category-attributes", selectedCategoryId],
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Failed to poll import job", error)
-      }
-    }, 2000)
-
-    return () => clearInterval(interval)
-  }, [isPolling, importJob, queryClient, selectedCategoryId])
 
   const selectedCategory = useMemo(
     () => leafCategories.find((category) => category.id === selectedCategoryId) ?? null,
@@ -855,7 +829,7 @@ export default function AttributesPage() {
               : "Assign attributes to specific leaf categories."}
           </p>
         </div>
-        <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+        <Button variant="outline" onClick={() => router.push("/dhthub-admin/attributes/import")}>
           <Upload className="mr-2 h-4 w-4" />
           Import CSV
         </Button>

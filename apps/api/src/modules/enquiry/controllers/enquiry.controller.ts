@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { EnquiryService } from '../services';
-import { CreateEnquiryDto, UpdateEnquiryStatusDto } from '../dto';
+import { CreateEnquiryFromCartDto, UpdateEnquiryStatusDto } from '../dto';
 import { EnquiryView } from '../dto/views';
 import { EnquiryStatus } from '../entities';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -23,10 +23,11 @@ export class EnquiryController {
   @Post('from-cart')
   async createFromCart(
     @Req() req: any,
-    @Body() dto: CreateEnquiryDto,
+    @Body() dto: CreateEnquiryFromCartDto,
   ): Promise<EnquiryView> {
     const userId = req.user.id;
-    return this.enquiryService.createFromCart(userId, dto);
+    const user = req.user;
+    return this.enquiryService.createFromCart(userId, dto, user);
   }
 
   @Get()

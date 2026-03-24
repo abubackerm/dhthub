@@ -1,6 +1,18 @@
-import { EnquiryItemEntity } from '../../entities/enquiry-item.entity';
 import { ProductVariantEntity } from '../../../catalog/entities/product-variant.entity';
 import { ProductEntity } from '../../../catalog/entities/product.entity';
+
+type EnquiryItemData = {
+  id: string;
+  enquiryId: string;
+  variantId: string;
+  productId: string;
+  sku: string;
+  price: number | null;
+  total: number | null;
+  qty: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export class EnquiryItemView {
   id: string;
@@ -18,7 +30,7 @@ export class EnquiryItemView {
   updatedAt: Date;
 
   static fromEntity(
-    entity: EnquiryItemEntity | { id: string; enquiryId: string; variantId: string; productId: string; sku: string; price: number | null; total: number | null; qty: number; createdAt: Date; updatedAt: Date },
+    entity: EnquiryItemData,
     variant: ProductVariantEntity,
     product: ProductEntity,
   ): EnquiryItemView {
@@ -40,7 +52,7 @@ export class EnquiryItemView {
   }
 
   static fromEntities(
-    entities: EnquiryItemEntity[],
+    entities: EnquiryItemData[],
     variants: Map<string, ProductVariantEntity>,
     products: Map<string, ProductEntity>,
   ): EnquiryItemView[] {

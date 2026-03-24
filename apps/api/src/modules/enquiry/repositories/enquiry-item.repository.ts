@@ -56,7 +56,7 @@ export class EnquiryItemRepository {
       enquiryId: string;
       variantId: string;
       qty: number;
-      createdBy?: string;
+      _createdBy?: string;
     },
   ): Promise<EnquiryItemEntity> {
     return this.getClient().enquiryItem.create({
@@ -64,7 +64,6 @@ export class EnquiryItemRepository {
         enquiryId: data.enquiryId,
         variantId: data.variantId,
         qty: data.qty,
-        createdBy: data.createdBy,
       },
       include: {
         variant: true,
@@ -77,7 +76,7 @@ export class EnquiryItemRepository {
       enquiryId: string;
       variantId: string;
       qty: number;
-      createdBy?: string;
+      _createdBy?: string;
     }>,
   ): Promise<{ count: number }> {
     return this.getClient().enquiryItem.createMany({
@@ -85,7 +84,6 @@ export class EnquiryItemRepository {
         enquiryId: item.enquiryId,
         variantId: item.variantId,
         qty: item.qty,
-        createdBy: item.createdBy,
       })),
     });
   }
@@ -117,7 +115,7 @@ export class EnquiryItemRepository {
       productId: string;
       sku: string;
       qty: number;
-      createdBy?: string;
+      _createdBy?: string;
     },
   ): Promise<EnquiryItemEntity> {
     return this.getClient().enquiryItem.create({
@@ -127,7 +125,6 @@ export class EnquiryItemRepository {
         productId: data.productId,
         sku: data.sku,
         qty: data.qty,
-        createdBy: data.createdBy,
       },
       include: {
         variant: true,
@@ -142,7 +139,7 @@ export class EnquiryItemRepository {
       productId: string;
       sku: string;
       qty: number;
-      createdBy?: string;
+      _createdBy?: string;
     }>,
   ): Promise<{ count: number }> {
     return this.getClient().enquiryItem.createMany({
@@ -152,7 +149,6 @@ export class EnquiryItemRepository {
         productId: item.productId,
         sku: item.sku,
         qty: item.qty,
-        createdBy: item.createdBy,
       })),
     });
   }
@@ -161,14 +157,13 @@ export class EnquiryItemRepository {
     id: string,
     price: number,
     total: number,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<EnquiryItemEntity> {
     return this.getClient().enquiryItem.update({
       where: { id },
       data: {
         price,
         total,
-        updatedBy,
       },
     });
   }
@@ -179,7 +174,7 @@ export class EnquiryItemRepository {
       price: number;
       total: number;
     }>,
-    updatedBy?: string,
+    _updatedBy?: string,
   ): Promise<void> {
     await Promise.all(
       updates.map((update) =>
@@ -188,7 +183,6 @@ export class EnquiryItemRepository {
           data: {
             price: update.price,
             total: update.total,
-            updatedBy,
           },
         }),
       ),

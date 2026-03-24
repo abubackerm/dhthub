@@ -8,7 +8,7 @@ import { CacheService } from '@core/cache';
 
 export interface CreateAttributeDefinitionData {
   name: string;
-  slug: string;
+  slug?: string;
   dataType: AttributeDataType;
   group?: string | null;
   sortOrder?: number;
@@ -55,13 +55,63 @@ export class AttributeDefinitionService extends BaseService {
     return `attribute:slug:${slug}`;
   }
 
+  /**
+   * Generate a slug from a name
+   */
+  private generateSlugFromName(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'attribute';
+  }
+
+  /**
+   * Generate a unique slug, adding a suffix if needed
+   */
+  private async generateUniqueSlug(baseName: string, excludeId?: string): Promise<string> {
+    const baseSlug = this.generateSlugFromName(baseName);
+    let slug = baseSlug;
+    let suffix = 1;
+
+    while (true) {
+      const existing = await this.attributeRepo.findBySlug(slug);
+      if (!existing || (excludeId && existing.id === excludeId)) {
+        return slug;
+      }
+      slug = `${baseSlug}-${suffix}`;
+      suffix++;
+    }
+  }
+
   async create(data: CreateAttributeDefinitionData): Promise<AttributeDefinitionEntity> {
-    const existing = await this.attributeRepo.findBySlug(data.slug);
+    // Auto-generate slug if not provided
+    const slug = data.slug || await this.generateUniqueSlug(data.name);
+
+    const existing = await this.attributeRepo.findBySlug(slug);
     if (existing) {
-      throw new ConflictException('Attribute definition with this slug already exists');
+      // If slug exists, generate a unique one
+      const uniqueSlug = await this.generateUniqueSlug(data.name);
+      const attribute = await this.attributeRepo.create({
+        ...data,
+        slug: uniqueSlug,
+      });
+
+      this.emit('attribute.created', {
+        id: attribute.id,
+        name: attribute.name,
+        slug: attribute.slug,
+      });
+
+      return attribute;
     }
 
-    const attribute = await this.attributeRepo.create(data);
+    const attribute = await this.attributeRepo.create({
+      ...data,
+      slug,
+    });
 
     this.emit('attribute.created', {
       id: attribute.id,

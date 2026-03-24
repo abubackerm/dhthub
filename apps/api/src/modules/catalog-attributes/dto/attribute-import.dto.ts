@@ -63,6 +63,17 @@ export class AttributeImportDto {
   rowNumber?: number;
 }
 
+export interface AttributeConflict {
+  rowNumber: number;
+  name: string;
+  existingAttribute: {
+    id: string;
+    name: string;
+    slug: string;
+    dataType: string;
+  };
+}
+
 export interface AttributeImportResult {
   valid: AttributeImportDto[];
   invalid: Array<{
@@ -70,5 +81,5 @@ export interface AttributeImportResult {
     slug: string;
     errors: string[];
   }>;
-  duplicateSlugs: string[];
+  conflicts: AttributeConflict[];
 }

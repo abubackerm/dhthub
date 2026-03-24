@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Menu, X, CircleUser, ShoppingCart, ChevronDown, LogOut } from "lucide-react";
 import { SignInDialog } from "@/components/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
+import { useCart } from "@/lib/api/cart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +27,10 @@ export function DHTHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [signInOpen, setSignInOpen] = useState(false);
     const { data: session } = authClient.useSession();
+    const { data: cart } = useCart();
 
     const isAuthenticated = !!session?.user;
+    const itemCount = cart?.itemCount || 0;
 
     const handleLogout = async () => {
         await authClient.signOut();
@@ -64,9 +67,14 @@ export function DHTHeader() {
                         {/* Cart Icon */}
                         <Link
                             href="/cart"
-                            className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
+                            className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors relative"
                         >
                             <ShoppingCart className="h-5 w-5" />
+                            {itemCount > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-(--dht-red) text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                    {itemCount > 99 ? '99+' : itemCount}
+                                </span>
+                            )}
                         </Link>
 
                         {/* Auth Section */}
@@ -139,10 +147,15 @@ export function DHTHeader() {
                             {/* Mobile Cart Icon */}
                             <Link
                                 href="/cart"
-                                className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
+                                className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors relative"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 <ShoppingCart className="h-5 w-5" />
+                                {itemCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-(--dht-red) text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                        {itemCount > 99 ? '99+' : itemCount}
+                                    </span>
+                                )}
                                 <span>Cart</span>
                             </Link>
 

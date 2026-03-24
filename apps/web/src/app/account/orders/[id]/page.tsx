@@ -31,8 +31,8 @@ const statusColors: Record<EnquiryStatus, string> = {
   PAYMENT_PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
   PAID: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
   PROCESSING: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  CLOSED: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
+  IN_TRANSIT: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  DELIVERED: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 }
 
 const statusFlow: EnquiryStatus[] = [
@@ -44,8 +44,8 @@ const statusFlow: EnquiryStatus[] = [
   "PAYMENT_PENDING",
   "PAID",
   "PROCESSING",
-  "COMPLETED",
-  "CLOSED",
+  "IN_TRANSIT",
+  "DELIVERED",
 ]
 
 const formatCurrency = (amount: number | null) => {

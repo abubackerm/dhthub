@@ -29,11 +29,12 @@ export class CreateAttributeDto {
   @MaxLength(255)
   name: string;
 
+  @IsOptional()
   @IsString()
   @Matches(/^[a-z0-9-]+$/, {
     message: 'Slug must be lowercase alphanumeric with hyphens only',
   })
-  slug: string;
+  slug?: string;
 
   @IsEnum(AttributeDataTypeDto)
   dataType: AttributeDataTypeDto;
