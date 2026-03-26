@@ -214,6 +214,31 @@ export class ProductRepository {
     });
   }
 
+  async findCellIdsByCategoryIds(categoryIds: string[]): Promise<string[]> {
+    if (categoryIds.length === 0) return [];
+    const categories = await this.getClient().category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, path: true },
+    });
+    if (categories.length === 0) return [];
+    const pathConditions = categories.map((c) => ({
+      path: { startsWith: `${c.path}.` },
+    }));
+    const descendantCategories = await this.getClient().category.findMany({
+      where: { OR: pathConditions },
+      select: { id: true },
+    });
+    const allCategoryIds = [
+      ...categories.map((c) => c.id),
+      ...descendantCategories.map((c) => c.id),
+    ];
+    const cells = await this.getClient().cell.findMany({
+      where: { categoryId: { in: allCategoryIds } },
+      select: { id: true },
+    });
+    return cells.map((c) => c.id);
+  }
+
   async findActive(): Promise<ProductEntity[]> {
     return this.getClient().product.findMany({
       where: { status: 'active' },

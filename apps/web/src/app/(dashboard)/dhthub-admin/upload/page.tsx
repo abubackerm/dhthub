@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Table,
   TableBody,
@@ -40,10 +42,23 @@ import {
   type ImportJobWithErrorsView,
 } from "@/lib/api/import"
 import { exportProducts } from "@/lib/api/catalog/products"
+import { getCategoryTree } from "@/lib/api/catalog/categories"
+import type { CategoryTreeNode } from "@/lib/api/catalog/types"
 
 type UploadStep = 1 | 2 | 3
 type UploadState = "idle" | "uploading" | "success" | "errors"
 type ImportTab = "create" | "edit"
+
+function extractBranchCategories(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
+  const branches: CategoryTreeNode[] = [];
+  for (const node of nodes) {
+    if (node.children.length > 0) {
+      branches.push(node);
+      branches.push(...extractBranchCategories(node.children));
+    }
+  }
+  return branches;
+}
 
 export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -58,6 +73,10 @@ export default function UploadPage() {
     ImportJobWithErrorsView["errors"]
   >([])
   const [isValidating, setIsValidating] = useState(false)
+  const [branchCategories, setBranchCategories] = useState<CategoryTreeNode[]>([])
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [isExporting, setIsExporting] = useState(false)
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false)
 
   const importedProducts = jobRecords.filter(
     (r) => r.rawData?.type === "success",
@@ -93,6 +112,35 @@ export default function UploadPage() {
 
     return () => clearInterval(interval)
   }, [isPolling, job])
+
+  useEffect(() => {
+    if (activeTab !== "edit" || categoriesLoaded) return
+
+    getCategoryTree()
+      .then((tree) => {
+        const branches = extractBranchCategories(tree)
+        setBranchCategories(branches)
+        setCategoriesLoaded(true)
+      })
+      .catch((error) => {
+        console.error("Failed to load categories", error)
+        setCategoriesLoaded(true)
+      })
+  }, [activeTab, categoriesLoaded])
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    )
+  }
+
+  const toggleAllCategories = () => {
+    if (selectedCategoryIds.length === branchCategories.length) {
+      setSelectedCategoryIds([])
+    } else {
+      setSelectedCategoryIds(branchCategories.map((c) => c.id))
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -239,27 +287,43 @@ export default function UploadPage() {
     setJobRecords([])
   }
 
-  const handleExportAll = async () => {
+  const handleExportEditCsv = async () => {
     try {
-      toast.loading("Exporting all products to CSV...", { id: 'export-all' })
-      
-      const result = await exportProducts([])
-      
-      // Download the CSV file
-      const blob = new Blob([result.content], { type: result.contentType })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = result.filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      
-      toast.success("Exported all products to CSV", { id: 'export-all' })
+      setIsExporting(true)
+      toast.loading("Exporting products and variants...", { id: "export-edit" })
+
+      const result = await exportProducts({
+        categoryIds:
+          selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+      })
+
+      const downloadBlob = (
+        content: string,
+        filename: string,
+        contentType: string,
+      ) => {
+        const blob = new Blob([content], { type: contentType })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+
+      downloadBlob(result.products.content, result.products.filename, result.products.contentType)
+      downloadBlob(result.variants.content, result.variants.filename, result.variants.contentType)
+
+      toast.success("Downloaded products-edit.csv and variants-edit.csv", {
+        id: "export-edit",
+      })
     } catch (error) {
       console.error("Failed to export products", error)
-      toast.error("Failed to export products", { id: 'export-all' })
+      toast.error("Failed to export products", { id: "export-edit" })
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -733,7 +797,7 @@ export default function UploadPage() {
                 {step > 1 ? <Check className="h-4 w-4" /> : "1"}
               </div>
               <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
-                Download Edit Template
+                Download Edit Templates
               </span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -748,7 +812,7 @@ export default function UploadPage() {
                 {step > 2 ? <Check className="h-4 w-4" /> : "2"}
               </div>
               <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>
-                Upload Edited File
+                Upload Edited Files
               </span>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -772,24 +836,99 @@ export default function UploadPage() {
           {step === 1 && (
             <Card>
               <CardHeader>
-                <CardTitle>Download Edit Template</CardTitle>
+                <CardTitle>Download Edit Templates</CardTitle>
                 <CardDescription>
-                  Download a CSV pre-populated with all existing products. Edit the values you want to change, then re-upload.
+                  Select branch categories to filter which products and variants to export. All leaf categories under each branch will be included.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Branch Category Filter */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">
+                      Filter by Branch Categories
+                    </Label>
+                    {branchCategories.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto py-1 text-xs"
+                        onClick={toggleAllCategories}
+                      >
+                        {selectedCategoryIds.length === branchCategories.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {!categoriesLoaded ? (
+                    <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Loading categories...
+                    </div>
+                  ) : branchCategories.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      No branch categories found.
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-48 rounded-md border">
+                      <div className="p-3 space-y-1">
+                        {branchCategories.map((cat) => (
+                          <label
+                            key={cat.id}
+                            className="flex items-center gap-3 rounded-sm px-2 py-1.5 hover:bg-muted/50 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedCategoryIds.includes(cat.id)}
+                              onCheckedChange={() => toggleCategory(cat.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {cat.name}
+                              </p>
+                              {cat.path && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {cat.path}
+                                </p>
+                              )}
+                            </div>
+                            {cat.productCount > 0 && (
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                {cat.productCount} products
+                              </Badge>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+
+                  {selectedCategoryIds.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedCategoryIds.length} of {branchCategories.length} branches selected
+                      {selectedCategoryIds.length === branchCategories.length &&
+                        " -- exporting all products"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Download Cards */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between rounded-md border border-dashed p-3">
                     <div>
-                      <p className="text-sm font-medium">products_edit_template.csv</p>
+                      <p className="text-sm font-medium">products-edit.csv</p>
                       <p className="text-xs text-muted-foreground">
-                        All existing products with current data
+                        Product data: SKU, name, cell, description, attribute headers
                       </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleExportAll}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                    <div>
+                      <p className="text-sm font-medium">variants-edit.csv</p>
+                      <p className="text-xs text-muted-foreground">
+                        Variant data: linked by product_sku, price, stock, attribute values
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -798,16 +937,27 @@ export default function UploadPage() {
                   <AlertTitle>Editing Tips</AlertTitle>
                   <AlertDescription>
                     <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-                      <li>Keep the <strong>product_sku</strong> column unchanged - this identifies which product to update</li>
-                      <li>Edit only the columns you want to change</li>
-                      <li>Delete rows you don't want to update</li>
-                      <li>Re-upload the edited CSV when done</li>
+                      <li>Two CSV files are downloaded: <strong>products-edit.csv</strong> and <strong>variants-edit.csv</strong></li>
+                      <li>Keep the <strong>product_sku</strong> column unchanged -- it links products to variants</li>
+                      <li>Edit only the columns you want to change, delete rows you don&#39;t want to update</li>
+                      <li>Re-upload each edited CSV separately, or bundle both in a ZIP file</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
 
-                <div className="flex justify-end pt-4">
-                  <Button onClick={() => setStep(2)}>
+                <div className="flex items-center justify-between pt-4">
+                  <Button
+                    onClick={handleExportEditCsv}
+                    disabled={isExporting || branchCategories.length === 0}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {isExporting
+                      ? "Exporting..."
+                      : selectedCategoryIds.length > 0
+                        ? `Download ${selectedCategoryIds.length} Branch${selectedCategoryIds.length > 1 ? "es" : ""}`
+                        : "Download All Products"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setStep(2)}>
                     Continue to Upload
                   </Button>
                 </div>

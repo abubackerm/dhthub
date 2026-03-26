@@ -305,6 +305,7 @@ export class CatalogImportService {
         try {
           const productSku = (data.product_sku || '').trim();
           const productName = (data.product_name || '').trim();
+          const productSlug = (data.product_slug || '').trim();
           const cellSlug = (data.cell_slug || '').trim();
           const description = (data.description || '').trim();
 
@@ -358,7 +359,7 @@ export class CatalogImportService {
           }
 
           // Check if product already exists
-          const existingProduct = await this.db.product.findFirst({
+          let existingProduct = await this.db.product.findFirst({
             where: {
               metadata: {
                 path: ['userSku'],
@@ -366,6 +367,13 @@ export class CatalogImportService {
               },
             },
           });
+
+          // Also check by internal SKU if not found via metadata
+          if (!existingProduct) {
+            existingProduct = await this.db.product.findFirst({
+              where: { sku: productSku },
+            });
+          }
 
           // Respect import mode
           if (importMode === 'CREATE_ONLY' && existingProduct) {
@@ -382,7 +390,7 @@ export class CatalogImportService {
 
           // Auto-generate unique SKU and slug
           const autoSku = generateProductSku();
-          const slug = generateSlug(productName);
+          const slug = productSlug || generateSlug(productName);
 
           // Collect table column headers (at_head1-15)
           const tableColumns: Array<{ attributeId: string; position: number }> = [];
@@ -418,6 +426,7 @@ export class CatalogImportService {
               data: {
                 name: productName,
                 cellId: cellId,
+                ...(productSlug ? { slug: productSlug } : {}),
                 description: description || existingProduct.description,
               },
             });
@@ -580,7 +589,8 @@ export class CatalogImportService {
       for await (const { data, rowNumber } of this.csvParserService.parseStream(fileStream)) {
         try {
           const productSku = (data.product_sku || '').trim();
-          const price = parseFloat(String(data.price || '0'));
+          const priceRaw = String(data.price || '0').trim().replace(/[^0-9.\-]/g, '');
+          const price = parseFloat(priceRaw);
           const stock = parseInt(String(data.stock || '0'), 10);
 
           this.logger.debug(`Processing variants row ${rowNumber}: ${JSON.stringify(data)}`);
@@ -616,7 +626,7 @@ export class CatalogImportService {
             productId: product.id,
             sku: variantSku,
             name: variantName,
-            price: Math.round(price * 100),
+            price,
             stock,
             attributes,
           });

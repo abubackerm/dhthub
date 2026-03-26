@@ -109,6 +109,8 @@ export class ImportProcessorService {
     }
 
     const context = await this.validationService.buildValidationContext();
+    const importMode = job.mode || 'UPSERT';
+    this.logger.log(`Import mode: ${importMode}`);
     const fileStream = Readable.from(fileBuffer);
 
     let processedRows = 0;
@@ -135,13 +137,13 @@ export class ImportProcessorService {
         }
       } else {
         try {
-          const product = await this.createProductFromRow(data, context);
+          const product = await this.upsertProductFromRow(data, context, importMode);
           successRows++;
           successRecords.push({
             rowNumber,
             sku: product.sku,
             field: undefined,
-            message: `Created: ${product.name}`,
+            message: product.updated ? `Updated: ${product.name}` : `Created: ${product.name}`,
             severity: 'error',
           });
         } catch (error) {
@@ -178,19 +180,59 @@ export class ImportProcessorService {
     );
   }
 
-  private async createProductFromRow(
+  private async upsertProductFromRow(
     row: CsvRow,
     context: { cellSkuMap: Map<string, string>; cellSlugMap: Map<string, string> },
-  ): Promise<{ id: string; sku: string; name: string }> {
+    importMode: string,
+  ): Promise<{ id: string; sku: string; name: string; updated: boolean }> {
     const productName = row.product_name!.trim();
+    const productSku = row.product_sku?.trim() || '';
+    const productSlug = row.product_slug?.trim() || '';
     const description = row.description?.trim() || null;
 
     let cellId: string | null = null;
-    if (row.cell_sku) {
-      cellId = context.cellSkuMap.get(row.cell_sku) ?? context.cellSlugMap.get(row.cell_sku) ?? null;
+    const cellRef = row.cell_slug?.trim() || row.cell_sku?.trim() || '';
+    if (cellRef) {
+      cellId = context.cellSkuMap.get(cellRef) ?? context.cellSlugMap.get(cellRef) ?? null;
     }
 
-    const slug = await this.productService.generateUniqueSlug(productName);
+    // Look up existing product by SKU
+    let existingProduct = await this.db.product.findFirst({
+      where: {
+        metadata: {
+          path: ['userSku'],
+          equals: productSku,
+        },
+      },
+    });
+
+    if (!existingProduct) {
+      existingProduct = await this.db.product.findFirst({
+        where: { sku: productSku },
+      });
+    }
+
+    if (existingProduct && importMode === 'CREATE_ONLY') {
+      throw new Error(`Product already exists: ${productSku} (CREATE_ONLY mode)`);
+    }
+
+    if (!existingProduct && importMode === 'UPDATE_ONLY') {
+      throw new Error(`Product not found: ${productSku} (UPDATE_ONLY mode)`);
+    }
+
+    if (existingProduct) {
+      const updated = await this.productService.update(existingProduct.id, {
+        name: productName,
+        ...(productSlug ? { slug: productSlug } : {}),
+        ...(cellId !== null ? { cellId } : {}),
+        ...(description !== null ? { description } : {}),
+      });
+      this.logger.debug(`Updated product "${productName}" (${existingProduct.id}), mode: ${importMode}`);
+      await this.processTableColumns(updated.id, row);
+      return { id: updated.id, sku: updated.sku ?? productSku, name: productName, updated: true };
+    }
+
+    const slug = productSlug || await this.productService.generateUniqueSlug(productName);
 
     const product = await this.productService.create(
       null,
@@ -214,7 +256,7 @@ export class ImportProcessorService {
 
     await this.processTableColumns(product.id, row);
 
-    return { id: product.id, sku: product.sku ?? '', name: productName };
+    return { id: product.id, sku: product.sku ?? '', name: productName, updated: false };
   }
 
   private async processTableColumns(productId: string, row: CsvRow): Promise<void> {

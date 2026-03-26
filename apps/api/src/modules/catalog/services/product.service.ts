@@ -732,17 +732,36 @@ export class ProductService extends BaseService {
   }
 
   /**
-   * Export products and variants to CSV format for edit mode
+   * Export products and variants to separate CSV files for edit mode.
+   * Optionally filter by categoryIds (resolves cells under those categories).
    */
-  async exportToCsv(productIds?: string[]): Promise<string> {
-    // Build query based on whether we're exporting specific products or all
-    const where = productIds?.length
-      ? { id: { in: productIds } }
-      : undefined;
+  async exportToCsv(options?: {
+    productIds?: string[];
+    categoryIds?: string[];
+  }): Promise<{ productsCsv: string; variantsCsv: string }> {
+    const { productIds, categoryIds } = options ?? {};
+
+    // Build where clause
+    const where: Record<string, unknown> = {};
+
+    if (productIds?.length) {
+      where.id = { in: productIds };
+    }
+
+    if (categoryIds?.length) {
+      const cellIds = await this.productRepo.findCellIdsByCategoryIds(categoryIds);
+      if (cellIds.length > 0) {
+        where.cellId = { in: cellIds };
+      } else {
+        return { productsCsv: '', variantsCsv: '' };
+      }
+    }
+
+    const hasWhere = Object.keys(where).length > 0 ? where : undefined;
 
     // Fetch products with their variants and table columns
     const products = await this.productRepo.findMany({
-      where,
+      where: hasWhere,
       include: {
         cell: {
           select: {
@@ -804,14 +823,15 @@ export class ProductService extends BaseService {
     const productsHeader = [
       'product_sku',
       'product_name',
+      'product_slug',
       'cell_slug',
       'description',
       ...Array.from({ length: 15 }, (_, i) => `at_head${i + 1}`),
     ];
 
     const productsRows = products.map(product => {
-      const userSku = (product.metadata as any)?.userSku || '';
-      
+      const userSku = (product.metadata as any)?.userSku || product.sku || '';
+
       // Build at_head1-15 from table columns
       const tableColumnsMap = new Map<string, number>();
       (product.tableColumns || []).forEach((tc: any) => {
@@ -830,6 +850,7 @@ export class ProductService extends BaseService {
       return [
         escapeCsvValue(userSku),
         escapeCsvValue(product.name),
+        escapeCsvValue(product.slug || ''),
         escapeCsvValue(product.cell?.slug || ''),
         escapeCsvValue(product.description || ''),
         ...atHeads.map(escapeCsvValue),
@@ -848,13 +869,13 @@ export class ProductService extends BaseService {
     const variantsRows: string[][] = [];
     for (const product of products) {
       const userSku = (product.metadata as any)?.userSku || product.sku;
-      
+
       for (const variant of product.variants || []) {
         // Build attribute values map
         const attrValues: Record<string, string> = {};
         for (const attrValue of variant.attributeValues || []) {
           const slug = attrValue.attribute.slug;
-          const value = attrValue.textValue || 
+          const value = attrValue.textValue ||
                        (attrValue.numberValue !== null ? String(attrValue.numberValue) : '') ||
                        (attrValue.booleanValue !== null ? String(attrValue.booleanValue) : '');
           attrValues[slug] = value || '-';
@@ -863,7 +884,7 @@ export class ProductService extends BaseService {
         const row = [
           escapeCsvValue(userSku),
           escapeCsvValue(variant.sku),
-          escapeCsvValue(variant.price !== null ? String(variant.price / 100) : ''),
+          escapeCsvValue(variant.price !== null ? String(variant.price) : ''),
           escapeCsvValue(String(variant.quantity || 0)),
           ...sortedAttributes.map(slug => escapeCsvValue(attrValues[slug] || '')),
         ];
@@ -872,20 +893,17 @@ export class ProductService extends BaseService {
       }
     }
 
-    // Combine into single CSV with section headers
-    const lines: string[] = [];
+    // Build separate CSVs
+    const productsCsv = [
+      productsHeader.join(','),
+      ...productsRows.map(row => row.join(',')),
+    ].join('\n');
 
-    // Products section
-    lines.push('# PRODUCTS');
-    lines.push(productsHeader.join(','));
-    lines.push(...productsRows.map(row => row.join(',')));
-    lines.push('');
+    const variantsCsv = [
+      variantsHeader.join(','),
+      ...variantsRows.map(row => row.join(',')),
+    ].join('\n');
 
-    // Variants section
-    lines.push('# VARIANTS');
-    lines.push(variantsHeader.join(','));
-    lines.push(...variantsRows.map(row => row.join(',')));
-
-    return lines.join('\n');
+    return { productsCsv, variantsCsv };
   }
 }

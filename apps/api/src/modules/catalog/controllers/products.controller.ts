@@ -133,6 +133,7 @@ export class ProductsController {
     const product = await this.productService.update(id, {
       name: dto.name,
       slug: dto.slug,
+      sku: dto.sku,
       description: dto.description,
       cellId: dto.cellId,
       status: dto.status as any,
@@ -264,14 +265,27 @@ export class ProductsController {
   @Post('export')
   @HttpCode(HttpStatus.OK)
   async exportProducts(
-    @Body() body: { productIds?: string[]; exportAll?: boolean },
-  ): Promise<{ filename: string; contentType: string; content: string }> {
+    @Body() body: { productIds?: string[]; categoryIds?: string[]; exportAll?: boolean },
+  ): Promise<{
+    products: { filename: string; contentType: string; content: string };
+    variants: { filename: string; contentType: string; content: string };
+  }> {
     const productIds = body.exportAll ? undefined : body.productIds;
-    const csv = await this.productService.exportToCsv(productIds);
+    const { productsCsv, variantsCsv } = await this.productService.exportToCsv({
+      productIds,
+      categoryIds: body.categoryIds,
+    });
     return {
-      filename: 'products-export.csv',
-      contentType: 'text/csv',
-      content: csv,
+      products: {
+        filename: 'products-edit.csv',
+        contentType: 'text/csv',
+        content: productsCsv,
+      },
+      variants: {
+        filename: 'variants-edit.csv',
+        contentType: 'text/csv',
+        content: variantsCsv,
+      },
     };
   }
 }

@@ -134,10 +134,19 @@ export async function getVariantImages(
   return apiClient.get(`/v1/catalog/products/${productId}/variants/${variantId}/images`);
 }
 
-export async function exportProducts(productIds?: string[]): Promise<{ filename: string; contentType: string; content: string }> {
-  return apiClient.post('/v1/catalog/products/export', {
-    productIds,
-    exportAll: !productIds || productIds.length === 0,
+export interface ExportProductsResult {
+  products: { filename: string; contentType: string; content: string };
+  variants: { filename: string; contentType: string; content: string };
+}
+
+export async function exportProducts(options?: {
+  productIds?: string[];
+  categoryIds?: string[];
+}): Promise<ExportProductsResult> {
+  return apiClient.post<ExportProductsResult>('/v1/catalog/products/export', {
+    productIds: options?.productIds,
+    categoryIds: options?.categoryIds,
+    exportAll: !options?.productIds?.length && !options?.categoryIds?.length,
   });
 }
 
