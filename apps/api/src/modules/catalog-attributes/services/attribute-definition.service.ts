@@ -194,7 +194,8 @@ export class AttributeDefinitionService extends BaseService {
   async findAll(params?: {
     skip?: number;
     take?: number;
-  }): Promise<AttributeDefinitionEntity[]> {
+    search?: string;
+  }): Promise<{ data: AttributeDefinitionEntity[]; total: number }> {
     return this.attributeRepo.findAll(params);
   }
 

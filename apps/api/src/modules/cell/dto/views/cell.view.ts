@@ -63,18 +63,38 @@ export class CellView {
       updatedBy: cell.updatedBy,
     };
 
+    // Normalize imageUrl if present
+    if (view.imageUrl && view.imageUrl.startsWith('http')) {
+      const parsed = new URL(view.imageUrl);
+      view.imageUrl = parsed.pathname;
+    }
+    if (view.imageUrl && view.imageUrl.startsWith('/catalog')) {
+      view.imageUrl = view.imageUrl.replace('/catalog', '');
+    }
+
     // Add category if present (for CellWithCategory)
     if (cell.category) {
       (view as CellWithCategory).category = cell.category;
     }
 
-    // Map images from storagePath to url
-    view.images = (cell.images || []).map((img: any) => ({
-      id: img.id,
-      storagePath: img.storagePath,
-      altText: img.altText,
-      isPrimary: img.isPrimary,
-    }));
+    // Map images from storagePath to url with normalization
+    view.images = (cell.images || []).map((img: any) => {
+      let url = img.storagePath;
+      // Normalize URL: strip http(s)://hostname, remove /catalog prefix
+      if (url && url.startsWith('http')) {
+        const parsed = new URL(url);
+        url = parsed.pathname;
+      }
+      if (url && url.startsWith('/catalog')) {
+        url = url.replace('/catalog', '');
+      }
+      return {
+        id: img.id,
+        storagePath: url,
+        altText: img.altText,
+        isPrimary: img.isPrimary,
+      };
+    });
 
     // Add attributes if present
     if (cell.cellAttributes) {

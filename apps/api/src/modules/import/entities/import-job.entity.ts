@@ -17,6 +17,8 @@ export enum ImportType {
   CATALOG = 'CATALOG',
   ATTRIBUTES = 'ATTRIBUTES',
   IMAGES = 'IMAGES',
+  CATEGORY_CREATE = 'CATEGORY_CREATE',
+  CATEGORY_UPDATE = 'CATEGORY_UPDATE',
 }
 
 export class ImportJobEntity extends BaseEntity {

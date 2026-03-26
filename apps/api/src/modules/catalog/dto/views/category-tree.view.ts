@@ -20,9 +20,17 @@ export class CategoryTreeView extends CategoryView {
     view.description = entity.description;
     view.parentId = entity.parentId;
     view.path = entity.path;
-    view.imageUrl = entity.imageUrl;
     view.sortOrder = entity.sortOrder;
     view.isActive = entity.isActive;
+    
+    // Normalize imageUrl if present
+    if (entity.imageUrl && entity.imageUrl.startsWith('http')) {
+      const parsed = new URL(entity.imageUrl);
+      view.imageUrl = parsed.pathname;
+    }
+    if (view.imageUrl && view.imageUrl.startsWith('/catalog')) {
+      view.imageUrl = view.imageUrl.replace('/catalog', '');
+    }
     view.createdAt = entity.createdAt;
     view.updatedAt = entity.updatedAt;
     view.children = children;

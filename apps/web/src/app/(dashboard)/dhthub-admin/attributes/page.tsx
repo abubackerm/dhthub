@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Eye, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Search, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -314,6 +314,11 @@ export default function AttributesPage() {
   const [validateOnly, setValidateOnly] = useState(false)
   const [importJob, setImportJob] = useState<any>(null)
   const [isPolling, setIsPolling] = useState(false)
+  
+  // Pagination and search state for global attributes
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 100
 
   useEffect(() => {
     if (!selectedCategoryId && leafCategories.length > 0) {
@@ -337,14 +342,22 @@ export default function AttributesPage() {
   })
 
   const {
-    data: globalAttributes = [],
+    data: globalAttributesResponse,
     isLoading: globalAttributesLoading,
     error: globalAttributesError,
   } = useQuery({
-    queryKey: ["global-attributes"],
-    queryFn: getAllAttributes,
+    queryKey: ["global-attributes", currentPage, searchQuery],
+    queryFn: () => getAllAttributes({
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+      search: searchQuery || undefined,
+    }),
     enabled: activeTab === "global",
   })
+
+  const globalAttributes = globalAttributesResponse?.data ?? []
+  const totalAttributes = globalAttributesResponse?.total ?? 0
+  const totalPages = Math.ceil(totalAttributes / pageSize)
 
   const createMutation = useMutation({
     mutationFn: async (payload: { categoryId: string; formData: AttributeFormData }) => {
@@ -856,6 +869,25 @@ export default function AttributesPage() {
               </Button>
             </CardHeader>
             <CardContent>
+              {/* Search and pagination info */}
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search attributes..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setCurrentPage(1) // Reset to first page on search
+                    }}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {totalAttributes} attribute{totalAttributes !== 1 ? 's' : ''}
+                </div>
+              </div>
+
               {globalAttributesLoading ? (
                 <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -867,66 +899,97 @@ export default function AttributesPage() {
                 </div>
               ) : globalAttributes.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground">
-                  <p>No global attributes found.</p>
-                  <p className="mt-1 text-sm">Import CSV or create your first attribute.</p>
+                  <p>{searchQuery ? "No attributes match your search." : "No global attributes found."}</p>
+                  {!searchQuery && <p className="mt-1 text-sm">Import CSV or create your first attribute.</p>}
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Slug</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Group</TableHead>
-                      <TableHead>Filter</TableHead>
-                      <TableHead>Required</TableHead>
-                      <TableHead className="w-[140px] text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {globalAttributes.map((attribute) => (
-                      <TableRow key={attribute.id}>
-                        <TableCell className="font-medium">{attribute.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {attribute.slug}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{getDataTypeLabel(attribute.dataType)}</Badge>
-                        </TableCell>
-                        <TableCell>{attribute.group || "-"}</TableCell>
-                        <TableCell>{getFilterLabel(attribute.filterType)}</TableCell>
-                        <TableCell>
-                          {attribute.isRequired ? (
-                            <Check className="h-4 w-4 text-(--dht-green)" />
-                          ) : (
-                            <span className="text-muted-foreground">No</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openEditGlobalSheet(attribute)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteGlobal(attribute)}
-                              disabled={deleteGlobalAttributeMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Slug</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Group</TableHead>
+                        <TableHead>Filter</TableHead>
+                        <TableHead>Required</TableHead>
+                        <TableHead className="w-[140px] text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {globalAttributes.map((attribute) => (
+                        <TableRow key={attribute.id}>
+                          <TableCell className="font-medium">{attribute.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {attribute.slug}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{getDataTypeLabel(attribute.dataType)}</Badge>
+                          </TableCell>
+                          <TableCell>{attribute.group || "-"}</TableCell>
+                          <TableCell>{getFilterLabel(attribute.filterType)}</TableCell>
+                          <TableCell>
+                            {attribute.isRequired ? (
+                              <Check className="h-4 w-4 text-(--dht-green)" />
+                            ) : (
+                              <span className="text-muted-foreground">No</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openEditGlobalSheet(attribute)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteGlobal(attribute)}
+                                disabled={deleteGlobalAttributeMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Pagination controls */}
+                  {totalPages > 1 && (
+                    <div className="mt-4 flex items-center justify-between border-t pt-4">
+                      <div className="text-sm text-muted-foreground">
+                        Page {currentPage} of {totalPages}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="mr-1 h-4 w-4" />
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                          <ChevronRight className="ml-1 h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

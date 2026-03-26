@@ -154,7 +154,7 @@ export class AttributeImportService {
     try {
       // Step 1: Parse and validate attributes CSV
       const attributeResult = attributesFile
-        ? await this.parseAndValidateAttributes(attributesFile)
+        ? await this.parseAndValidateAttributes(attributesFile, options.conflictMode)
         : { valid: [], invalid: [], duplicateSlugs: [] };
 
       // Step 2: Parse and validate options CSV
@@ -190,16 +190,16 @@ export class AttributeImportService {
       for (const attr of attributeResult.valid) {
         const result = await this.upsertAttribute(attr, options);
         if (result.skipped) {
-          // Skip tracking - track skipped attribute by slug
+          // Skip tracking - track skipped attribute by name
           summary.skippedAttributes.push(attr.name);
           continue;
         }
         if (result.success) {
           attributeMap.set(attr.slug, result.attributeId!);
           if (result.created) {
-            summary.createdAttributes.push(attr.slug);
+            summary.createdAttributes.push(attr.name);
           } else {
-            summary.updatedAttributes.push(attr.slug);
+            summary.updatedAttributes.push(attr.name);
           }
           summary.successRows++;
         } else {
@@ -256,7 +256,7 @@ export class AttributeImportService {
   /**
    * Parse and validate attributes CSV
    */
-  private async parseAndValidateAttributes(filePath: string): Promise<{
+  private async parseAndValidateAttributes(filePath: string, conflictMode?: string): Promise<{
     valid: Array<{
       name: string;
       slug: string;
@@ -286,12 +286,15 @@ export class AttributeImportService {
     const nameSet = new Set<string>();
     const duplicateNames: string[] = [];
 
+    // Only deduplicate within file if NOT using add_anyway mode
+    const shouldDeduplicate = conflictMode !== 'add_anyway';
+
     try {
       for await (const { rowNumber, data } of this.csvParserService.parseStream(stream)) {
         const name = data.name?.trim() || '';
         
-        // Check for duplicate names within the file
-        if (nameSet.has(name.toLowerCase())) {
+        // Check for duplicate names within the file (skip if add_anyway mode)
+        if (shouldDeduplicate && nameSet.has(name.toLowerCase())) {
           duplicateNames.push(name);
           continue;
         }
@@ -492,8 +495,8 @@ export class AttributeImportService {
       }
 
       // Check if attribute exists by name
-      const existingByName = await this.attributeRepo.findAll();
-      const existing = existingByName.find(a => a.name.toLowerCase() === attr.name.toLowerCase());
+      const { data: existingAttributes } = await this.attributeRepo.findAll();
+      const existing = existingAttributes.find(a => a.name.toLowerCase() === attr.name.toLowerCase());
 
       const conflictMode = options.conflictMode || 'replace';
 

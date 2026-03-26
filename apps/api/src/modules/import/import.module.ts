@@ -10,10 +10,12 @@ import { ImportValidationService } from './services/import-validation.service';
 import { ImportProgressService } from './services/import-progress.service';
 import { ImportProcessorService } from './services/import-processor.service';
 import { CatalogImportProcessorService } from './services/catalog-import-processor.service';
+import { CategoryImportProcessorService } from './services/category-import-processor.service';
 import { ImageImportProcessorService } from './services/image-import-processor.service';
+import { CatalogImportService } from './services/catalog-import.service';
 import { TemplatePackService } from './services/template-pack.service';
 import { ZipExtractorService } from './services/zip-extractor.service';
-import { CatalogImportService } from './services/catalog-import.service';
+import { CategoryImportService } from './services/category-import.service';
 import { ImageImportService } from './services/image-import.service';
 import { ImportJobRepository } from './repositories/import-job.repository';
 import { ImportErrorRepository } from './repositories/import-error.repository';
@@ -76,6 +78,24 @@ import { AuditModule } from '@shared/audit';
         },
       },
     }),
+    BullModule.registerQueue({
+      name: 'category-import',
+      defaultJobOptions: {
+        removeOnComplete: {
+          count: 100,
+          age: 3600,
+        },
+        removeOnFail: {
+          count: 500,
+          age: 7 * 24 * 3600,
+        },
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      },
+    }),
     StorageModule,
     // Import CatalogModule for ProductService, CategoryService, CategoryRepository
     CatalogModule,
@@ -95,13 +115,15 @@ import { AuditModule } from '@shared/audit';
     ImportJobService,
     ImportProcessorService,
     CatalogImportProcessorService,
+    CategoryImportProcessorService,
     ImageImportProcessorService,
+    CatalogImportService,
     CsvParserService,
     ImportValidationService,
     ImportProgressService,
     TemplatePackService,
     ZipExtractorService,
-    CatalogImportService,
+    CategoryImportService,
     ImageImportService,
     // Repositories
     ImportJobRepository,
@@ -116,6 +138,7 @@ import { AuditModule } from '@shared/audit';
     ImportProgressService,
     ZipExtractorService,
     ImageImportService,
+    CategoryImportService,
   ],
 })
 export class ImportModule {}

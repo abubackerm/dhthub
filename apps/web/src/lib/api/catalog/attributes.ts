@@ -25,8 +25,35 @@ export async function createAttribute(
   return apiClient.post<AttributeView>('/v1/catalog/attributes', data);
 }
 
-export async function getAllAttributes(): Promise<AttributeView[]> {
-  return apiClient.get<AttributeView[]>('/v1/catalog/attributes');
+export interface AttributeListResponse {
+  data: AttributeView[];
+  total: number;
+}
+
+export interface AttributeListParams {
+  skip?: number;
+  take?: number;
+  search?: string;
+}
+
+export async function getAllAttributes(
+  params?: AttributeListParams,
+): Promise<AttributeListResponse> {
+  const queryParams = new URLSearchParams();
+  if (params?.skip != null) {
+    queryParams.set('skip', String(params.skip));
+  }
+  if (params?.take != null) {
+    queryParams.set('take', String(params.take));
+  }
+  if (params?.search) {
+    queryParams.set('search', params.search);
+  }
+
+  const query = queryParams.toString();
+  const endpoint = `/v1/catalog/attributes${query ? `?${query}` : ''}`;
+
+  return apiClient.get<AttributeListResponse>(endpoint);
 }
 
 export async function updateAttribute(

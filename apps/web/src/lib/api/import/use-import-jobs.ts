@@ -20,7 +20,7 @@ import {
   type ImportJobsQueryParams,
   type CreateImportJobResponse,
   type ImportMode,
-} from './import';
+} from '../import';
 
 export const IMPORT_JOBS_QUERY_KEY = ['import-jobs'];
 

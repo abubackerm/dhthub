@@ -44,14 +44,39 @@ export class ProductView {
     view.price = entity.price;
     view.quantity = entity.quantity;
     view.isFeatured = entity.isFeatured;
-    view.images = images;
-    
-    // Derive primaryImageUrl from images - first primary, or first image
-    const primaryImage = images.find(img => img.isPrimary) || images[0];
+
+    // Normalize image URLs
+    view.images = images.map((img) => {
+      let url = img.url;
+      // Normalize URL: strip http(s)://hostname, remove /catalog prefix
+      if (url && url.startsWith('http')) {
+        const parsed = new URL(url);
+        url = parsed.pathname;
+      }
+      if (url && url.startsWith('/catalog')) {
+        url = url.replace('/catalog', '');
+      }
+      return {
+        url,
+        altText: img.altText,
+        isPrimary: img.isPrimary,
+      };
+    });
+
+    // Derive primaryImageUrl from NORMALIZED images - first primary, or first image
+    const primaryImage = view.images.find(img => img.isPrimary) || view.images[0];
     view.primaryImageUrl = primaryImage?.url || null;
-    
-    // Use thumbnailUrl if set, otherwise fall back to primaryImageUrl
-    view.thumbnailUrl = entity.thumbnailUrl || view.primaryImageUrl;
+
+    // Use thumbnailUrl if set and normalize it, otherwise fall back to primaryImageUrl
+    let thumbnailUrl = entity.thumbnailUrl;
+    if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
+      const parsed = new URL(thumbnailUrl);
+      thumbnailUrl = parsed.pathname;
+    }
+    if (thumbnailUrl && thumbnailUrl.startsWith('/catalog')) {
+      thumbnailUrl = thumbnailUrl.replace('/catalog', '');
+    }
+    view.thumbnailUrl = thumbnailUrl || view.primaryImageUrl;
     
     view.variants = VariantView.fromEntities(variants);
     view.createdAt = entity.createdAt;

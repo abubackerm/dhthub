@@ -55,7 +55,8 @@ export class ImportValidationService {
     }
 
     // Load all attributes
-    const attributes = await this.attributeDefinitionRepository.findAll();
+    const attributesResult = await this.attributeDefinitionRepository.findAll();
+    const attributes = attributesResult.data;
     const attributeMap = new Map<string, string>();
     for (const attribute of attributes) {
       attributeMap.set(attribute.slug, attribute.id);

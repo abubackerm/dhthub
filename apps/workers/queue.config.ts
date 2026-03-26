@@ -30,6 +30,7 @@ export const QUEUES = {
   PRODUCT_IMPORT: 'product-import',
   CATALOG_IMPORT: 'catalog-import',
   ATTRIBUTE_IMPORT: 'attribute-import',
+  CATEGORY_IMPORT: 'category-import',
   EMAIL: 'email',
   EXPORT: 'export',
   NOTIFICATION: 'notification',

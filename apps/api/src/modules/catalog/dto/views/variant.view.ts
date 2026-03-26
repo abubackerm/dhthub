@@ -19,11 +19,22 @@ export class VariantView {
     view.price = entity.price;
     view.quantity = entity.quantity;
     view.isDefault = entity.isDefault;
-    view.images = (entity.variantImages || []).map((img) => ({
-      url: img.storagePath,
-      altText: img.altText,
-      isPrimary: img.isPrimary,
-    }));
+    view.images = (entity.variantImages || []).map((img) => {
+      let url = img.storagePath;
+      // Normalize URL: strip http(s)://hostname, remove /catalog prefix
+      if (url && url.startsWith('http')) {
+        const parsed = new URL(url);
+        url = parsed.pathname;
+      }
+      if (url && url.startsWith('/catalog')) {
+        url = url.replace('/catalog', '');
+      }
+      return {
+        url,
+        altText: img.altText,
+        isPrimary: img.isPrimary,
+      };
+    });
     view.createdAt = entity.createdAt;
     view.updatedAt = entity.updatedAt;
     return view;

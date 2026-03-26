@@ -87,7 +87,7 @@ export class LeafPageView {
       description: data.category.description,
       path: data.category.path,
       sku: data.category.sku ?? null,
-      imageUrl: data.category.imageUrl,
+      imageUrl: LeafPageView.normalizeImageUrl(data.category.imageUrl),
     };
     view.cells = data.cells.map((cell: any) => LeafPageView.mapCell(cell));
     view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
@@ -217,6 +217,19 @@ export class LeafPageView {
       })),
     };
   }
+
+  public static normalizeImageUrl(url: string | null): string | null {
+    if (!url) return url;
+    // Normalize URL: strip http(s)://hostname, remove /catalog prefix
+    if (url.startsWith('http')) {
+      const parsed = new URL(url);
+      url = parsed.pathname;
+    }
+    if (url.startsWith('/catalog')) {
+      url = url.replace('/catalog', '');
+    }
+    return url;
+  }
 }
 
 export interface LeafCategoryView {
@@ -262,7 +275,7 @@ export class ConsolidatedLeafPageView {
       description: data.category.description,
       path: data.category.path,
       sku: data.category.sku ?? null,
-      imageUrl: data.category.imageUrl,
+      imageUrl: LeafPageView.normalizeImageUrl(data.category.imageUrl),
     };
     view.leafCategories = data.leafCategories.map((lc: any) => ({
       id: lc.id,

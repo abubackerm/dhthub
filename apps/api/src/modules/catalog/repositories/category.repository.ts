@@ -38,6 +38,12 @@ export class CategoryRepository {
     });
   }
 
+  async findBySku(sku: string): Promise<CategoryEntity | null> {
+    return this.getClient().category.findFirst({
+      where: { sku },
+    });
+  }
+
   async findRootCategories(): Promise<CategoryEntity[]> {
     const client = this.getClient();
     return client.category.findMany({

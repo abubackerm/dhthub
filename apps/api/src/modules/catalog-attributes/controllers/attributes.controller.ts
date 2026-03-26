@@ -61,9 +61,16 @@ export class AttributesController {
   }
 
   @Get()
-  async findAll(@Query('skip') skip?: number, @Query('take') take?: number): Promise<AttributeView[]> {
-    const attributes = await this.attributeService.findAll({ skip, take });
-    return AttributeView.fromEntities(attributes);
+  async findAll(
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Query('search') search?: string,
+  ): Promise<{ data: AttributeView[]; total: number }> {
+    const result = await this.attributeService.findAll({ skip, take, search });
+    return {
+      data: AttributeView.fromEntities(result.data),
+      total: result.total,
+    };
   }
 
   @Get('by-data-type/:dataType')

@@ -100,14 +100,29 @@ export class AttributeDefinitionRepository {
   async findAll(params?: {
     skip?: number;
     take?: number;
-    where?: Record<string, unknown>;
-  }): Promise<AttributeDefinitionEntity[]> {
-    const { skip, take, where } = params ?? {};
-    return this.getClient().attributeDefinition.findMany({
-      skip,
-      take,
-      where,
-      orderBy: { sortOrder: 'asc' },
-    });
+    search?: string;
+  }): Promise<{ data: AttributeDefinitionEntity[]; total: number }> {
+    const { skip, take, search } = params ?? {};
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' as const } },
+            { slug: { contains: search, mode: 'insensitive' as const } },
+            { group: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined;
+
+    const [data, total] = await Promise.all([
+      this.getClient().attributeDefinition.findMany({
+        skip,
+        take,
+        where,
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.getClient().attributeDefinition.count({ where }),
+    ]);
+
+    return { data, total };
   }
 }

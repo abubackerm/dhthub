@@ -3,6 +3,7 @@ import { ZipExtractorService } from '../services/zip-extractor.service';
 import { CatalogImportService } from '../services/catalog-import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImageImportService, ImageUploadStrategy } from '../services/image-import.service';
+import { CategoryImportService } from '../services/category-import.service';
 import { ImportJobStatus } from '../entities/import-job-status.enum';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,6 +25,7 @@ export class ImportWorkerController {
     private readonly catalogImportService: CatalogImportService,
     private readonly importJobService: ImportJobService,
     private readonly imageImportService: ImageImportService,
+    private readonly categoryImportService: CategoryImportService,
   ) {}
 
   /**
@@ -173,6 +175,111 @@ export class ImportWorkerController {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[ImageImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       await this.importJobService.markAsFailed(jobId);
+      throw error;
+    }
+  }
+
+  /**
+   * Worker API: Process category CREATE import (called by BullMQ worker)
+   * POST /v1/import/worker/process-category-create
+   */
+  @Post('process-category-create')
+  async processCategoryCreate(@Body() body: { jobId: string; fileUrl: string }) {
+    const { jobId, fileUrl } = body;
+
+    this.logger.log(`[CategoryImport] Received CREATE request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+
+    let actualFileUrl = fileUrl;
+    if (!actualFileUrl) {
+      this.logger.warn(`fileUrl not provided in request, retrieving from database for job ${jobId}`);
+      const job = await this.importJobService.findById(jobId);
+      actualFileUrl = job.fileUrl;
+      this.logger.log(`[CategoryImport] Retrieved fileUrl from database: "${actualFileUrl}"`);
+    }
+
+    if (!actualFileUrl) {
+      throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
+    }
+
+    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+
+    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
+    }
+
+    try {
+      const result = await this.categoryImportService.processCreateImport(jobId, filePath);
+
+      this.logger.log(
+        `[CategoryImport] CREATE completed for job ${jobId}: ${result.categoriesCreated} categories, ${result.failedRows} errors`,
+      );
+
+      return {
+        success: true,
+        jobId,
+        categoriesCreated: result.categoriesCreated,
+        processedRows: result.processedRows,
+        failedRows: result.failedRows,
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
+      throw error;
+    }
+  }
+
+  /**
+   * Worker API: Process category UPDATE import (called by BullMQ worker)
+   * POST /v1/import/worker/process-category-update
+   */
+  @Post('process-category-update')
+  async processCategoryUpdate(@Body() body: { jobId: string; fileUrl: string }) {
+    const { jobId, fileUrl } = body;
+
+    this.logger.log(`[CategoryImport] Received UPDATE request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+
+    let actualFileUrl = fileUrl;
+    if (!actualFileUrl) {
+      this.logger.warn(`fileUrl not provided in request, retrieving from database for job ${jobId}`);
+      const job = await this.importJobService.findById(jobId);
+      actualFileUrl = job.fileUrl;
+      this.logger.log(`[CategoryImport] Retrieved fileUrl from database: "${actualFileUrl}"`);
+    }
+
+    if (!actualFileUrl) {
+      throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
+    }
+
+    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+
+    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
+    }
+
+    try {
+      const result = await this.categoryImportService.processUpdateImport(jobId, filePath);
+
+      this.logger.log(
+        `[CategoryImport] UPDATE completed for job ${jobId}: ${result.categoriesCreated} categories, ${result.cellsCreated} cells, ${result.failedRows} errors`,
+      );
+
+      return {
+        success: true,
+        jobId,
+        categoriesCreated: result.categoriesCreated,
+        cellsCreated: result.cellsCreated,
+        processedRows: result.processedRows,
+        failedRows: result.failedRows,
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
