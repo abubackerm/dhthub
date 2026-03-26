@@ -260,4 +260,18 @@ export class ProductsController {
       isPrimary: img.isPrimary,
     }));
   }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  async exportProducts(
+    @Body() body: { productIds?: string[]; exportAll?: boolean },
+  ): Promise<{ filename: string; contentType: string; content: string }> {
+    const productIds = body.exportAll ? undefined : body.productIds;
+    const csv = await this.productService.exportToCsv(productIds);
+    return {
+      filename: 'products-export.csv',
+      contentType: 'text/csv',
+      content: csv,
+    };
+  }
 }

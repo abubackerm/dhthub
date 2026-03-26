@@ -3,6 +3,20 @@ import { DatabaseProvider, TransactionClient } from '@core/database/database.pro
 import { transactionContext } from '@core/database/transaction-context.store';
 import { VariantAttributeValueEntity } from '../entities';
 
+export class VariantAttributeValueWithAttributeEntity extends VariantAttributeValueEntity {
+  attribute: {
+    id: string;
+    name: string;
+    slug: string;
+    dataType: string;
+  };
+  option?: {
+    id: string;
+    label: string;
+    value: string;
+  } | null;
+}
+
 @Injectable()
 export class VariantAttributeValueRepository {
   constructor(private readonly db: DatabaseProvider) {}
@@ -24,14 +38,14 @@ export class VariantAttributeValueRepository {
     });
   }
 
-  async findByVariantIdWithAttribute(variantId: string): Promise<VariantAttributeValueEntity[]> {
+  async findByVariantIdWithAttribute(variantId: string): Promise<VariantAttributeValueWithAttributeEntity[]> {
     return this.getClient().variantAttributeValue.findMany({
       where: { variantId },
       include: {
         attribute: true,
         option: true,
       },
-    });
+    }) as unknown as VariantAttributeValueWithAttributeEntity[];
   }
 
   async create(data: {

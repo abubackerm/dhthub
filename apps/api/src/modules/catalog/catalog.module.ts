@@ -8,6 +8,7 @@ import { CategoryRepository } from './repositories/category.repository';
 import { CategoryImageRepository } from './repositories/category-image.repository';
 import { ProductImageRepository } from './repositories/product-image.repository';
 import { VariantImageRepository } from './repositories/variant-image.repository';
+import { ProductTableColumnRepository } from './repositories/product-table-column.repository';
 import { CategoriesController } from './controllers/categories.controller';
 import { ProductsController } from './controllers/products.controller';
 
@@ -25,6 +26,7 @@ import { ProductsController } from './controllers/products.controller';
     CategoryImageRepository,
     ProductImageRepository,
     VariantImageRepository,
+    ProductTableColumnRepository,
   ],
   exports: [
     // Services (Public API)
@@ -37,6 +39,7 @@ import { ProductsController } from './controllers/products.controller';
     CategoryImageRepository,
     ProductImageRepository,
     VariantImageRepository,
+    ProductTableColumnRepository,
   ],
 })
 export class CatalogModule {}

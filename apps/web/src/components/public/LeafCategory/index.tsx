@@ -74,7 +74,13 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
     return () => setFilterData(null);
   }, [data, allVariants, basePath, setFilterData]);
 
-  const totalVariantCount = useMemo(() => allVariants.length, [allVariants]);
+  const totalVariantCount = useMemo(() => {
+    if (!data) return 0;
+    const variantCount = allVariants.length;
+    if (variantCount > 0) return variantCount;
+    const productCount = data.cells.reduce((sum, c) => sum + c.products.length, 0);
+    return productCount;
+  }, [data, allVariants]);
 
   const filteredCells = useMemo(() => {
     if (!data) return [];
@@ -85,6 +91,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
       ...cell,
       products: cell.products.map((product) => ({
         ...product,
+        _hadVariants: product.variants.length > 0,
         variants: product.variants.filter((variant) => {
           return data.filterableAttributes.every((attr) => {
             const attrValue = getAttributeValue(variant.attributeValues, attr.id);
@@ -105,7 +112,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
             return true;
           });
         }),
-      })).filter((product) => product.variants.length > 0),
+      })).filter((product) => product.variants.length > 0 || !product._hadVariants),
     })).filter((cell) => cell.products.length > 0);
   }, [data, searchParams]);
 
@@ -201,7 +208,8 @@ function CellSection({
   filterableAttributes: LeafFilterableAttributeView[];
 }) {
   const variantCount = cell.products.reduce((sum, p) => sum + p.variants.length, 0);
-  if (variantCount === 0) return null;
+  const hasProducts = cell.products.length > 0;
+  if (variantCount === 0 && !hasProducts) return null;
 
   return (
     <div className="cell-section">
@@ -233,7 +241,23 @@ function ProductSection({
   filterableAttributes: LeafFilterableAttributeView[];
   basePath: string;
 }) {
-  if (product.variants.length === 0) return null;
+  if (product.variants.length === 0) {
+    return (
+      <div className="mb-6">
+        <h2 className="text-lg font-medium text-foreground mb-2">
+          <Link
+            href={`${basePath}/${product.slug}`}
+            className="hover:text-(--dht-red) transition-colors"
+          >
+            {product.name}
+          </Link>
+        </h2>
+        {product.description && (
+          <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mb-6">

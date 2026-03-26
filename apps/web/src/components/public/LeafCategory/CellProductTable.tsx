@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart, Package } from "l
 import type {
   LeafProductView,
   LeafFilterableAttributeView,
+  LeafTableColumnView,
   LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
@@ -38,11 +39,67 @@ export function CellProductTable({
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
 
-  // Get visible attributes for table columns (all filterable attributes are shown)
-  const visibleAttributes = useMemo(
-    () => [...filterableAttributes].sort((a, b) => a.name.localeCompare(b.name)),
-    [filterableAttributes]
-  );
+  // Get visible attributes for table columns.
+  // Use product-level tableColumns (at_head) for ordering when available,
+  // falling back to category-level filterableAttributes sorted alphabetically.
+  const visibleAttributes = useMemo(() => {
+    // Collect all unique attribute IDs from all products' tableColumns,
+    // preserving a reference to the first tableColumn seen for each attribute
+    // (to use its metadata when the attribute isn't in filterableAttributes).
+    const orderedAttrIds: string[] = [];
+    const seenAttrIds = new Set<string>();
+    const tcMap = new Map<string, LeafTableColumnView>();
+
+    for (const product of products) {
+      for (const tc of product.tableColumns) {
+        if (!seenAttrIds.has(tc.attributeId)) {
+          seenAttrIds.add(tc.attributeId);
+          orderedAttrIds.push(tc.attributeId);
+          tcMap.set(tc.attributeId, tc);
+        }
+      }
+    }
+
+    // If any products have tableColumns, use that ordering
+    if (orderedAttrIds.length > 0) {
+      const attrMap = new Map(filterableAttributes.map((a) => [a.id, a]));
+      const result: LeafFilterableAttributeView[] = [];
+
+      for (const attrId of orderedAttrIds) {
+        const attr = attrMap.get(attrId);
+        if (attr) {
+          result.push(attr);
+        } else {
+          // Attribute is in tableColumns but not in filterableAttributes.
+          // Synthesize a column definition from the tableColumn data.
+          const tc = tcMap.get(attrId);
+          if (tc) {
+            result.push({
+              id: tc.attributeId,
+              name: tc.attributeName,
+              slug: tc.attributeSlug,
+              dataType: tc.dataType as LeafFilterableAttributeView["dataType"],
+              filterType: null,
+              unitSymbol: tc.unitSymbol,
+              options: [],
+            });
+          }
+        }
+      }
+
+      // Append any filterable attributes not in tableColumns (sorted alphabetically)
+      for (const attr of filterableAttributes) {
+        if (!seenAttrIds.has(attr.id)) {
+          result.push(attr);
+        }
+      }
+
+      return result;
+    }
+
+    // Fallback: use all filterableAttributes sorted alphabetically
+    return [...filterableAttributes].sort((a, b) => a.name.localeCompare(b.name));
+  }, [products, filterableAttributes]);
 
   // Flatten all variants with product info for the table
   const flatVariants = useMemo(() => {
@@ -298,7 +355,7 @@ function getAttributeValueDisplay(
       value = av.textValue;
       break;
     case "enum":
-      value = av.optionLabel || av.optionValue;
+      value = av.optionLabel || av.optionValue || av.textValue;
       break;
     case "boolean":
       value = av.booleanValue ? "Yes" : "No";
@@ -331,7 +388,7 @@ function getAttributeValueForSort(
     case "text":
       return av.textValue ?? "";
     case "enum":
-      return av.optionValue ?? av.optionLabel ?? "";
+      return av.optionValue ?? av.optionLabel ?? av.textValue ?? "";
     case "boolean":
       return av.booleanValue ? 1 : 0;
     default:

@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CellRepository } from '@modules/cell/repositories/cell.repository';
-import { ProductVariantRepository } from '@modules/catalog/repositories/product-variant.repository';
 import { AttributeDefinitionRepository } from '@modules/catalog-attributes/repositories/attribute-definition.repository';
 import { AttributeOptionRepository } from '@modules/catalog-attributes/repositories/attribute-option.repository';
 import { AttributeDataType } from '@modules/catalog-attributes/entities';
@@ -20,11 +19,11 @@ export interface ValidationResult {
 }
 
 export interface ValidationContext {
-  cellMap: Map<string, string>; // cellPath -> cellId
+  cellSkuMap: Map<string, string>; // cellSku -> cellId
+  cellSlugMap: Map<string, string>; // cellSlug -> cellId
   attributeMap: Map<string, string>; // attributeSlug -> attributeId
   attributeOptionMap: Map<string, string>; // attributeSlug:optionValue -> optionId
   requiredAttributesByCell: Map<string, Set<string>>; // cellId -> Set<attributeSlug>
-  skuSet: Set<string>; // Set of existing SKUs for uniqueness check
 }
 
 @Injectable()
@@ -33,7 +32,6 @@ export class ImportValidationService {
 
   constructor(
     private readonly cellRepository: CellRepository,
-    private readonly productVariantRepository: ProductVariantRepository,
     private readonly attributeDefinitionRepository: AttributeDefinitionRepository,
     private readonly attributeOptionRepository: AttributeOptionRepository,
   ) {}
@@ -47,10 +45,14 @@ export class ImportValidationService {
 
     // Load all cells
     const cells = await this.cellRepository.list({ activeOnly: false });
-    const cellMap = new Map<string, string>();
+    const cellSkuMap = new Map<string, string>();
+    const cellSlugMap = new Map<string, string>();
     for (const cell of cells.cells) {
       if (cell.slug) {
-        cellMap.set(cell.slug, cell.id);
+        cellSlugMap.set(cell.slug, cell.id);
+      }
+      if (cell.sku) {
+        cellSkuMap.set(cell.sku, cell.id);
       }
     }
 
@@ -90,27 +92,17 @@ export class ImportValidationService {
       }
     }
 
-    // Load existing SKUs for uniqueness check
-    const existingVariants = await this.productVariantRepository.findAll();
-    const skuSet = new Set<string>();
-    for (const variant of existingVariants) {
-      if (variant.sku) {
-        skuSet.add(variant.sku.toLowerCase());
-      }
-    }
-
     this.logger.debug(
-      `Validation context built: ${cellMap.size} cells, ` +
-      `${attributeMap.size} attributes, ${attributeOptionMap.size} options, ` +
-      `${skuSet.size} existing SKUs`,
+      `Validation context built: ${cellSkuMap.size} cells by SKU, ` +
+      `${attributeMap.size} attributes, ${attributeOptionMap.size} options`,
     );
 
     return {
-      cellMap,
+      cellSkuMap,
+      cellSlugMap,
       attributeMap,
       attributeOptionMap,
       requiredAttributesByCell,
-      skuSet,
     };
   }
 
@@ -121,12 +113,12 @@ export class ImportValidationService {
     rowNumber: number,
     row: CsvRow,
     context: ValidationContext,
-    validateOnly = false,
+    _validateOnly = false,
   ): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
-    // Validate required columns
-    const requiredColumns = ['productName', 'sku', 'cell', 'price', 'stock'];
+    // Validate required columns for new template format
+    const requiredColumns = ['product_name'];
     for (const col of requiredColumns) {
       if (!row[col]) {
         errors.push({
@@ -142,165 +134,32 @@ export class ImportValidationService {
       return { isValid: false, errors };
     }
 
-    // Extract fields with type safety
-    const productName = row.productName!;
-    const sku = row.sku!;
-    const cellPath = row.cell!;
-    const price = row.price!;
-    const stock = row.stock!;
+    const productName = row.product_name!;
 
-    // Validate cell exists
-    const cellId = context.cellMap.get(cellPath);
-    if (!cellId) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'cell',
-        message: `Cell not found: ${cellPath}`,
-        severity: 'error',
-      });
-    } else {
-      // Check required attributes for cell
-      const requiredAttrs = context.requiredAttributesByCell.get(cellId);
-      if (requiredAttrs && requiredAttrs.size > 0) {
-        for (const requiredAttr of requiredAttrs) {
-          if (!row[requiredAttr]) {
-            errors.push({
-              rowNumber,
-              sku,
-              field: requiredAttr,
-              message: `Missing required attribute for cell: ${requiredAttr}`,
-              severity: 'error',
-            });
-          }
-        }
-      }
-    }
-
-    // Validate SKU uniqueness
-    if (context.skuSet.has(sku.toLowerCase())) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'sku',
-        message: `SKU already exists: ${sku}`,
-        severity: 'error',
-      });
-    } else {
-      // Add to set to catch duplicates within same import
-      context.skuSet.add(sku.toLowerCase());
-    }
-
-    // Validate price is numeric and positive
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum)) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'price',
-        message: `Price must be a valid number: ${price}`,
-        severity: 'error',
-      });
-    } else if (priceNum < 0) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'price',
-        message: `Price must be positive: ${price}`,
-        severity: 'error',
-      });
-    }
-
-    // Validate stock is numeric and non-negative
-    const stockNum = parseInt(stock, 10);
-    if (isNaN(stockNum)) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'stock',
-        message: `Stock must be a valid number: ${stock}`,
-        severity: 'error',
-      });
-    } else if (stockNum < 0) {
-      errors.push({
-        rowNumber,
-        sku,
-        field: 'stock',
-        message: `Stock cannot be negative: ${stock}`,
-        severity: 'error',
-      });
-    }
-
-    // Validate attribute values
-    for (const [key, value] of Object.entries(row)) {
-      // Skip standard columns
-      if (['productName', 'sku', 'cell', 'price', 'stock'].includes(key)) {
-        continue;
-      }
-
-      // Check if this is a valid attribute
-      const attributeId = context.attributeMap.get(key);
-      if (!attributeId) {
+    // Validate cell_sku if provided
+    let cellId: string | undefined;
+    if (row.cell_sku) {
+      cellId = context.cellSkuMap.get(row.cell_sku) ?? context.cellSlugMap.get(row.cell_sku);
+      if (!cellId) {
         errors.push({
           rowNumber,
-          sku,
-          field: key,
-          message: `Unknown attribute: ${key}`,
-          severity: 'warning',
+          field: 'cell_sku',
+          message: `Cell not found: ${row.cell_sku}`,
+          severity: 'error',
         });
-        continue;
-      }
-
-      // Get attribute definition to validate type
-      const attribute = await this.attributeDefinitionRepository.findById(attributeId);
-      if (!attribute) continue;
-
-      // Validate numeric attributes
-      if (attribute.dataType === AttributeDataType.NUMBER && value) {
-        const num = parseFloat(value);
-        if (isNaN(num)) {
-          errors.push({
-            rowNumber,
-            sku,
-            field: key,
-            message: `Attribute ${key} must be a number: ${value}`,
-            severity: 'error',
-          });
-        }
-      }
-
-      // Validate ENUM attributes — auto-create missing options during real import
-      if (attribute.dataType === AttributeDataType.ENUM && value) {
-        const slug = this.toSlug(value);
-        const optionKey = `${attribute.slug}:${slug}`;
-        if (!context.attributeOptionMap.has(optionKey)) {
-          if (validateOnly) {
-            errors.push({
-              rowNumber,
-              sku,
-              field: key,
-              message: `New option "${value}" will be created for ${key} on import`,
-              severity: 'warning',
-            });
-          } else {
-            try {
-              const label = this.toLabel(value);
-              const created = await this.attributeOptionRepository.upsertByValue({
-                attributeId: attribute.id,
-                label,
-                value: slug,
-              });
-              context.attributeOptionMap.set(optionKey, created.id);
-              this.logger.log(
-                `Auto-created attribute option "${label}" (${slug}) for ${attribute.slug}`,
-              );
-            } catch (error) {
-              const msg = error instanceof Error ? error.message : String(error);
+      } else {
+        // Check required attributes for cell
+        const requiredAttrs = context.requiredAttributesByCell.get(cellId);
+        if (requiredAttrs && requiredAttrs.size > 0) {
+          for (const requiredAttr of requiredAttrs) {
+            const found = Object.entries(row).some(([key, value]) =>
+              key.startsWith('at_head') && value === requiredAttr,
+            );
+            if (!found) {
               errors.push({
                 rowNumber,
-                sku,
-                field: key,
-                message: `Failed to auto-create option for ${key}: ${msg}`,
+                field: requiredAttr,
+                message: `Missing required attribute for cell: ${requiredAttr}`,
                 severity: 'error',
               });
             }
@@ -309,12 +168,27 @@ export class ImportValidationService {
       }
     }
 
+    // Validate at_head columns reference valid attributes
+    const AT_HEAD_PATTERN = /^at_head(\d+)$/;
+    for (const [key, value] of Object.entries(row)) {
+      if (!AT_HEAD_PATTERN.test(key) || !value) continue;
+
+      const attributeId = context.attributeMap.get(value);
+      if (!attributeId) {
+        errors.push({
+          rowNumber,
+          field: key,
+          message: `Unknown attribute slug "${value}" in ${key}. Attribute must exist before importing.`,
+          severity: 'error',
+        });
+      }
+    }
+
     // Validate product name is not empty
     if (productName.trim().length === 0) {
       errors.push({
         rowNumber,
-        sku,
-        field: 'productName',
+        field: 'product_name',
         message: 'Product name cannot be empty',
         severity: 'error',
       });
@@ -359,36 +233,12 @@ export class ImportValidationService {
   }
 
   /**
-   * Convert a raw CSV value to a URL-safe slug.
-   * "Stainless Steel" → "stainless-steel", "Grade 10.9" → "grade-10-9"
-   */
-  private toSlug(raw: string): string {
-    return raw
-      .trim()
-      .toLowerCase()
-      .replace(/[.]+/g, '-')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
-  /**
-   * Convert a raw CSV value to a human-readable label.
-   * "stainless-steel" → "Stainless Steel", "grade-10-9" → "Grade 10 9"
-   */
-  private toLabel(raw: string): string {
-    return raw
-      .trim()
-      .replace(/[-_]+/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-
-  /**
    * Validate file format and headers
    */
   validateFileFormat(headers: string[]): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    const requiredHeaders = ['productName', 'sku', 'cell', 'price', 'stock'];
+    const requiredHeaders = ['product_name'];
     const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
 
     if (missingHeaders.length > 0) {

@@ -16,6 +16,13 @@ export class ProductRepository {
     return this.getClient().product.findMany();
   }
 
+  async findMany(options?: {
+    where?: any;
+    include?: any;
+  }): Promise<ProductEntity[]> {
+    return this.getClient().product.findMany(options);
+  }
+
   async findById(id: string): Promise<ProductEntity | null> {
     return this.getClient().product.findUnique({
       where: { id },

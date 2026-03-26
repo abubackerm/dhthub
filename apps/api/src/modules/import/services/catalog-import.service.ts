@@ -7,11 +7,50 @@ import { ExtractedFiles } from '../dto';
 import * as fs from 'fs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImageImportService } from './image-import.service';
+import { createHash } from 'crypto';
+import { Readable } from 'stream';
 
-const SYSTEM_FIELDS = ['product_slug', 'sku', 'price', 'stock'];
+const SYSTEM_FIELDS = ['product_sku', 'sku', 'price', 'stock'];
+
+/**
+ * Generate a unique SKU in the format: P-{8 random alphanumeric chars}
+ */
+function generateProductSku(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `P-${result}`;
+}
+
+/**
+ * Generate variant SKU from product SKU and attribute values
+ * Format: {product_sku}-{attr1}-{attr2}-{attr3}
+ */
+function generateVariantSku(productSku: string, attributes: Record<string, string>): string {
+  const attrKeys = Object.keys(attributes).sort();
+  const attrValues = attrKeys.map(key => attributes[key]).filter(Boolean);
+  
+  // Hash the attribute values to create a consistent short string
+  const attrString = attrValues.join('-');
+  const hash = createHash('md5').update(attrString).digest('hex').substring(0, 4).toUpperCase();
+  
+  return `${productSku}-${hash}`;
+}
+
+/**
+ * Generate a slug from product name
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 export interface ProductMap {
-  [slug: string]: { id: string; name: string; cellSlug: string };
+  [slug: string]: { id: string; name: string; cellSlug: string; userSku?: string };
 }
 
 export interface AttributeMap {
@@ -22,6 +61,7 @@ export interface ImportContext {
   jobId: string;
   productMap: ProductMap;
   attributeMap: AttributeMap;
+  importMode?: string;
 }
 
 export interface CsvRowExtended {
@@ -78,10 +118,16 @@ export class CatalogImportService {
       await this.importJobService.updateTotalRows(jobId, totalRows);
       this.logger.log(`Total variant rows to import: ${totalRows}`);
 
+      // Get import mode from job
+      const job = await this.importJobService.findById(jobId);
+      const importMode = job.mode || 'UPSERT';
+      this.logger.log(`Import mode: ${importMode}`);
+
       const context: ImportContext = {
         jobId,
         productMap: {},
         attributeMap: {},
+        importMode,
       };
 
       // Step 1: Import products (if provided)
@@ -161,6 +207,8 @@ export class CatalogImportService {
         id: true,
         slug: true,
         name: true,
+        sku: true,
+        metadata: true,
         cell: {
           select: {
             slug: true,
@@ -170,14 +218,67 @@ export class CatalogImportService {
     });
 
     for (const product of products) {
-      productMap[product.slug] = {
+      const entry: ProductMap[string] = {
         id: product.id,
         name: product.name,
         cellSlug: product.cell?.slug || '',
       };
+
+      // Index by slug
+      productMap[product.slug] = entry;
+
+      // Index by auto-generated SKU (P-XXXXXXXX format)
+      if (product.sku) {
+        productMap[product.sku] = entry;
+      }
+
+      // Index by user SKU from metadata (the SKU users provide in CSV)
+      const userSku = product.metadata?.userSku as string | undefined;
+      if (userSku) {
+        entry.userSku = userSku;
+        productMap[userSku] = entry;
+      }
     }
 
     return productMap;
+  }
+
+  /**
+   * Process a standalone variants CSV (not from a ZIP).
+   * Used by ImportProcessorService when a single CSV with product_sku is uploaded.
+   */
+  async processStandaloneVariantsCsv(
+    jobId: string,
+    fileBuffer: Buffer,
+  ): Promise<{ processed: number; success: number; failed: number }> {
+    this.logger.log(`Processing standalone variants CSV for job: ${jobId}`);
+
+    const job = await this.importJobService.findById(jobId);
+    const importMode = job.mode || 'UPSERT';
+
+    const context: ImportContext = {
+      jobId,
+      productMap: await this.loadExistingProducts(),
+      attributeMap: {},
+      importMode,
+    };
+
+    this.logger.log(`Loaded ${Object.keys(context.productMap).length} existing products from database`);
+
+    const fileStream = Readable.from(fileBuffer);
+    const result = await this.step3_importVariants(fileStream, context, jobId);
+
+    await this.importJobService.updateProgress(jobId, {
+      processedRows: result.processed,
+      successRows: result.success,
+      failedRows: result.failed,
+    });
+
+    this.logger.log(
+      `Standalone variants import complete: ${result.success} success, ${result.failed} failed out of ${result.processed}`,
+    );
+
+    return result;
   }
 
   /**
@@ -193,27 +294,31 @@ export class CatalogImportService {
     let successCount = 0;
     let errorCount = 0;
 
-    this.logger.log(`Starting to process products file: ${filePath}`);
+    // Get import mode from context (will be passed via context in real usage)
+    const job = await this.importJobService.findById(jobId);
+    const importMode = job.mode || 'UPSERT';
+
+    this.logger.log(`Starting to process products file: ${filePath}, import mode: ${importMode}`);
 
     try {
       for await (const { data, rowNumber } of this.csvParserService.parseStream(fileStream)) {
         try {
-          const productSlug = (data.product_slug || '').trim();
+          const productSku = (data.product_sku || '').trim();
           const productName = (data.product_name || '').trim();
           const cellSlug = (data.cell_slug || '').trim();
           const description = (data.description || '').trim();
 
           this.logger.debug(`Processing products row ${rowNumber}: ${JSON.stringify(data)}`);
 
-          if (!productSlug && !productName && !cellSlug && !description) {
+          if (!productSku && !productName && !cellSlug && !description) {
             this.logger.debug(`Skipping empty row ${rowNumber}`);
             continue;
           }
 
           processedCount++;
 
-          if (!productSlug || !productName) {
-            await this.recordError(jobId, rowNumber, null, 'Missing required fields: product_slug, product_name', data, 'products.csv');
+          if (!productSku || !productName) {
+            await this.recordError(jobId, rowNumber, null, 'Missing required fields: product_sku, product_name', data, 'products.csv');
             errorCount++;
             continue;
           }
@@ -245,21 +350,69 @@ export class CatalogImportService {
                 cellId = newCell.id;
               } else {
                 this.logger.error(`Cannot create cell: category not found for ${cellSlug}`);
-                await this.recordError(jobId, rowNumber, productSlug, `Cell not found and cannot create: ${cellSlug}`, data, 'products.csv');
+                await this.recordError(jobId, rowNumber, productSku, `Cell not found and cannot create: ${cellSlug}`, data, 'products.csv');
                 errorCount++;
                 continue;
               }
             }
           }
 
-          // Upsert product - create if not exists, update if already exists
-          let product;
-          const existingProduct = await this.db.product.findUnique({
-            where: { slug: productSlug },
+          // Check if product already exists
+          const existingProduct = await this.db.product.findFirst({
+            where: {
+              metadata: {
+                path: ['userSku'],
+                equals: productSku,
+              },
+            },
           });
 
-          if (existingProduct) {
-            // Update existing product
+          // Respect import mode
+          if (importMode === 'CREATE_ONLY' && existingProduct) {
+            await this.recordError(jobId, rowNumber, productSku, `Product already exists: ${productSku} (CREATE_ONLY mode)`, data, 'products.csv');
+            errorCount++;
+            continue;
+          }
+
+          if (importMode === 'UPDATE_ONLY' && !existingProduct) {
+            await this.recordError(jobId, rowNumber, productSku, `Product not found: ${productSku} (UPDATE_ONLY mode)`, data, 'products.csv');
+            errorCount++;
+            continue;
+          }
+
+          // Auto-generate unique SKU and slug
+          const autoSku = generateProductSku();
+          const slug = generateSlug(productName);
+
+          // Collect table column headers (at_head1-15)
+          const tableColumns: Array<{ attributeId: string; position: number }> = [];
+          let hasInvalidAttrSlug = false;
+          for (let i = 1; i <= 15; i++) {
+            const attrSlug = data[`at_head${i}`]?.trim();
+            if (attrSlug) {
+              const attribute = await this.db.attributeDefinition.findUnique({
+                where: { slug: attrSlug },
+              });
+              if (attribute) {
+                tableColumns.push({
+                  attributeId: attribute.id,
+                  position: i,
+                });
+              } else {
+                this.logger.warn(`Attribute not found for column at_head${i}: ${attrSlug}`);
+                await this.recordError(jobId, rowNumber, productSku, `Unknown attribute slug "${attrSlug}" in at_head${i}. Attribute must exist before importing.`, data, 'products.csv');
+                hasInvalidAttrSlug = true;
+              }
+            }
+          }
+          if (hasInvalidAttrSlug) {
+            errorCount++;
+            continue;
+          }
+
+          let product;
+          if (existingProduct && importMode !== 'CREATE_ONLY') {
+            // Update existing product (UPSERT or UPDATE_ONLY)
             product = await this.db.product.update({
               where: { id: existingProduct.id },
               data: {
@@ -268,33 +421,61 @@ export class CatalogImportService {
                 description: description || existingProduct.description,
               },
             });
-            this.logger.log(`Updated existing product: ${productSlug}`);
-          } else {
-            // Create new product
+            this.logger.log(`Updated existing product: ${productSku} (internal SKU: ${product.sku}), mode: ${importMode}`);
+          } else if (!existingProduct && importMode !== 'UPDATE_ONLY') {
+            // Create new product with auto-generated SKU (UPSERT or CREATE_ONLY)
             product = await this.db.product.create({
               data: {
-                slug: productSlug,
+                sku: autoSku,
+                slug,
                 name: productName,
                 cellId: cellId,
                 description: description || null,
                 type: 'variable',
                 status: 'active',
+                metadata: {
+                  userSku: productSku,
+                },
               },
             });
-            this.logger.log(`Created new product: ${productSlug}`);
+            this.logger.log(`Created new product: ${productSku} (auto SKU: ${autoSku}), mode: ${importMode}`);
+          } else {
+            // Should not reach here due to earlier checks, but handle gracefully
+            continue;
           }
 
-          productMap[productSlug] = {
+          // Create/update table column associations
+          if (tableColumns.length > 0) {
+            await this.db.$transaction(async (prisma) => {
+              // Delete existing table columns for this product
+              await prisma.productTableColumn.deleteMany({
+                where: { productId: product.id },
+              });
+
+              // Create new table column associations
+              for (const column of tableColumns) {
+                await prisma.productTableColumn.create({
+                  data: {
+                    productId: product.id,
+                    ...column,
+                  },
+                });
+              }
+            });
+          }
+
+          productMap[productSku] = {
             id: product.id,
             name: product.name,
             cellSlug,
+            userSku: productSku,
           };
 
           successCount++;
-          this.logger.debug(`Imported product: ${productSlug}`);
+          this.logger.debug(`Imported product: ${productSku}`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          await this.recordError(jobId, rowNumber, String(data.product_slug || ''), errorMessage, data, 'products.csv');
+          await this.recordError(jobId, rowNumber, String(data.product_sku || ''), errorMessage, data, 'products.csv');
           errorCount++;
           processedCount++;
         }
@@ -381,54 +562,60 @@ export class CatalogImportService {
    * Step 3: Import variants from CSV
    */
   private async step3_importVariants(
-    filePath: string,
+    streamOrPath: string | Readable,
     context: ImportContext,
     jobId: string,
   ): Promise<{ processed: number; success: number; failed: number }> {
-    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const fileStream = typeof streamOrPath === 'string'
+      ? fs.createReadStream(streamOrPath, { encoding: 'utf8' })
+      : streamOrPath;
     let batch: VariantBatchItem[] = [];
     let processedCount = 0;
     let successCount = 0;
     let errorCount = 0;
 
-    this.logger.log(`Starting to process variants file: ${filePath}`);
+    this.logger.log(`Starting to process variants file: ${typeof streamOrPath === 'string' ? streamOrPath : '<buffer>'}`);
 
     try {
       for await (const { data, rowNumber } of this.csvParserService.parseStream(fileStream)) {
         try {
-          const productSlug = (data.product_slug || '').trim();
-          const sku = (data.sku || '').trim();
+          const productSku = (data.product_sku || '').trim();
           const price = parseFloat(String(data.price || '0'));
           const stock = parseInt(String(data.stock || '0'), 10);
 
           this.logger.debug(`Processing variants row ${rowNumber}: ${JSON.stringify(data)}`);
 
-          if (!productSlug && !sku && !data.price && !data.stock && Object.keys(data).length <= 2) {
+          if (!productSku && !data.price && !data.stock && Object.keys(data).length <= 2) {
             this.logger.debug(`Skipping empty variants row ${rowNumber}`);
             continue;
           }
 
           processedCount++;
 
-          if (!productSlug || !sku) {
-            await this.recordError(jobId, rowNumber, sku, 'Missing required fields: product_slug, sku', data, 'variants.csv');
+          if (!productSku) {
+            await this.recordError(jobId, rowNumber, '', 'Missing required field: product_sku', data, 'variants.csv');
             errorCount++;
             continue;
           }
 
-          const product = context.productMap[productSlug];
+          const product = context.productMap[productSku];
           if (!product) {
-            await this.recordError(jobId, rowNumber, sku, `Product not found: ${productSlug}`, data, 'variants.csv');
+            await this.recordError(jobId, rowNumber, '', `Product not found: ${productSku}`, data, 'variants.csv');
             errorCount++;
             continue;
           }
 
           const attributes = this.extractAttributes(data);
+          
+          // Auto-generate variant SKU from product SKU and attribute values
+          const productSkuInternal = product.userSku || productSku;
+          const variantSku = generateVariantSku(productSkuInternal, attributes);
+          const variantName = `${product.name} - ${variantSku}`;
 
           batch.push({
             productId: product.id,
-            sku,
-            name: `${product.name} - ${sku}`,
+            sku: variantSku,
+            name: variantName,
             price: Math.round(price * 100),
             stock,
             attributes,
@@ -476,9 +663,20 @@ export class CatalogImportService {
             where: { sku: item.sku },
           });
 
+          // Respect import mode
+          if (context.importMode === 'CREATE_ONLY' && existingVariant) {
+            this.logger.warn(`Skipping variant ${item.sku} - already exists in CREATE_ONLY mode`);
+            continue;
+          }
+
+          if (context.importMode === 'UPDATE_ONLY' && !existingVariant) {
+            this.logger.warn(`Skipping variant ${item.sku} - does not exist in UPDATE_ONLY mode`);
+            continue;
+          }
+
           let variant;
-          if (existingVariant) {
-            // Update existing variant
+          if (existingVariant && context.importMode !== 'CREATE_ONLY') {
+            // Update existing variant (UPSERT or UPDATE_ONLY)
             variant = await prisma.productVariant.update({
               where: { id: existingVariant.id },
               data: {
@@ -489,9 +687,9 @@ export class CatalogImportService {
                 attributes: item.attributes as any,
               },
             });
-            this.logger.debug(`Updated existing variant: ${item.sku}`);
-          } else {
-            // Create new variant
+            this.logger.debug(`Updated existing variant: ${item.sku}, mode: ${context.importMode}`);
+          } else if (!existingVariant && context.importMode !== 'UPDATE_ONLY') {
+            // Create new variant (UPSERT or CREATE_ONLY)
             variant = await prisma.productVariant.create({
               data: {
                 productId: item.productId,
@@ -502,42 +700,58 @@ export class CatalogImportService {
                 attributes: item.attributes as any,
               },
             });
-            this.logger.debug(`Created new variant: ${item.sku}`);
+            this.logger.debug(`Created new variant: ${item.sku}, mode: ${context.importMode}`);
+          } else {
+            // Skipped due to import mode
+            continue;
           }
 
           // Delete existing attribute values for this variant if updating
-          if (existingVariant) {
+          if (existingVariant && context.importMode !== 'CREATE_ONLY') {
             await prisma.variantAttributeValue.deleteMany({
               where: { variantId: variant.id },
             });
           }
 
-          // Create/update attribute values
+          // Create/update attribute values for each dynamic column header
           for (const [attrSlug, value] of Object.entries(item.attributes)) {
-            const attribute = context.attributeMap[attrSlug];
+            let attribute = context.attributeMap[attrSlug];
+            
             if (!attribute) {
-              const newAttr = await prisma.attributeDefinition.upsert({
+              // Look up attribute by slug if not in cache
+              const attr = await prisma.attributeDefinition.findUnique({
                 where: { slug: attrSlug },
-                update: {},
-                create: {
-                  slug: attrSlug,
-                  name: attrSlug,
-                  dataType: 'text',
-                  isRequired: false,
-                  isFilterable: true,
-                },
               });
-
-              context.attributeMap[attrSlug] = {
-                id: newAttr.id,
-                name: newAttr.name,
-                dataType: newAttr.dataType,
-              };
-
-              await this.createAttributeValue(prisma, variant.id, newAttr.id, value as string);
-            } else {
-              await this.createAttributeValue(prisma, variant.id, attribute.id, value as string, attribute.dataType);
+              
+              if (attr) {
+                attribute = {
+                  id: attr.id,
+                  name: attr.name,
+                  dataType: attr.dataType,
+                };
+                context.attributeMap[attrSlug] = attribute;
+              } else {
+                this.logger.error(`Unknown attribute slug "${attrSlug}" for variant ${item.sku}. Skipping attribute value.`);
+                continue;
+              }
             }
+
+            // Handle special values: empty string, "-"
+            let finalValue: string;
+            if (value === '') {
+              finalValue = '';
+            } else if (value === '-') {
+              finalValue = '';
+            } else {
+              finalValue = value as string;
+            }
+
+            // Skip if value is empty after processing
+            if (!finalValue) {
+              continue;
+            }
+
+            await this.createAttributeValue(prisma, variant.id, attribute.id, finalValue, attribute.dataType);
           }
 
           successCount++;

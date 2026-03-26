@@ -26,134 +26,45 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 import {
   createImportJob,
   downloadErrorCsv,
   downloadTemplate,
-  downloadTemplatePack,
+  downloadVariantsTemplate,
   getImportJob,
   getImportJobErrors,
-  searchCategories,
   type ImportJobView,
   type ImportMode,
   type ImportJobWithErrorsView,
 } from "@/lib/api/import"
-import { getCells, getCellAttributes, type Cell } from "@/lib/api/catalog"
+import { exportProducts } from "@/lib/api/catalog/products"
 
 type UploadStep = 1 | 2 | 3
 type UploadState = "idle" | "uploading" | "success" | "errors"
-
-type CategorySearchResult = {
-  id: string
-  name: string
-  path: string
-}
-
-type CellSearchResult = {
-  id: string
-  name: string
-  slug: string
-  categoryId: string
-  categoryName: string
-}
-
-function formatCategoryPath(result: CategorySearchResult): string {
-  const segments = result.path.split(".")
-  return segments.map((segment) => segment.replace(/-/g, " ")).join(" / ")
-}
+type ImportTab = "create" | "edit"
 
 export default function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [activeTab, setActiveTab] = useState<ImportTab>("create")
   const [step, setStep] = useState<UploadStep>(1)
-  const [categoryQuery, setCategoryQuery] = useState<string>("")
-  const [categoryResults, setCategoryResults] = useState<CategorySearchResult[]>([])
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
-  const [selectedCategory, setSelectedCategory] = useState<CategorySearchResult | null>(null)
-  const [cells, setCells] = useState<Cell[]>([])
-  const [selectedCellId, setSelectedCellId] = useState<string>("")
-  const [selectedCell, setSelectedCell] = useState<Cell | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadState, setUploadState] = useState<UploadState>("idle")
-  const [cellAttributes, setCellAttributes] = useState<
-    Array<{ id: string; name: string; slug: string; isRequired: boolean }>
-  >([])
-  const [importMode, setImportMode] = useState<ImportMode>("UPSERT")
   const [job, setJob] = useState<ImportJobView | null>(null)
   const [isPolling, setIsPolling] = useState(false)
-  const [validationErrors, setValidationErrors] = useState<
+  const [jobRecords, setJobRecords] = useState<
     ImportJobWithErrorsView["errors"]
   >([])
   const [isValidating, setIsValidating] = useState(false)
 
-  useEffect(() => {
-    if (!categoryQuery) {
-      setCategoryResults([])
-      return
-    }
-
-    let cancelled = false
-    const handler = setTimeout(async () => {
-      try {
-        const results = await searchCategories(categoryQuery, 20)
-        if (!cancelled) {
-          setCategoryResults(results)
-        }
-      } catch (error) {
-        console.error("Failed to search categories", error)
-      }
-    }, 300)
-
-    return () => {
-      cancelled = true
-      clearTimeout(handler)
-    }
-  }, [categoryQuery])
-
-  // Load cells when category is selected
-  useEffect(() => {
-    if (!selectedCategoryId) {
-      setCells([])
-      return
-    }
-
-    ;(async () => {
-      try {
-        const cellsData = await getCells({ categoryId: selectedCategoryId })
-        setCells(cellsData.data || [])
-      } catch (error) {
-        console.error("Failed to load cells", error)
-        toast.error("Failed to load cells")
-      }
-    })()
-  }, [selectedCategoryId])
-
-  // Load cell attributes when cell is selected
-  useEffect(() => {
-    if (!selectedCellId) {
-      setCellAttributes([])
-      return
-    }
-
-    ;(async () => {
-      try {
-        const attrs = await getCellAttributes(selectedCellId)
-        setCellAttributes(
-          attrs.map((attr) => ({
-            id: attr.id,
-            name: attr.name,
-            slug: attr.slug,
-            isRequired: attr.isRequired,
-          })),
-        )
-      } catch (error) {
-        console.error("Failed to load cell attributes", error)
-        toast.error("Failed to load cell attributes")
-      }
-    })()
-  }, [selectedCellId])
+  const importedProducts = jobRecords.filter(
+    (r) => r.rawData?.type === "success",
+  )
+  const validationErrors = jobRecords.filter(
+    (r) => r.rawData?.type !== "success",
+  )
 
   useEffect(() => {
     if (!isPolling || !job) return
@@ -168,10 +79,10 @@ export default function UploadPage() {
 
           if (updated.status === "FAILED" || updated.status === "COMPLETED") {
             try {
-              const jobWithErrors = await getImportJobErrors(job.id, { limit: 500 })
-              setValidationErrors(jobWithErrors.errors)
+              const jobWithErrors = await getImportJobErrors(job.id, { limit: 5000 })
+              setJobRecords(jobWithErrors.errors)
             } catch (error) {
-              console.error("Failed to load job errors", error)
+              console.error("Failed to load job records", error)
             }
           }
         }
@@ -182,23 +93,6 @@ export default function UploadPage() {
 
     return () => clearInterval(interval)
   }, [isPolling, job])
-
-  const handleCategorySelect = (categoryId: string) => {
-    const found = categoryResults.find((c) => c.id === categoryId) ?? null
-    setSelectedCategoryId(categoryId)
-    setSelectedCategory(found)
-    setCategoryQuery("")
-    setCategoryResults([])
-    // Reset cell selection when category changes
-    setSelectedCellId("")
-    setSelectedCell(null)
-  }
-
-  const handleCellSelect = (cellId: string) => {
-    const found = cells.find((c) => c.id === cellId) ?? null
-    setSelectedCellId(cellId)
-    setSelectedCell(found)
-  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -225,10 +119,14 @@ export default function UploadPage() {
 
     setUploadState("uploading")
     setIsValidating(true)
-    setValidationErrors([])
+    setJobRecords([])
+
+    // Use CREATE_ONLY for create tab, UPDATE_ONLY for edit tab
+    const mode: ImportMode = activeTab === "create" ? "CREATE_ONLY" : "UPDATE_ONLY"
 
     createImportJob(selectedFile, {
-      mode: importMode,
+      mode,
+      importType: 'CATALOG',
     })
       .then((response) => {
         toast.success("Import job created")
@@ -274,8 +172,8 @@ export default function UploadPage() {
       })
   }
 
-  const handleDownloadTemplate = () => {
-    downloadTemplate(selectedCellId || undefined)
+  const handleDownloadProductsTemplate = () => {
+    downloadTemplate({ mode: 'create' }) // Create mode - no product_sku
       .then((template) => {
         const blob = new Blob([template.content], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
@@ -293,27 +191,22 @@ export default function UploadPage() {
       })
   }
 
-  const handleDownloadTemplatePack = () => {
-    downloadTemplatePack()
-      .then((templatePack) => {
-        const binaryString = atob(templatePack.content)
-        const bytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i)
-        }
-        const blob = new Blob([bytes], { type: templatePack.contentType })
+  const handleDownloadVariantsTemplate = () => {
+    downloadVariantsTemplate()
+      .then((template) => {
+        const blob = new Blob([template.content], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = templatePack.filename
+        a.download = template.filename
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
       })
       .catch((error) => {
-        console.error("Failed to download template pack", error)
-        toast.error("Failed to download template pack")
+        console.error("Failed to download variants template", error)
+        toast.error("Failed to download variants template")
       })
   }
 
@@ -339,18 +232,35 @@ export default function UploadPage() {
 
   const handleReset = () => {
     setStep(1)
-    setSelectedCategoryId("")
-    setSelectedCategory(null)
-    setCells([])
-    setSelectedCellId("")
-    setSelectedCell(null)
-    setCategoryQuery("")
-    setCategoryResults([])
     setSelectedFile(null)
     setUploadState("idle")
     setJob(null)
     setIsPolling(false)
-    setValidationErrors([])
+    setJobRecords([])
+  }
+
+  const handleExportAll = async () => {
+    try {
+      toast.loading("Exporting all products to CSV...", { id: 'export-all' })
+      
+      const result = await exportProducts([])
+      
+      // Download the CSV file
+      const blob = new Blob([result.content], { type: result.contentType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = result.filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      toast.success("Exported all products to CSV", { id: 'export-all' })
+    } catch (error) {
+      console.error("Failed to export products", error)
+      toast.error("Failed to export products", { id: 'export-all' })
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -364,483 +274,827 @@ export default function UploadPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Upload Products</h1>
         <p className="text-muted-foreground">
-          Bulk upload products into a cell using a CSV file
+          Bulk upload products using CSV or ZIP files with auto-SKU generation
         </p>
       </div>
 
       <Alert>
         <Info className="h-4 w-4" />
-        <AlertTitle>Choose Your Import Method</AlertTitle>
+        <AlertTitle>New Simplified Import Flow</AlertTitle>
         <AlertDescription>
           <div className="mt-2 space-y-2">
             <div>
-              <strong className="text-sm font-medium">Single CSV Import:</strong>
+              <strong className="text-sm font-medium">No Cell Selection Required:</strong>
               <p className="text-sm text-muted-foreground">
-                Download template for one category → Fill → Upload CSV
+                SKUs are auto-generated (format: P-&#123;8 chars&#125;) and user SKU is stored in metadata
               </p>
             </div>
             <div>
-              <strong className="text-sm font-medium">Multi-CSV Catalog Import:</strong>
+              <strong className="text-sm font-medium">Create Mode:</strong>
               <p className="text-sm text-muted-foreground">
-                Download template pack → Fill 5 CSV files → ZIP → Upload
+                Add new products from scratch. Download template, fill data, upload CSV/ZIP.
+              </p>
+            </div>
+            <div>
+              <strong className="text-sm font-medium">Edit Mode:</strong>
+              <p className="text-sm text-muted-foreground">
+                Update existing products. Search products, export to CSV, edit, re-upload.
               </p>
             </div>
           </div>
         </AlertDescription>
       </Alert>
 
-      {/* Step Indicator */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              step >= 1
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {step > 1 ? <Check className="h-4 w-4" /> : "1"}
-          </div>
-          <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
-            Select Cell
-          </span>
-        </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              step >= 2
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {step > 2 ? <Check className="h-4 w-4" /> : "2"}
-          </div>
-          <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>
-            Upload File
-          </span>
-        </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              step >= 3
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {step > 3 ? <Check className="h-4 w-4" /> : "3"}
-          </div>
-          <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>
-            Review Results
-          </span>
-        </div>
-      </div>
+      {/* Create/Edit Tabs */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ImportTab)} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="create">Create New Products</TabsTrigger>
+          <TabsTrigger value="edit">Edit Existing Products</TabsTrigger>
+        </TabsList>
 
-      {/* Step 1: Select Cell */}
-      {step === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Select a Cell</CardTitle>
-            <CardDescription>
-              Choose the cell where you want to upload products. First select a category, then select a cell.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-2">
-              <Label>Category</Label>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  placeholder="Search for a category..."
-                  value={categoryQuery}
-                  onChange={(e) => setCategoryQuery(e.target.value)}
-                />
-                {categoryResults.length > 0 && (
-                  <div className="max-h-60 overflow-y-auto rounded-md border bg-popover text-sm shadow">
-                    {categoryResults.map((result) => (
-                      <button
-                        key={result.id}
-                        type="button"
-                        className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-accent ${
-                          selectedCategoryId === result.id ? "bg-accent" : ""
-                        }`}
-                        onClick={() => handleCategorySelect(result.id)}
-                      >
-                        <span className="font-medium">{result.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatCategoryPath(result)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* Create Tab */}
+        <TabsContent value="create">
+          {/* Step Indicator */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 1
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 1 ? <Check className="h-4 w-4" /> : "1"}
               </div>
+              <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
+                Download Template
+              </span>
             </div>
-
-            {selectedCategory && (
-              <div className="grid gap-2">
-                <Label>Cell</Label>
-                {cells.length === 0 ? (
-                  <div className="text-sm text-muted-foreground p-4 border rounded-md">
-                    No cells found in this category. Please create cells in the Categories page first.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="max-h-60 overflow-y-auto rounded-md border bg-popover text-sm shadow">
-                      {cells.map((cell) => (
-                        <button
-                          key={cell.id}
-                          type="button"
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent ${
-                            selectedCellId === cell.id ? "bg-accent" : ""
-                          }`}
-                          onClick={() => handleCellSelect(cell.id)}
-                        >
-                          <span className="font-medium">{cell.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {cell.slug}
-                          </span>
-                          <Badge variant={cell.isActive ? "default" : "secondary"} className="text-xs ml-auto">
-                            {cell.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 2
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 2 ? <Check className="h-4 w-4" /> : "2"}
               </div>
-            )}
+              <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>
+                Upload File
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 3
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 3 ? <Check className="h-4 w-4" /> : "3"}
+              </div>
+              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>
+                Review Results
+              </span>
+            </div>
+          </div>
 
-            {selectedCell && (
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>Selected Cell</Label>
-                  <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2">
-                    <div>
-                      <div className="font-medium">{selectedCell.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {selectedCell.description || "No description"}
-                      </div>
-                    </div>
-                    <Badge variant={selectedCell.isActive ? "default" : "secondary"}>
-                      {selectedCell.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed p-3">
-                  <div>
-                    <p className="text-sm font-medium">CSV Template</p>
-                    <p className="text-xs text-muted-foreground">
-                      Download a pre-formatted template with the correct columns for this cell
+          {/* Step 1: Download Template */}
+          {step === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Download Import Template</CardTitle>
+                <CardDescription>
+                  Download the CSV template and fill in your product data. SKUs will be auto-generated on import.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Products Template</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Defines products with dynamic attribute columns (at_head1-15)
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download CSV Template
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border border-dashed p-3">
-                  <div>
-                    <p className="text-sm font-medium">Template Pack (ZIP)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Download all catalog templates (products, variants, images, attributes) for multi-CSV import
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={handleDownloadTemplatePack}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Template Pack
-                  </Button>
-                </div>
-
-                {cellAttributes.length > 0 && (
-                  <div className="grid gap-4">
+                  
+                  <div className="flex items-center justify-between rounded-md border border-dashed p-3">
                     <div>
-                      <Label>Required & Optional Attributes</Label>
-                      <p className="text-sm text-muted-foreground">
-                        These attributes should be included as columns in your CSV file
+                      <p className="text-sm font-medium">products_template.csv</p>
+                      <p className="text-xs text-muted-foreground">
+                        Product definitions with attributes configuration
                       </p>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <Button variant="outline" size="sm" onClick={handleDownloadProductsTemplate}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Required Columns</h3>
+                    <div className="grid gap-2 text-sm">
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">product_name</span> - Product name (required)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">cell_sku</span> - Cell SKU (optional)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">at_head1-15</span> - Attribute slugs
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Variants Template</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Product variants with dynamic attribute values. SKU auto-generated from product_sku + attribute values.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                    <div>
+                      <p className="text-sm font-medium">variants_template.csv</p>
+                      <p className="text-xs text-muted-foreground">
+                        Product variants with attribute values
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleDownloadVariantsTemplate}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={() => setStep(2)}>
+                    Continue to Upload
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Upload File */}
+          {step === 2 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Upload CSV/ZIP File</CardTitle>
+                    <CardDescription>
+                      Upload your filled CSV or ZIP file. ZIP can contain multiple CSV files (products, variants, images, attributes).
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline">Step 2 of 3</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/40 px-6 py-10 text-center transition-colors hover:border-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".csv,.xlsx,.zip"
+                    onChange={handleFileSelect}
+                  />
+                  <UploadIcon className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Drag and drop your CSV or ZIP file</p>
+                    <p className="text-xs text-muted-foreground">or click to browse</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    CSV up to 200MB and 500k rows, or ZIP with multiple CSV files.
+                  </p>
+                </div>
+
+                {selectedFile && (
+                  <div className="space-y-2 rounded-md border bg-muted/60 p-3 text-sm">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="mb-2 text-sm font-medium">Required Attributes</h3>
-                        <div className="space-y-1">
-                          {cellAttributes
-                            .filter((attr) => attr.isRequired)
-                            .map((attr) => (
-                              <div
-                                key={attr.id}
-                                className="flex items-center justify-between rounded-md bg-muted/70 px-3 py-1.5"
-                              >
-                                <span className="text-sm">{attr.name}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  Required
-                                </Badge>
-                              </div>
-                            ))}
+                        <div className="font-medium">{selectedFile.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
                         </div>
                       </div>
-                      <div>
-                        <h3 className="mb-2 text-sm font-medium">Optional Attributes</h3>
-                        <div className="space-y-1">
-                          {cellAttributes
-                            .filter((attr) => !attr.isRequired)
-                            .map((attr) => (
-                              <div
-                                key={attr.id}
-                                className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-1.5"
-                              >
-                                <span className="text-sm">{attr.name}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  Optional
-                                </Badge>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
+                      <Badge variant="outline">Ready</Badge>
                     </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" asChild>
-                <Link href="/dhthub-admin/products">Cancel</Link>
-              </Button>
-              <Button onClick={() => setStep(2)} disabled={!selectedCellId}>
-                Continue
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="flex items-center justify-between pt-4">
+                  <Button variant="outline" onClick={() => setStep(1)}>
+                    Back
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleUploadAndValidate}
+                      disabled={!selectedFile || uploadState === "uploading" || isValidating}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isValidating ? "Starting Import..." : "Start Import"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Step 2: Upload File */}
-      {step === 2 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Upload CSV File</CardTitle>
-                <CardDescription>
-                  Upload your product data in CSV format, or use ZIP for multi-CSV catalog imports. We'll validate it before importing.
-                </CardDescription>
-              </div>
-              <Badge variant="outline">Step 2 of 3</Badge>
+          {/* Step 3: Review Results */}
+          {step === 3 && (
+            <div className="space-y-6">
+              {isPolling && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4 animate-spin" />
+                      <AlertTitle>Processing Import...</AlertTitle>
+                      <AlertDescription>
+                        {job?.status === "PENDING"
+                          ? "Waiting for worker to pick up job..."
+                          : job?.totalRows
+                            ? `${job.processedRows} of ${job.totalRows} rows processed.`
+                            : "Extracting and processing files..."}
+                      </AlertDescription>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length === 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertTitle className="text-green-800 dark:text-green-300">
+                        Upload Complete
+                      </AlertTitle>
+                      <AlertDescription className="text-green-700 dark:text-green-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Rows</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Imported</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Imported Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell className="font-mono">{record.sku ?? "-"}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Imported
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} imported products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 mt-6">
+                      <Button variant="outline" onClick={handleReset}>
+                        Upload Another
+                      </Button>
+                      <Button asChild>
+                        <Link href="/dhthub-admin/products">View Products</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length > 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800 dark:text-amber-300">
+                        {job.successRows > 0 ? "Upload Completed with Errors" : "Upload Failed"}
+                      </AlertTitle>
+                      <AlertDescription className="text-amber-700 dark:text-amber-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully. {job.failedRows} rows had errors.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Rows</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Imported</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Imported Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell className="font-mono">{record.sku ?? "-"}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Imported
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} imported products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold mb-3">Error Details</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Row #</TableHead>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Error</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {validationErrors.map((error, i) => (
+                            <TableRow key={error.id ?? i}>
+                              <TableCell>{error.rowNumber}</TableCell>
+                              <TableCell className="font-mono">
+                                {error.sku ?? "-"}
+                              </TableCell>
+                              <TableCell className="text-destructive">
+                                {error.message}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
+                      <Button variant="outline" onClick={handleDownloadErrorReport}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Error Report
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleReset}>
+                          Upload Another
+                        </Button>
+                        <Button asChild>
+                          <Link href="/dhthub-admin/products">View Products</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <Label>Import Mode</Label>
-              <Tabs
-                value={importMode}
-                onValueChange={(value) => setImportMode(value as ImportMode)}
-                className="w-full"
+          )}
+        </TabsContent>
+
+        {/* Edit Tab */}
+        <TabsContent value="edit">
+          {/* Step Indicator */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 1
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
               >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="CREATE_ONLY">Create Only</TabsTrigger>
-                  <TabsTrigger value="UPSERT">Upsert (Recommended)</TabsTrigger>
-                  <TabsTrigger value="UPDATE_ONLY">Update Only</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <p className="text-sm text-muted-foreground">
-                Choose how existing SKUs should be handled during import.
-              </p>
-            </div>
-
-            <div
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/40 px-6 py-10 text-center transition-colors hover:border-primary"
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept=".csv,.xlsx,.zip"
-                onChange={handleFileSelect}
-              />
-              <UploadIcon className="h-10 w-10 text-muted-foreground" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Drag and drop your CSV file</p>
-                <p className="text-xs text-muted-foreground">or click to browse</p>
+                {step > 1 ? <Check className="h-4 w-4" /> : "1"}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                CSV up to 200MB and 500k rows, or ZIP with multiple CSV files.
-              </p>
+              <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
+                Download Edit Template
+              </span>
             </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 2
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 2 ? <Check className="h-4 w-4" /> : "2"}
+              </div>
+              <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>
+                Upload Edited File
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 3
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 3 ? <Check className="h-4 w-4" /> : "3"}
+              </div>
+              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>
+                Review Results
+              </span>
+            </div>
+          </div>
 
-            {selectedFile && (
-              <div className="space-y-2 rounded-md border bg-muted/60 p-3 text-sm">
+          {/* Step 1: Download Edit Template */}
+          {step === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Download Edit Template</CardTitle>
+                <CardDescription>
+                  Download a CSV pre-populated with all existing products. Edit the values you want to change, then re-upload.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                    <div>
+                      <p className="text-sm font-medium">products_edit_template.csv</p>
+                      <p className="text-xs text-muted-foreground">
+                        All existing products with current data
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleExportAll}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Editing Tips</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
+                      <li>Keep the <strong>product_sku</strong> column unchanged - this identifies which product to update</li>
+                      <li>Edit only the columns you want to change</li>
+                      <li>Delete rows you don't want to update</li>
+                      <li>Re-upload the edited CSV when done</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={() => setStep(2)}>
+                    Continue to Upload
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Upload Edited File */}
+          {step === 2 && (
+            <Card>
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium">{selectedFile.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
+                    <CardTitle>Upload Edited CSV</CardTitle>
+                    <CardDescription>
+                      Upload your edited CSV file with product updates.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline">Step 2 of 3</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/40 px-6 py-10 text-center transition-colors hover:border-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".csv,.xlsx,.zip"
+                    onChange={handleFileSelect}
+                  />
+                  <UploadIcon className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Drag and drop your edited CSV file</p>
+                    <p className="text-xs text-muted-foreground">or click to browse</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    CSV up to 200MB and 500k rows, or ZIP with multiple CSV files.
+                  </p>
+                </div>
+
+                {selectedFile && (
+                  <div className="space-y-2 rounded-md border bg-muted/60 p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{selectedFile.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
+                        </div>
+                      </div>
+                      <Badge variant="outline">Ready</Badge>
                     </div>
                   </div>
-                  <Badge variant="outline">Ready</Badge>
-                </div>
-              </div>
-            )}
+                )}
 
-            <div className="flex items-center justify-between pt-4">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleUploadAndValidate}
-                  disabled={!selectedFile || uploadState === "uploading" || isValidating}
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {isValidating ? "Starting Import..." : "Start Import"}
-                </Button>
-              </div>
+                <div className="flex items-center justify-between pt-4">
+                  <Button variant="outline" onClick={() => setStep(1)}>
+                    Back
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleUploadAndValidate}
+                      disabled={!selectedFile || uploadState === "uploading" || isValidating}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isValidating ? "Starting Import..." : "Start Import"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Review Results */}
+          {step === 3 && (
+            <div className="space-y-6">
+              {isPolling && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4 animate-spin" />
+                      <AlertTitle>Processing Import...</AlertTitle>
+                      <AlertDescription>
+                        {job?.status === "PENDING"
+                          ? "Waiting for worker to pick up job..."
+                          : job?.totalRows
+                            ? `${job.processedRows} of ${job.totalRows} rows processed.`
+                            : "Extracting and processing files..."}
+                      </AlertDescription>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length === 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertTitle className="text-green-800 dark:text-green-300">
+                        Update Complete
+                      </AlertTitle>
+                      <AlertDescription className="text-green-700 dark:text-green-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} products updated successfully.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Rows</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Updated</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Updated Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell className="font-mono">{record.sku ?? "-"}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Updated
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} updated products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 mt-6">
+                      <Button variant="outline" onClick={handleReset}>
+                        Update More
+                      </Button>
+                      <Button asChild>
+                        <Link href="/dhthub-admin/products">View Products</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length > 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800 dark:text-amber-300">
+                        {job.successRows > 0 ? "Update Completed with Errors" : "Update Failed"}
+                      </AlertTitle>
+                      <AlertDescription className="text-amber-700 dark:text-amber-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} products updated successfully. {job.failedRows} rows had errors.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Rows</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Updated</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Updated Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>SKU</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell className="font-mono">{record.sku ?? "-"}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Updated
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} updated products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold mb-3">Error Details</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Row #</TableHead>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Error</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {validationErrors.map((error, i) => (
+                            <TableRow key={error.id ?? i}>
+                              <TableCell>{error.rowNumber}</TableCell>
+                              <TableCell className="font-mono">
+                                {error.sku ?? "-"}
+                              </TableCell>
+                              <TableCell className="text-destructive">
+                                {error.message}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
+                      <Button variant="outline" onClick={handleDownloadErrorReport}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Error Report
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleReset}>
+                          Update More
+                        </Button>
+                        <Button asChild>
+                          <Link href="/dhthub-admin/products">View Products</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 3: Review Results */}
-      {step === 3 && (
-        <div className="space-y-6">
-          {isPolling && (
-            <Card>
-              <CardContent className="pt-6">
-                <Alert>
-                  <AlertCircle className="h-4 w-4 animate-spin" />
-                  <AlertTitle>Processing Import...</AlertTitle>
-                  <AlertDescription>
-                    {job?.status === "PENDING"
-                      ? "Waiting for worker to pick up the job..."
-                      : job?.totalRows
-                        ? `${job.processedRows} of ${job.totalRows} rows processed.`
-                        : "Extracting and processing files..."}
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
           )}
-
-          {!isPolling && job && validationErrors.length === 0 && (
-            <Card>
-              <CardContent className="pt-6">
-                <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertTitle className="text-green-800 dark:text-green-300">
-                    Upload Complete
-                  </AlertTitle>
-                  <AlertDescription className="text-green-700 dark:text-green-400">
-                    {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
-                  <div>
-                    <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
-                    <p className="text-sm text-muted-foreground">Total Rows</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
-                    <p className="text-sm text-muted-foreground">Imported</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{job.failedRows}</p>
-                    <p className="text-sm text-muted-foreground">Errors</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={handleReset}>
-                    Upload Another
-                  </Button>
-                  <Button asChild>
-                    <Link href="/dhthub-admin/products">View Products</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {!isPolling && job && validationErrors.length > 0 && (
-            <Card>
-              <CardContent className="pt-6">
-                <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertTitle className="text-amber-800 dark:text-amber-300">
-                    {job.successRows > 0 ? "Upload Completed with Errors" : "Upload Failed"}
-                  </AlertTitle>
-                  <AlertDescription className="text-amber-700 dark:text-amber-400">
-                    {job.successRows} of {job.totalRows || job.processedRows} rows imported successfully. {job.failedRows} rows had errors.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
-                  <div>
-                    <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
-                    <p className="text-sm text-muted-foreground">Total Rows</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
-                    <p className="text-sm text-muted-foreground">Imported</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-red-600">{job.failedRows}</p>
-                    <p className="text-sm text-muted-foreground">Errors</p>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-3">Error Details</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Row #</TableHead>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Error</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {validationErrors.map((error, i) => (
-                        <TableRow key={error.id ?? i}>
-                          <TableCell>{error.rowNumber}</TableCell>
-                          <TableCell className="font-mono">
-                            {error.sku ?? "-"}
-                          </TableCell>
-                          <TableCell className="text-destructive">
-                            {error.message}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex justify-between mt-6">
-                  <Button variant="outline" onClick={handleDownloadErrorReport}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Error Report
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleReset}>
-                      Upload Another
-                    </Button>
-                    <Button asChild>
-                      <Link href="/dhthub-admin/products">View Products</Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

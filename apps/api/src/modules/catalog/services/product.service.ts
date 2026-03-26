@@ -37,6 +37,31 @@ interface AttributeValue {
   optionId?: string | null;
 }
 
+interface ProductWithRelations extends ProductEntity {
+  cell?: {
+    slug: string;
+  };
+  tableColumns?: Array<{
+    position: number;
+    attribute: {
+      slug: string;
+    };
+  }>;
+  variants?: Array<{
+    sku: string;
+    price: number | null;
+    quantity: number;
+    attributeValues?: Array<{
+      attribute: {
+        slug: string;
+      };
+      textValue?: string | null;
+      numberValue?: number | null;
+      booleanValue?: boolean | null;
+    }>;
+  }>;
+}
+
 @Injectable()
 export class ProductService extends BaseService {
   constructor(
@@ -67,6 +92,7 @@ export class ProductService extends BaseService {
     isFeatured?: boolean,
     metadata?: Record<string, unknown> | null,
     createdBy?: string,
+    status?: ProductStatus,
   ): Promise<ProductEntity> {
     // Check product limit before creating
     const productLimit = this.configService.get<number>('catalog.productLimit', 25000);
@@ -96,12 +122,12 @@ export class ProductService extends BaseService {
     }
 
     const product = await this.productRepo.create({
-      sku,
+      sku: sku ?? this.generateProductSku(),
       name,
       slug,
       description,
       type: type ?? ProductType.SIMPLE,
-      status: ProductStatus.DRAFT,
+      status: status ?? ProductStatus.DRAFT,
       price,
       compareAtPrice,
       costPrice,
@@ -634,6 +660,15 @@ export class ProductService extends BaseService {
     return slug;
   }
 
+  private generateProductSku(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `P-${result}`;
+  }
+
   private slugify(text: string): string {
     return text
       .toLowerCase()
@@ -694,5 +729,163 @@ export class ProductService extends BaseService {
 
   async getVariantImages(variantId: string): Promise<any[]> {
     return this.variantImageRepo.findByVariantId(variantId);
+  }
+
+  /**
+   * Export products and variants to CSV format for edit mode
+   */
+  async exportToCsv(productIds?: string[]): Promise<string> {
+    // Build query based on whether we're exporting specific products or all
+    const where = productIds?.length
+      ? { id: { in: productIds } }
+      : undefined;
+
+    // Fetch products with their variants and table columns
+    const products = await this.productRepo.findMany({
+      where,
+      include: {
+        cell: {
+          select: {
+            slug: true,
+          },
+        },
+        tableColumns: {
+          include: {
+            attribute: {
+              select: {
+                slug: true,
+              },
+            },
+          },
+          orderBy: {
+            position: 'asc',
+          },
+        },
+        variants: {
+          include: {
+            attributeValues: {
+              include: {
+                attribute: {
+                  select: {
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }) as ProductWithRelations[];
+
+    // Build CSV content
+    const escapeCsvValue = (value: string | null | undefined): string => {
+      if (value === null || value === undefined) {
+        return '';
+      }
+      const str = String(value);
+      if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // Collect all unique attribute slugs from variants
+    const attributeSlugs = new Set<string>();
+    for (const product of products) {
+      for (const variant of product.variants || []) {
+        for (const attrValue of variant.attributeValues || []) {
+          attributeSlugs.add(attrValue.attribute.slug);
+        }
+      }
+    }
+    const sortedAttributes = Array.from(attributeSlugs).sort();
+
+    // Generate products CSV
+    const productsHeader = [
+      'product_sku',
+      'product_name',
+      'cell_slug',
+      'description',
+      ...Array.from({ length: 15 }, (_, i) => `at_head${i + 1}`),
+    ];
+
+    const productsRows = products.map(product => {
+      const userSku = (product.metadata as any)?.userSku || '';
+      
+      // Build at_head1-15 from table columns
+      const tableColumnsMap = new Map<string, number>();
+      (product.tableColumns || []).forEach((tc: any) => {
+        if (tc.attribute?.slug) {
+          tableColumnsMap.set(tc.attribute.slug, tc.position);
+        }
+      });
+
+      const atHeads: string[] = Array(15).fill('');
+      tableColumnsMap.forEach((position, slug) => {
+        if (position >= 1 && position <= 15) {
+          atHeads[position - 1] = slug;
+        }
+      });
+
+      return [
+        escapeCsvValue(userSku),
+        escapeCsvValue(product.name),
+        escapeCsvValue(product.cell?.slug || ''),
+        escapeCsvValue(product.description || ''),
+        ...atHeads.map(escapeCsvValue),
+      ];
+    });
+
+    // Generate variants CSV
+    const variantsHeader = [
+      'product_sku',
+      'sku',
+      'price',
+      'stock',
+      ...sortedAttributes,
+    ];
+
+    const variantsRows: string[][] = [];
+    for (const product of products) {
+      const userSku = (product.metadata as any)?.userSku || product.sku;
+      
+      for (const variant of product.variants || []) {
+        // Build attribute values map
+        const attrValues: Record<string, string> = {};
+        for (const attrValue of variant.attributeValues || []) {
+          const slug = attrValue.attribute.slug;
+          const value = attrValue.textValue || 
+                       (attrValue.numberValue !== null ? String(attrValue.numberValue) : '') ||
+                       (attrValue.booleanValue !== null ? String(attrValue.booleanValue) : '');
+          attrValues[slug] = value || '-';
+        }
+
+        const row = [
+          escapeCsvValue(userSku),
+          escapeCsvValue(variant.sku),
+          escapeCsvValue(variant.price !== null ? String(variant.price / 100) : ''),
+          escapeCsvValue(String(variant.quantity || 0)),
+          ...sortedAttributes.map(slug => escapeCsvValue(attrValues[slug] || '')),
+        ];
+
+        variantsRows.push(row);
+      }
+    }
+
+    // Combine into single CSV with section headers
+    const lines: string[] = [];
+
+    // Products section
+    lines.push('# PRODUCTS');
+    lines.push(productsHeader.join(','));
+    lines.push(...productsRows.map(row => row.join(',')));
+    lines.push('');
+
+    // Variants section
+    lines.push('# VARIANTS');
+    lines.push(variantsHeader.join(','));
+    lines.push(...variantsRows.map(row => row.join(',')));
+
+    return lines.join('\n');
   }
 }

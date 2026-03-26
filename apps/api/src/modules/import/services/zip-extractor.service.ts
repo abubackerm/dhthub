@@ -1,8 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import AdmZip from 'adm-zip';
-import * as fs from 'fs';
-import * as path from 'path';
 import { ExtractedFiles, ZipValidationResult, CATALOG_REQUIRED_CSV_FILES, ATTRIBUTE_REQUIRED_CSV_FILES, OPTIONAL_CSV_FILES } from '../dto';
+import { StorageService } from '@modules/storage/storage.service';
 
 export type ImportType = 'CATALOG' | 'ATTRIBUTES';
 
@@ -11,20 +10,16 @@ export class ZipExtractorService {
   private readonly logger = new Logger(ZipExtractorService.name);
   private readonly allowedFiles = [...CATALOG_REQUIRED_CSV_FILES, ...ATTRIBUTE_REQUIRED_CSV_FILES, ...OPTIONAL_CSV_FILES];
 
+  constructor(private readonly storageService: StorageService) {}
+
   /**
-   * Extract ZIP file to target directory
+   * Extract ZIP file and upload to SeaweedFS
    */
   async extract(
     zipBuffer: Buffer,
-    targetDir: string,
-    importType: ImportType = 'CATALOG'
+    importType: ImportType = 'CATALOG',
   ): Promise<ExtractedFiles> {
-    this.logger.log(`Extracting ZIP to: ${targetDir} (importType: ${importType})`);
-
-    // Ensure target directory exists
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
+    this.logger.log(`Extracting ZIP and uploading to SeaweedFS (importType: ${importType})`);
 
     try {
       const zip = new AdmZip(zipBuffer);
@@ -37,44 +32,55 @@ export class ZipExtractorService {
           continue;
         }
 
-        const baseName = path.basename(entry.entryName);
+        const baseName = this.sanitizeFileName(entry.entryName);
         // Normalize: strip _template suffix (e.g. variants_template.csv -> variants.csv)
         const normalizedName = baseName.replace(/_template\.csv$/i, '.csv');
 
         if (!this.allowedFiles.includes(normalizedName)) {
+          this.logger.debug(`Skipping disallowed file: ${normalizedName}`);
           continue;
         }
 
-        const filePath = path.join(targetDir, normalizedName);
         const data = entry.getData();
-        fs.writeFileSync(filePath, data);
+        
+        // Upload to SeaweedFS
+        const timestamp = Date.now();
+        const date = new Date(timestamp);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const storageKey = `/imports/${year}/${month}/extracted/${timestamp}-${normalizedName}`;
+        const fileUrl = await this.storageService.uploadFile(
+          storageKey,
+          data,
+          'text/csv',
+        );
 
-        this.logger.debug(`Extracted: ${entry.entryName} -> ${filePath}`);
+        this.logger.debug(`Extracted and uploaded: ${entry.entryName} -> ${fileUrl}`);
 
         if (normalizedName === 'products.csv') {
-          extractedFiles.products = filePath;
+          extractedFiles.products = fileUrl;
         } else if (normalizedName === 'variants.csv') {
-          extractedFiles.variants = filePath;
+          extractedFiles.variants = fileUrl;
         } else if (normalizedName === 'images.csv') {
-          extractedFiles.images = filePath;
+          extractedFiles.images = fileUrl;
         } else if (normalizedName === 'attributes.csv') {
-          extractedFiles.attributes = filePath;
+          extractedFiles.attributes = fileUrl;
         } else if (normalizedName === 'attribute-options.csv') {
-          extractedFiles.attributeOptions = filePath;
+          extractedFiles.attributeOptions = fileUrl;
         }
       }
 
       // Validate based on import type
       if (importType === 'CATALOG' && !extractedFiles.variants) {
         throw new BadRequestException(
-          'variants.csv is required but not found in the ZIP archive. ' +
+          'variants.csv is required but not found in ZIP archive. ' +
           'Accepted names: variants.csv or variants_template.csv (at root or inside a folder).',
         );
       }
 
       if (importType === 'ATTRIBUTES' && !extractedFiles.attributes) {
         throw new BadRequestException(
-          'attributes.csv is required but not found in the ZIP archive. ' +
+          'attributes.csv is required but not found in ZIP archive. ' +
           'Accepted names: attributes.csv or attributes_template.csv (at root or inside a folder).',
         );
       }
@@ -88,6 +94,14 @@ export class ZipExtractorService {
   }
 
   /**
+   * Sanitize filename from ZIP entry (remove path prefixes)
+   */
+  private sanitizeFileName(entryName: string): string {
+    const parts = entryName.split('/');
+    return parts[parts.length - 1];
+  }
+
+  /**
    * Validate that required files are present in extracted files
    */
   validateRequiredFiles(files: ExtractedFiles, importType: ImportType = 'CATALOG'): ZipValidationResult {
@@ -95,12 +109,12 @@ export class ZipExtractorService {
 
     // Check required files based on import type
     if (importType === 'CATALOG') {
-      if (!files.variants || !fs.existsSync(files.variants)) {
-        errors.push('variants.csv is required but not found in the archive');
+      if (!files.variants) {
+        errors.push('variants.csv is required but not found in archive');
       }
     } else if (importType === 'ATTRIBUTES') {
-      if (!files.attributes || !fs.existsSync(files.attributes)) {
-        errors.push('attributes.csv is required but not found in the archive');
+      if (!files.attributes) {
+        errors.push('attributes.csv is required but not found in archive');
       }
     }
 
@@ -111,7 +125,7 @@ export class ZipExtractorService {
       const key = this.mapFileNameToKey(optional);
       const filePath = files[key as keyof ExtractedFiles];
 
-      if (filePath && fs.existsSync(filePath)) {
+      if (filePath) {
         presentFiles.push(optional);
       } else {
         missingOptionalFiles.push(optional);
@@ -129,17 +143,23 @@ export class ZipExtractorService {
   }
 
   /**
-   * Clean up extracted files after processing
+   * Clean up extracted files from SeaweedFS after processing
    */
-  async cleanup(targetDir: string): Promise<void> {
-    try {
-      if (fs.existsSync(targetDir)) {
-        fs.rmSync(targetDir, { recursive: true, force: true });
-        this.logger.debug(`Cleaned up extraction directory: ${targetDir}`);
+  async cleanup(files: ExtractedFiles): Promise<void> {
+    for (const [_key, fileUrl] of Object.entries(files)) {
+      if (!fileUrl) continue;
+
+      try {
+        // Extract storage key from SeaweedFS URL
+        const urlParts = new URL(fileUrl);
+        const storageKey = urlParts.pathname;
+
+        await this.storageService.deleteFile(storageKey);
+        this.logger.debug(`Cleaned up extracted file from SeaweedFS: ${storageKey}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to cleanup extracted file ${fileUrl}: ${errorMessage}`);
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to cleanup extraction directory ${targetDir}: ${errorMessage}`);
     }
   }
 
@@ -155,42 +175,5 @@ export class ZipExtractorService {
       'attribute-options.csv': 'attributeOptions',
     };
     return mapping[fileName] || fileName;
-  }
-
-  /**
-   * Get file size in bytes
-   */
-  getFileSize(filePath: string): number {
-    try {
-      const stats = fs.statSync(filePath);
-      return stats.size;
-    } catch (error) {
-      this.logger.warn(`Failed to get file size for ${filePath}`);
-      return 0;
-    }
-  }
-
-  /**
-   * Count lines in CSV file (for progress tracking)
-   */
-  async countCsvLines(filePath: string): Promise<number> {
-    return new Promise((resolve, reject) => {
-      let count = 0;
-      const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
-
-      stream.on('data', (chunk: string | Buffer) => {
-        const lines = (typeof chunk === 'string' ? chunk : chunk.toString()).split('\n');
-        count += lines.length - 1; // -1 because last line might not have newline
-      });
-
-      stream.on('end', () => {
-        // Subtract header row
-        resolve(Math.max(0, count - 1));
-      });
-
-      stream.on('error', (error) => {
-        reject(error);
-      });
-    });
   }
 }

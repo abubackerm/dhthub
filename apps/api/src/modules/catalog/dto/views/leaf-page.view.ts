@@ -31,6 +31,17 @@ export interface LeafProductView {
   description: string | null;
   images: { url: string; altText: string | null; isPrimary: boolean }[];
   variants: LeafVariantView[];
+  tableColumns: LeafTableColumnView[];
+}
+
+export interface LeafTableColumnView {
+  id: string;
+  position: number;
+  attributeId: string;
+  attributeName: string;
+  attributeSlug: string;
+  dataType: string;
+  unitSymbol: string | null;
 }
 
 export interface LeafCellView {
@@ -153,6 +164,15 @@ export class LeafPageView {
       variants: (product.variants || []).map((variant: any) =>
         LeafPageView.mapVariant(variant)
       ),
+      tableColumns: (product.tableColumns || []).map((tc: any) => ({
+        id: tc.id,
+        position: tc.position,
+        attributeId: tc.attribute.id,
+        attributeName: tc.attribute.name,
+        attributeSlug: tc.attribute.slug,
+        dataType: tc.attribute.dataType,
+        unitSymbol: tc.attribute.unit?.symbol || null,
+      })),
     };
   }
 

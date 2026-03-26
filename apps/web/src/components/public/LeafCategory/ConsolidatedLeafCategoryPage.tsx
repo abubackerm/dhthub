@@ -86,7 +86,14 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
     return () => setFilterData(null);
   }, [data, allVariants, basePath, setFilterData]);
 
-  const totalVariantCount = useMemo(() => allVariants.length, [allVariants]);
+  const totalVariantCount = useMemo(() => {
+    if (!data?.leafCategories) return 0;
+    const variantCount = allVariants.length;
+    if (variantCount > 0) return variantCount;
+    let productCount = 0;
+    data.leafCategories.forEach(lc => lc.cells.forEach(c => { productCount += c.products.length; }));
+    return productCount;
+  }, [data?.leafCategories, allVariants]);
 
   const filteredLeafCategories = useMemo(() => {
     if (!data?.leafCategories || !data?.filterableAttributes) return data?.leafCategories ?? [];
@@ -103,6 +110,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
             products: cell.products
               .map((product) => ({
                 ...product,
+                _hadVariants: product.variants.length > 0,
                 variants: product.variants.filter((variant) => {
                   return data.filterableAttributes.every((attr) => {
                     const attrValue = getAttributeValue(variant.attributeValues, attr.id);
@@ -124,7 +132,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
                   });
                 }),
               }))
-              .filter((product) => product.variants.length > 0),
+              .filter((product) => product.variants.length > 0 || !product._hadVariants),
           }))
           .filter((cell) => cell.products.length > 0),
       }))
@@ -294,7 +302,24 @@ function ProductSection({
   basePath: string;
   leafSlug: string;
 }) {
-  if (product.variants.length === 0) return null;
+  if (product.variants.length === 0) {
+    const productBasePath = `${basePath}/${leafSlug}`;
+    return (
+      <div className="mb-6">
+        <h2 className="text-lg font-medium text-foreground mb-2">
+          <Link
+            href={`${productBasePath}/${product.slug}`}
+            className="hover:text-(--dht-red) transition-colors"
+          >
+            {product.name}
+          </Link>
+        </h2>
+        {product.description && (
+          <p className="text-sm text-muted-foreground mb-2 max-w-3xl">{product.description}</p>
+        )}
+      </div>
+    );
+  }
 
   const productBasePath = `${basePath}/${leafSlug}`;
 

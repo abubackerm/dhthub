@@ -31,6 +31,19 @@ export async function getProducts(
   return apiClient.get<PaginatedResponse<ProductView>>(endpoint);
 }
 
+export async function searchProducts(
+  query: string,
+  limit: number = 50,
+): Promise<PaginatedResponse<ProductView>> {
+  const searchParams = new URLSearchParams();
+  searchParams.set('search', query);
+  searchParams.set('pageSize', String(limit));
+  searchParams.set('page', '1');
+
+  const qs = searchParams.toString();
+  return apiClient.get<PaginatedResponse<ProductView>>(`/v1/catalog/products?${qs}`);
+}
+
 export async function getProductById(id: string): Promise<ProductView> {
   return apiClient.get<ProductView>(`/v1/catalog/products/${id}`);
 }
@@ -121,4 +134,10 @@ export async function getVariantImages(
   return apiClient.get(`/v1/catalog/products/${productId}/variants/${variantId}/images`);
 }
 
+export async function exportProducts(productIds?: string[]): Promise<{ filename: string; contentType: string; content: string }> {
+  return apiClient.post('/v1/catalog/products/export', {
+    productIds,
+    exportAll: !productIds || productIds.length === 0,
+  });
+}
 

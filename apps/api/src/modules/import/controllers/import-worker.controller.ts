@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Get, Logger, BadRequestException } from '@nestjs/common';
 import { ZipExtractorService } from '../services/zip-extractor.service';
+import { ExtractedFiles } from '../dto/extracted-files.dto';
 import { CatalogImportService } from '../services/catalog-import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImageImportService, ImageUploadStrategy } from '../services/image-import.service';
@@ -59,12 +60,11 @@ export class ImportWorkerController {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
     }
 
-    let extractDir: string | undefined;
+    let extractedFiles: ExtractedFiles | undefined;
 
     try {
       const zipBuffer = fs.readFileSync(filePath);
-      extractDir = path.join(process.cwd(), 'uploads', 'import', 'extracted', jobId);
-      const extractedFiles = await this.zipExtractorService.extract(zipBuffer, extractDir);
+      extractedFiles = await this.zipExtractorService.extract(zipBuffer, 'CATALOG');
 
       this.logger.log(`[processCatalog] Extracted files: ${JSON.stringify(extractedFiles)}`);
 
@@ -76,8 +76,8 @@ export class ImportWorkerController {
       this.logger.error(`[processCatalog] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
     } finally {
-      if (extractDir) {
-        await this.zipExtractorService.cleanup(extractDir).catch(() => {});
+      if (extractedFiles) {
+        await this.zipExtractorService.cleanup(extractedFiles).catch(() => {});
       }
     }
   }

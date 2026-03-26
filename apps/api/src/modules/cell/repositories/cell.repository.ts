@@ -236,4 +236,16 @@ export class CellRepository {
 
     return map;
   }
+
+  async findByIds(ids: string[]): Promise<Array<{ id: string; slug: string; sku: string | null }>> {
+    if (ids.length === 0) return [];
+    return this.db.cell.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        slug: true,
+        sku: true,
+      },
+    });
+  }
 }

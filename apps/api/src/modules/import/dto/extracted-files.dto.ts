@@ -16,3 +16,9 @@ export interface ZipValidationResult {
 export const CATALOG_REQUIRED_CSV_FILES = ['variants.csv'];
 export const ATTRIBUTE_REQUIRED_CSV_FILES = ['attributes.csv'];
 export const OPTIONAL_CSV_FILES = ['products.csv', 'images.csv', 'attribute-options.csv'];
+
+export interface ExtractedFileInfo {
+  fileName: string;
+  url: string;
+  storageKey: string;
+}

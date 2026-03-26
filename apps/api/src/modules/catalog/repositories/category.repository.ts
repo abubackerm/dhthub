@@ -299,6 +299,16 @@ export class CategoryRepository {
                 },
               },
             },
+            tableColumns: {
+              orderBy: { position: 'asc' },
+              include: {
+                attribute: {
+                  include: {
+                    unit: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -418,6 +428,16 @@ export class CategoryRepository {
                           },
                         },
                         option: true,
+                      },
+                    },
+                  },
+                },
+                tableColumns: {
+                  orderBy: { position: 'asc' },
+                  include: {
+                    attribute: {
+                      include: {
+                        unit: true,
                       },
                     },
                   },

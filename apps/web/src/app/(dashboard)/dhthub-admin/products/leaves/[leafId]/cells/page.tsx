@@ -59,7 +59,8 @@ function CellSku({ cellId }: CellSkuProps) {
   const skuCount = useMemo(() => {
     if (!productsData?.data?.length) return 0
     const allVariants = productsData.data.flatMap(p => p.variants || [])
-    return allVariants.length
+    if (allVariants.length > 0) return allVariants.length
+    return productsData.data.length
   }, [productsData])
 
   return <span className="text-sm">{skuCount}</span>
@@ -77,7 +78,8 @@ function CellStock({ cellId }: CellStockProps) {
   const totalStock = useMemo(() => {
     if (!productsData?.data?.length) return 0
     const allVariants = productsData.data.flatMap(p => p.variants || [])
-    return allVariants.reduce((acc, v) => acc + v.quantity, 0)
+    if (allVariants.length > 0) return allVariants.reduce((acc, v) => acc + v.quantity, 0)
+    return productsData.data.reduce((acc, p) => acc + (p.quantity || 0), 0)
   }, [productsData])
 
   return <span className="text-sm">{totalStock}</span>
@@ -97,7 +99,14 @@ function CellPrice({ cellId }: CellPriceProps) {
     const allVariants = productsData.data.flatMap(p => p.variants || [])
     const prices = allVariants.map(v => v.price).filter((p): p is number => p !== null)
 
-    if (prices.length === 0) return "-"
+    if (prices.length === 0) {
+      const productPrices = productsData.data.map(p => p.price).filter((p): p is number => p !== null)
+      if (productPrices.length === 0) return "-"
+      const minPrice = Math.min(...productPrices)
+      const maxPrice = Math.max(...productPrices)
+      if (minPrice === maxPrice) return `$${minPrice.toFixed(2)}`
+      return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+    }
 
     const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)

@@ -74,6 +74,7 @@ export class ImportErrorRepository {
       rowNumber: number;
       sku?: string | null;
       message: string;
+      rawData?: any;
     }>,
   ): Promise<{ count: number }> {
     return this.getClient().importError.createMany({

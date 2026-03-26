@@ -69,10 +69,16 @@ export async function searchCategories(query: string, limit = 20, leafOnly = tru
   );
 }
 
-export async function downloadTemplate(cellId?: string) {
-  const endpoint = cellId
-    ? `/v1/import/template?cellId=${encodeURIComponent(cellId)}`
-    : '/v1/import/template';
+export async function downloadTemplate(options?: { cellId?: string; mode?: 'create' | 'edit' }) {
+  const params = new URLSearchParams();
+  if (options?.cellId) {
+    params.set('cellId', options.cellId);
+  }
+  if (options?.mode) {
+    params.set('mode', options.mode);
+  }
+  const query = params.toString();
+  const endpoint = `/v1/import/template${query ? `?${query}` : ''}`;
   return apiClient.get<{
     filename: string;
     headers: Array<{ name: string; required: boolean; description: string }>;
@@ -115,6 +121,7 @@ export async function createImportJob(
     createdBy?: string;
     mode: ImportMode;
     warehouseId?: string;
+    importType?: string;
   },
 ): Promise<CreateImportJobResponse> {
   const formData = new FormData();
@@ -125,6 +132,9 @@ export async function createImportJob(
   formData.append('mode', options.mode);
   if (options.warehouseId) {
     formData.append('warehouseId', options.warehouseId);
+  }
+  if (options.importType) {
+    formData.append('importType', options.importType);
   }
 
   const endpoint = '/v1/import/jobs';
@@ -193,6 +203,7 @@ export interface ImportJobWithErrorsView extends ImportJobView {
     rowNumber: number;
     sku: string | null;
     message: string;
+    rawData: Record<string, unknown> | null;
     createdAt: string;
   }>;
   errorCount: number;
@@ -244,6 +255,16 @@ export async function downloadTemplatePack() {
   return apiClient.get<{
     filename: string;
     contentType: string;
+    content: string;
+  }>(endpoint);
+}
+
+export async function downloadVariantsTemplate() {
+  const endpoint = '/v1/import/variants-template';
+  return apiClient.get<{
+    filename: string;
+    headers: Array<{ name: string; required: boolean; description: string }>;
+    description: string;
     content: string;
   }>(endpoint);
 }

@@ -16,6 +16,7 @@ import {
   Upload,
   Copy,
   Check,
+  AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -113,6 +114,27 @@ function getCategoryType(category: CategoryTreeNode): "BRANCH" | "LEAF" {
   return category.children.length === 0 ? "LEAF" : "BRANCH"
 }
 
+function isMixedBranch(category: CategoryTreeNode): boolean {
+  if (category.children.length === 0) return false;
+  const hasLeafChild = category.children.some(c => c.children.length === 0);
+  const hasBranchChild = category.children.some(c => c.children.length > 0);
+  return hasLeafChild && hasBranchChild;
+}
+
+function hasMixedDescendant(category: CategoryTreeNode): boolean {
+  if (isMixedBranch(category)) return true;
+  return category.children.some(child => hasMixedDescendant(child));
+}
+
+function countMixedBranches(categories: CategoryTreeNode[]): number {
+  let count = 0;
+  for (const cat of categories) {
+    if (isMixedBranch(cat)) count++;
+    count += countMixedBranches(cat.children);
+  }
+  return count;
+}
+
 interface CategoryTreeItemProps {
   category: CategoryTreeNode
   depth: number
@@ -143,6 +165,8 @@ function CategoryTreeItem({
   const hasChildren = category.children.length > 0
   const isExpanded = expandedIds.has(category.id)
   const isLeaf = getCategoryType(category) === "LEAF"
+  const showsMixedWarning = hasMixedDescendant(category)
+  const isDirectlyMixed = isMixedBranch(category)
   const childCount = category.children.length
 
   return (
@@ -171,7 +195,16 @@ function CategoryTreeItem({
         {isLeaf ? (
           <Tag className="h-4 w-4 text-blue-500" />
         ) : (
-          <Folder className="h-4 w-4 text-amber-500" />
+          <Folder className={`h-4 w-4 ${isDirectlyMixed ? "text-yellow-500" : "text-amber-500"}`} />
+        )}
+
+        {showsMixedWarning && (
+          <AlertTriangle
+            className="h-4 w-4 text-red-500"
+            title={isDirectlyMixed
+              ? "This branch has both leaf and branch children. The public page will not show consolidated leaf view. Consider restructuring so all children are either all leaves or all branches."
+              : "This branch contains mixed subcategories. Expand to see which branches have both leaf and branch children."}
+          />
         )}
 
         {/* Image thumbnail */}
@@ -215,8 +248,11 @@ function CategoryTreeItem({
         )}
 
         {/* Type badge */}
-        <Badge variant={isLeaf ? "default" : "secondary"} className="text-xs">
-          {isLeaf ? "LEAF" : "BRANCH"}
+        <Badge
+          variant={isLeaf ? "default" : isDirectlyMixed ? "outline" : "secondary"}
+          className={`text-xs ${isDirectlyMixed ? "border-red-500 text-red-600 bg-red-50" : ""}`}
+        >
+          {isLeaf ? "LEAF" : isDirectlyMixed ? "MIXED BRANCH" : "BRANCH"}
         </Badge>
 
         {/* Count info */}
@@ -327,6 +363,7 @@ export default function CategoriesPage() {
   const [selectedCategoryForCells, setSelectedCategoryForCells] = useState<CategoryTreeNode | null>(null)
 
   const allCategoriesFlat = useMemo(() => getAllCategoriesFlat(categories), [categories])
+  const mixedBranchCount = useMemo(() => countMixedBranches(categories), [categories])
 
   const handleToggle = (id: string) => {
     setExpandedIds((prev) => {
@@ -638,7 +675,15 @@ export default function CategoriesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Category Tree</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            Category Tree
+            {mixedBranchCount > 0 && (
+              <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50 text-xs font-normal">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                {mixedBranchCount} mixed {mixedBranchCount === 1 ? "branch" : "branches"}
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
             Manage your product categorization hierarchy
           </CardDescription>

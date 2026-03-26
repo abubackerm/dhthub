@@ -114,6 +114,7 @@ export class ImportProgressService {
   async recordErrors(
     jobId: string,
     errors: ValidationError[],
+    type: 'error' | 'success' = 'error',
   ): Promise<void> {
     if (errors.length === 0) {
       return;
@@ -125,17 +126,18 @@ export class ImportProgressService {
         rowNumber: e.rowNumber,
         sku: e.sku ?? null,
         message: `${e.field ? `[${e.field}] ` : ''}${e.message}`,
+        rawData: { type } as Record<string, string>,
       }));
 
       await this.importErrorRepository.createMany(errorRecords);
 
       this.logger.debug(
-        `Recorded ${errors.length} errors for job ${jobId}`,
+        `Recorded ${errors.length} ${type} records for job ${jobId}`,
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to record errors for job ${jobId}: ${errorMessage}`,
+        `Failed to record ${type} records for job ${jobId}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error;

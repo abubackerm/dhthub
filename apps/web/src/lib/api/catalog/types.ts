@@ -318,6 +318,17 @@ export interface LeafProductView {
   description: string | null;
   images: { url: string; altText: string | null; isPrimary: boolean }[];
   variants: LeafVariantView[];
+  tableColumns: LeafTableColumnView[];
+}
+
+export interface LeafTableColumnView {
+  id: string;
+  position: number;
+  attributeId: string;
+  attributeName: string;
+  attributeSlug: string;
+  dataType: string;
+  unitSymbol: string | null;
 }
 
 export interface LeafCellView {

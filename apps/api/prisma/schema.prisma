@@ -183,9 +183,10 @@ model Product {
   createdBy      String?       @map("created_by")
   updatedBy      String?       @map("updated_by")
 
-  cell     Cell?            @relation(fields: [cellId], references: [id])
-  variants ProductVariant[]
-  images   ProductImage[]
+  cell        Cell?              @relation(fields: [cellId], references: [id])
+  variants    ProductVariant[]
+  images      ProductImage[]
+  tableColumns ProductTableColumn[]
 
   @@index([status])
   @@index([cellId])
@@ -318,6 +319,22 @@ model VariantImage {
   @@map("variant_images")
 }
 
+model ProductTableColumn {
+  id          String   @id @default(cuid())
+  productId   String   @map("product_id")
+  attributeId String   @map("attribute_id")
+  position    Int      @map("position")      // Order 1-15
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute AttributeDefinition @relation(fields: [attributeId], references: [id])
+
+  @@unique([productId, position])
+  @@unique([productId, attributeId])
+  @@map("product_table_columns")
+}
+
 // ============================================
 // ATTRIBUTE SYSTEM - Structured Product Attributes
 // ============================================
@@ -356,6 +373,7 @@ model AttributeDefinition {
   values             VariantAttributeValue[]
   categoryAttributes CategoryAttribute[]
   cellAttributes     CellAttribute[]
+  productTableColumns ProductTableColumn[]
 
   @@index([slug])
   @@index([dataType])

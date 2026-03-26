@@ -43,9 +43,8 @@ export class AuditService {
   }
 
   private extractIpAddress(): string | undefined {
-    if (!this.request) return undefined;
+    if (!this.request?.headers) return undefined;
 
-    // Check forwarded headers first (Fastify headers are plain objects)
     const forwarded = this.request.headers['x-forwarded-for'] as string;
     if (forwarded) {
       return forwarded.split(',')[0]?.trim();
@@ -56,12 +55,11 @@ export class AuditService {
       return realIp;
     }
 
-    // Fastify provides IP via .ip property
     return this.request.ip || undefined;
   }
 
   private extractUserAgent(): string | undefined {
-    if (!this.request) return undefined;
+    if (!this.request?.headers) return undefined;
     const userAgent = this.request.headers['user-agent'] as string;
     return userAgent || undefined;
   }

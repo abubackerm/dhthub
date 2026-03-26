@@ -270,9 +270,12 @@ export class ImportController {
    * GET /v1/import/template
    */
   @Get('template')
-  async getTemplate(@Query('cellId') cellId?: string) {
-    const templateInfo = await this.importService.getTemplateInfo(cellId);
-    const templateContent = await this.importService.getTemplate(cellId);
+  async getTemplate(
+    @Query('cellId') cellId?: string,
+    @Query('mode') mode?: 'create' | 'edit',
+  ) {
+    const templateInfo = await this.importService.getTemplateInfo(cellId, mode);
+    const templateContent = await this.importService.getTemplate(cellId, mode);
 
     return {
       filename: templateInfo.filename,
@@ -287,9 +290,12 @@ export class ImportController {
    * GET /v1/import/template/download
    */
   @Get('template/download')
-  async downloadTemplate(@Query('cellId') cellId?: string) {
-    const templateContent = await this.importService.getTemplate(cellId);
-    const templateInfo = await this.importService.getTemplateInfo(cellId);
+  async downloadTemplate(
+    @Query('cellId') cellId?: string,
+    @Query('mode') mode?: 'create' | 'edit',
+  ) {
+    const templateContent = await this.importService.getTemplate(cellId, mode);
+    const templateInfo = await this.importService.getTemplateInfo(cellId, mode);
 
     return {
       filename: templateInfo.filename,
@@ -310,6 +316,31 @@ export class ImportController {
       filename: 'catalog-import-templates.zip',
       contentType: 'application/zip',
       content: zipBuffer.toString('base64'),
+    };
+  }
+
+  /**
+   * Download variants template (CSV only)
+   * GET /v1/import/variants-template
+   */
+  @Get('variants-template')
+  async getVariantsTemplate() {
+    const variantsTemplate = this.templatePackService.generateVariantsTemplate();
+    const headers = [
+      { name: 'product_sku', required: true, description: 'Product SKU to create variants for' },
+      { name: 'stock', required: false, description: 'Inventory quantity (integer, defaults to 0)' },
+      { name: 'price', required: false, description: 'Unit price in dollars (decimal, defaults to 0)' },
+      { name: 'diameter', required: false, description: 'Diameter attribute value' },
+      { name: 'length', required: false, description: 'Length attribute value' },
+      { name: 'material', required: false, description: 'Material attribute value' },
+      { name: 'finish', required: false, description: 'Finish attribute value' },
+    ];
+
+    return {
+      filename: 'variants_template.csv',
+      headers,
+      description: 'Template for product variants with attribute values. Each row creates a variant for the specified product.',
+      content: variantsTemplate,
     };
   }
 
@@ -426,6 +457,7 @@ export class ImportController {
       rowNumber: error.rowNumber,
       sku: error.sku,
       message: error.message,
+      rawData: error.rawData,
       createdAt: error.createdAt,
     };
   }

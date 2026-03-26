@@ -5,9 +5,11 @@ import { ImportValidationService, ValidationResult } from './import-validation.s
 import { ImportFileType, ImportMode, ImportType } from '../entities';
 import { InvalidFileFormatError, InvalidImportDataError } from '../domain/errors/import.errors';
 import { Readable } from 'stream';
-import * as fs from 'fs';
-import * as path from 'path';
-import { CellRepository } from '@modules/cell/repositories/cell.repository';
+import { StorageService } from '@modules/storage/storage.service';
+import { ProductRepository } from '@modules/catalog/repositories/product.repository';
+import { ProductVariantRepository } from '@modules/catalog/repositories/product-variant.repository';
+import { ProductTableColumnRepository } from '@modules/catalog/repositories/product-table-column.repository';
+import { CellRepository } from '@modules/cell';
 
 export interface UploadResult {
   jobId: string;
@@ -42,8 +44,6 @@ export interface ValidateOnlyResult {
 @Injectable()
 export class ImportService {
   private readonly logger = new Logger(ImportService.name);
-  private readonly uploadDir = path.join(process.cwd(), 'uploads', 'import');
-
   private readonly maxFileSizeBytes = 200 * 1024 * 1024; // 200MB
   private readonly maxRows = 500_000;
 
@@ -51,20 +51,12 @@ export class ImportService {
     private readonly importJobService: ImportJobService,
     private readonly csvParserService: CsvParserService,
     private readonly importValidationService: ImportValidationService,
-    private readonly cellRepository: CellRepository,
-  ) {
-    this.ensureUploadDirectory();
-  }
-
-  /**
-   * Ensure upload directory exists
-   */
-  private ensureUploadDirectory(): void {
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-      this.logger.debug(`Created upload directory: ${this.uploadDir}`);
-    }
-  }
+    private readonly storageService: StorageService,
+    private readonly productRepo: ProductRepository,
+    private readonly variantRepo: ProductVariantRepository,
+    private readonly productTableColumnRepo: ProductTableColumnRepository,
+    private readonly cellRepo: CellRepository,
+  ) {}
 
   /**
    * Upload CSV file and create import job
@@ -94,24 +86,19 @@ export class ImportService {
 
     this.logger.log(`Uploading CSV file: ${originalname} (${file.size} bytes)`);
 
-    // Save file to local filesystem
+    // Save file to SeaweedFS
     const timestamp = Date.now();
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const storageFileName = `${timestamp}-${originalname}`;
-    const relativePath = path.join('imports', `${year}`, `${month}`, storageFileName);
-    const filePath = path.join(this.uploadDir, relativePath);
-    const fileUrl = `/uploads/import/${relativePath.replace(/\\/g, '/')}`;
+    const storageKey = `/imports/${year}/${month}/${timestamp}-${originalname}`;
+    const fileUrl = await this.storageService.uploadFile(
+      storageKey,
+      file.buffer,
+      'text/csv',
+    );
 
-    const fileDir = path.dirname(filePath);
-    if (!fs.existsSync(fileDir)) {
-      fs.mkdirSync(fileDir, { recursive: true });
-    }
-
-    fs.writeFileSync(filePath, file.buffer);
-
-    this.logger.debug(`File saved to: ${filePath}`);
+    this.logger.debug(`File uploaded to SeaweedFS: ${fileUrl}`);
 
     // Count rows in CSV
     const fileStream = Readable.from(file.buffer);
@@ -134,7 +121,7 @@ export class ImportService {
       createdBy: options?.createdBy,
       mode: options?.mode ?? undefined,
       warehouseId: options?.warehouseId ?? undefined,
-      originalFilePath: relativePath.replace(/\\/g, '/'),
+      originalFilePath: storageKey,
       importType: options?.importType,
     });
 
@@ -177,24 +164,19 @@ export class ImportService {
 
     this.logger.log(`Uploading ZIP file: ${originalname} (${file.size} bytes)`);
 
-    // Save file to local filesystem
+    // Save file to SeaweedFS
     const timestamp = Date.now();
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const storageFileName = `${timestamp}-${originalname}`;
-    const relativePath = path.join('imports', `${year}`, `${month}`, storageFileName);
-    const filePath = path.join(this.uploadDir, relativePath);
-    const fileUrl = `/uploads/import/${relativePath.replace(/\\/g, '/')}`;
+    const storageKey = `/imports/${year}/${month}/${timestamp}-${originalname}`;
+    const fileUrl = await this.storageService.uploadFile(
+      storageKey,
+      file.buffer,
+      'application/zip',
+    );
 
-    const fileDir = path.dirname(filePath);
-    if (!fs.existsSync(fileDir)) {
-      fs.mkdirSync(fileDir, { recursive: true });
-    }
-
-    fs.writeFileSync(filePath, file.buffer);
-
-    this.logger.debug(`File saved to: ${filePath}`);
+    this.logger.debug(`File uploaded to SeaweedFS: ${fileUrl}`);
 
     // Create import job (will process ZIP later in worker)
     const job = await this.importJobService.create({
@@ -206,7 +188,7 @@ export class ImportService {
       createdBy: options?.createdBy,
       mode: options?.mode ?? undefined,
       warehouseId: options?.warehouseId ?? undefined,
-      originalFilePath: relativePath.replace(/\\/g, '/'),
+      originalFilePath: storageKey,
       importType: options?.importType,
     });
 
@@ -296,191 +278,139 @@ export class ImportService {
   }
 
   /**
-   * Get CSV template content
-   */
-  async getTemplate(cellId?: string): Promise<string> {
-    // Base columns that are always present
-    const baseHeaders = ['productName', 'sku', 'cell', 'price', 'stock'];
-
-    if (!cellId) {
-      // Fallback to a generic template when no cell is provided
-      const headers = [
-        'productName',
-        'sku',
-        'cell',
-        'diameter',
-        'length',
-        'material',
-        'finish',
-        'price',
-        'stock',
-      ];
-
-      const exampleRow = [
-        'Hex Bolt M8',
-        'BOLT-M8-20-ZINC',
-        'hex-bolts-standard',
-        '8',
-        '20',
-        'steel',
-        'zinc',
-        '0.50',
-        '1000',
-      ];
-
-      const additionalRows = [
-        [
-          'Hex Bolt M8',
-          'BOLT-M8-25-ZINC',
-          'hex-bolts-standard',
-          '8',
-          '25',
-          'steel',
-          'zinc',
-          '0.55',
-          '1000',
-        ],
-        [
-          'Hex Bolt M10',
-          'BOLT-M10-30-ZINC',
-          'hex-bolts-standard',
-          '10',
-          '30',
-          'steel',
-          'zinc',
-          '0.75',
-          '500',
-        ],
-      ];
-
-      return [
-        headers.join(','),
-        exampleRow.join(','),
-        ...additionalRows.map((r) => r.join(',')),
-      ].join('\n');
-    }
-
-    // Cell-specific template: include dynamic attribute columns based on assigned attributes
-    const cell = await this.cellRepository.findById(cellId);
-    const cellSlug = cell?.slug ?? 'unknown-cell';
-
-    const cellAttributes = await this.cellRepository.getAttributes(cellId);
-    const attributeHeaders = cellAttributes
-      .map((ca) => ca.attribute)
-      .filter((attr): attr is { slug: string } => Boolean(attr && (attr as any).slug))
-      .map((attr) => (attr as any).slug as string);
-
-    const headers = [
-      ...baseHeaders.slice(0, 3), // productName, sku, cell
-      ...attributeHeaders,
-      ...baseHeaders.slice(3), // price, stock
-    ];
-
-    const exampleRow = [
-      'Example Product',
-      'SKU-001',
-      cellSlug,
-      ...attributeHeaders.map(() => ''),
-      '0.50',
-      '1000',
-    ];
-
-    return [headers.join(','), exampleRow.join(',')].join('\n');
-  }
-
-  /**
    * Get CSV template headers and description
    */
-  async getTemplateInfo(cellId?: string) {
-    if (!cellId) {
-      return {
-        filename: 'product-import-template.csv',
-        headers: [
-          { name: 'productName', required: true, description: 'Product name' },
-          { name: 'sku', required: true, description: 'Unique SKU' },
-          {
-            name: 'cell',
-            required: true,
-            description: 'Cell slug (e.g., hex-bolts-standard)',
-          },
-          { name: 'diameter', required: false, description: 'Numeric attribute' },
-          { name: 'length', required: false, description: 'Numeric attribute' },
-          { name: 'material', required: false, description: 'Text/enum attribute' },
-          { name: 'finish', required: false, description: 'Text/enum attribute' },
-          { name: 'price', required: true, description: 'Unit price' },
-          { name: 'stock', required: true, description: 'Stock quantity' },
-        ],
-        description:
-          'Template for bulk product import. Additional columns map to attribute slugs dynamically.',
-      };
+  async getTemplateInfo(_cellId?: string, mode?: 'create' | 'edit') {
+    // Build header list based on mode
+    const headers = [];
+
+    // Add product_sku only for edit mode
+    if (mode === 'edit') {
+      headers.push({ name: 'product_sku', required: true, description: 'User-provided product identifier (for edit mode matching)' });
     }
 
-    const cellAttributes = await this.cellRepository.getAttributes(cellId);
-
-    const baseHeaders = [
-      { name: 'productName', required: true, description: 'Product name' },
-      { name: 'sku', required: true, description: 'Unique SKU' },
-      {
-        name: 'cell',
-        required: true,
-        description: 'Cell slug (e.g., hex-bolts-standard)',
-      },
-    ];
-
-    const attributeHeaders = cellAttributes
-      .map((ca) => ca.attribute)
-      .filter(
-        (attr): attr is { slug: string; name: string; isRequired?: boolean } =>
-          Boolean(attr && (attr as any).slug && (attr as any).name),
-      )
-      .map((attr) => ({
-        name: (attr as any).slug as string,
-        required: Boolean((attr as any).isRequired),
-        description: `Attribute: ${(attr as any).name as string}`,
-      }));
-
-    const tailHeaders = [
-      { name: 'price', required: true, description: 'Unit price' },
-      { name: 'stock', required: true, description: 'Stock quantity' },
-    ];
+    headers.push(
+      { name: 'product_name', required: true, description: 'Product name' },
+      { name: 'cell_sku', required: false, description: 'Cell SKU (optional)' },
+      { name: 'at_head1', required: false, description: 'Attribute header 1 - enter attribute slug' },
+      { name: 'at_head2', required: false, description: 'Attribute header 2 - enter attribute slug' },
+      { name: 'at_head3', required: false, description: 'Attribute header 3 - enter attribute slug' },
+      { name: 'at_head4', required: false, description: 'Attribute header 4 - enter attribute slug' },
+      { name: 'at_head5', required: false, description: 'Attribute header 5 - enter attribute slug' },
+      { name: 'at_head6', required: false, description: 'Attribute header 6 - enter attribute slug' },
+      { name: 'at_head7', required: false, description: 'Attribute header 7 - enter attribute slug' },
+      { name: 'at_head8', required: false, description: 'Attribute header 8 - enter attribute slug' },
+      { name: 'at_head9', required: false, description: 'Attribute header 9 - enter attribute slug' },
+      { name: 'at_head10', required: false, description: 'Attribute header 10 - enter attribute slug' },
+      { name: 'at_head11', required: false, description: 'Attribute header 11 - enter attribute slug' },
+      { name: 'at_head12', required: false, description: 'Attribute header 12 - enter attribute slug' },
+      { name: 'at_head13', required: false, description: 'Attribute header 13 - enter attribute slug' },
+      { name: 'at_head14', required: false, description: 'Attribute header 14 - enter attribute slug' },
+      { name: 'at_head15', required: false, description: 'Attribute header 15 - enter attribute slug' },
+      { name: 'description', required: false, description: 'Product description' },
+    );
 
     return {
-      filename: 'product-import-template.csv',
-      headers: [...baseHeaders, ...attributeHeaders, ...tailHeaders],
-      description:
-        'Template for bulk product import into the selected cell. Attribute columns are generated from the cell schema.',
+      filename: mode === 'edit' ? 'products-edit-template.csv' : 'products-template.csv',
+      headers,
+      description: mode === 'edit'
+        ? 'Template for editing existing products. Contains all current product data. Edit values and upload to update.'
+        : 'Template for bulk product import. SKUs are auto-generated.',
     };
   }
 
   /**
-   * Clean up uploaded file after processing
+   * Get CSV template content as string
    */
-  async cleanupFile(fileUrl: string): Promise<void> {
-    try {
-      const fileName = path.basename(fileUrl);
-      const filePath = path.join(this.uploadDir, fileName);
+  async getTemplate(_cellId?: string, mode?: 'create' | 'edit'): Promise<string> {
+    // Build headers based on mode
+    const headers = [];
 
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        this.logger.debug(`Cleaned up file: ${filePath}`);
+    if (mode === 'edit') {
+      headers.push('product_sku');
+    }
+
+    headers.push(
+      'product_name',
+      'cell_sku',
+      'at_head1',
+      'at_head2',
+      'at_head3',
+      'at_head4',
+      'at_head5',
+      'at_head6',
+      'at_head7',
+      'at_head8',
+      'at_head9',
+      'at_head10',
+      'at_head11',
+      'at_head12',
+      'at_head13',
+      'at_head14',
+      'at_head15',
+      'description',
+    );
+
+    if (mode === 'edit') {
+      // Fetch all products with their variants
+      const products = await this.productRepo.findMany();
+      
+      // Fetch cell data separately for all products that have cellId
+      const cellIds = products
+        .map(p => p.cellId)
+        .filter((id): id is string => id !== null);
+      
+      const cellMap = new Map<string, { slug: string; sku: string | null }>();
+      if (cellIds.length > 0) {
+        const cells = await this.cellRepo.findByIds(cellIds);
+        cells.forEach(cell => cellMap.set(cell.id, { slug: cell.slug, sku: cell.sku }));
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to cleanup file ${fileUrl}: ${errorMessage}`);
+
+      const rows = [];
+      for (const product of products) {
+        // For each product, get its default variant or first variant
+        const variants = await this.variantRepo.findByProductId(product.id);
+        const defaultVariant = variants.find(v => v.isDefault) || variants[0];
+
+        // Get table column definitions (at_head mappings) for this product
+        const tableColumns = await this.productTableColumnRepo.findByProductIdWithDetails(product.id);
+
+        // Map table column positions to attribute slugs
+        const atHeads: string[] = Array(15).fill('');
+        for (const tc of tableColumns) {
+          if (tc.position >= 1 && tc.position <= 15 && tc.attribute?.slug) {
+            atHeads[tc.position - 1] = tc.attribute.slug;
+          }
+        }
+
+        // Get cell SKU from cellMap if product has a cellId
+        const cellSku = product.cellId ? cellMap.get(product.cellId)?.sku || '' : '';
+
+        const row = [
+          defaultVariant?.sku || '',
+          product.name,
+          cellSku,
+          ...atHeads,
+          product.description || '',
+        ];
+        rows.push(row);
+      }
+
+      const csvRows = rows.map(row => 
+        row.map(cell => {
+          const str = String(cell ?? '');
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        }).join(',')
+      );
+
+      return [headers.join(','), ...csvRows].join('\n');
     }
-  }
 
-  /**
-   * Read file stream from local filesystem
-   */
-  readFileStream(fileUrl: string): Readable {
-    const fileName = path.basename(fileUrl);
-    const filePath = path.join(this.uploadDir, fileName);
-
-    if (!fs.existsSync(filePath)) {
-      throw new BadRequestException(`File not found: ${fileUrl}`);
-    }
-
-    return fs.createReadStream(filePath);
+    // Create mode: just return headers (no product_sku)
+    const csvString = headers.join(',') + '\n';
+    return csvString;
   }
 }

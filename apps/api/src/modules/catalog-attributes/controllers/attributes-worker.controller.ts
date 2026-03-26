@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Logger, BadRequestException } from '@nestjs/common';
 import { ZipExtractorService } from '@modules/import/services/zip-extractor.service';
+import { ExtractedFiles } from '@modules/import/dto/extracted-files.dto';
 import { AttributeImportService } from '../services/attribute-import.service';
 import { ImportJobService } from '@modules/import/services/import-job.service';
 import * as fs from 'fs';
@@ -53,12 +54,11 @@ export class AttributesWorkerController {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
     }
 
-    let extractDir: string | undefined;
+    let extractedFiles: ExtractedFiles | undefined;
 
     try {
       const zipBuffer = fs.readFileSync(filePath);
-      extractDir = path.join(process.cwd(), 'uploads', 'import', 'extracted', jobId);
-      const extractedFiles = await this.zipExtractorService.extract(zipBuffer, extractDir, 'ATTRIBUTES');
+      extractedFiles = await this.zipExtractorService.extract(zipBuffer, 'ATTRIBUTES');
 
       this.logger.log(`[processAttributeImport] Extracted files: ${JSON.stringify(extractedFiles)}`);
 
@@ -70,8 +70,8 @@ export class AttributesWorkerController {
       this.logger.error(`[processAttributeImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
     } finally {
-      if (extractDir) {
-        await this.zipExtractorService.cleanup(extractDir).catch(() => {});
+      if (extractedFiles) {
+        await this.zipExtractorService.cleanup(extractedFiles).catch(() => {});
       }
     }
   }

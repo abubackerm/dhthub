@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { IStorageService } from './storage.interface';
 
 @Injectable()
@@ -55,6 +55,26 @@ export class StorageService implements IStorageService {
 
   async getFileUrl(key: string): Promise<string> {
     return `${this.endpoint}/${this.bucketName}${key}`;
+  }
+
+  async getFile(key: string): Promise<Buffer> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+      const bytes = await response.Body?.transformToByteArray();
+      if (!bytes) {
+        throw new Error(`Empty response for file: ${key}`);
+      }
+      this.logger.debug(`Successfully retrieved file: ${key}`);
+      return Buffer.from(bytes);
+    } catch (error) {
+      this.logger.error(`Failed to get file: ${key}`, error);
+      throw error;
+    }
   }
 
   async deleteFile(key: string): Promise<void> {

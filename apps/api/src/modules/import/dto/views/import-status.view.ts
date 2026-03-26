@@ -6,6 +6,7 @@ export class ImportErrorView {
   rowNumber: number;
   sku: string | null;
   message: string;
+  rawData: Record<string, unknown> | null;
   createdAt: Date;
 }
 

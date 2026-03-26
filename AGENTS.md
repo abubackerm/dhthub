@@ -158,12 +158,38 @@
 - Example: `CallMcpTool({ server: "user-postgres-mcp", toolName: "execute_sql", arguments: { sql: "SELECT * FROM cells LIMIT 5;" } })`
 - Tables are lowercase (e.g., `cells`, not `Cell`) — check `information_schema.tables` if unsure of table names
 
-- Worker entry point (`apps/workers/index.ts` or package.json script) must start all workers simultaneously
-- Running individual workers directly bypasses the index that starts all workers, causing some workers to never run and leaving jobs stuck in PENDING
-- Both CatalogImportWorker and AttributeImportWorker should be started together via `tsx index.ts`, not run independently
+- This project uses Fastify (not Express) as the NestJS HTTP adapter
+- Use `FastifyRequest` type from `fastify` instead of `Request` from `express`
+- Access headers via `request.headers['header-name']` (plain object), NOT `request.headers.get('header-name')` (Headers API)
+- Example: `const ip = request.headers['x-forwarded-for']` for Fastify vs `request.headers.get('x-forwarded-for')` for Express
 
-- Import type specific file requirements in ZIP validation
-- Catalog imports require `variants.csv` (or `variants_template.csv`) plus optional `attributes.csv` and `images.csv`
-- Attribute imports only require `attributes.csv` and optionally `attribute-options.csv` - they do NOT need `variants.csv`
-- ZIP validation must check `importType` discriminator and apply correct file requirements per import type
-- Attribute import jobs failing with "variants.csv is required" when importType is ATTRIBUTES indicates validation logic error
+- Escape curly braces in JSX text content to avoid parsing errors
+- Use HTML entities: `{` → `&#123;` and `}` → `&#125;`
+- Example: `P-&#123;8 chars&#125;` displays as "P-{8 chars}" without breaking JSX parsing
+- Curly braces in JSX are interpreted as JavaScript expressions unless escaped
+
+- All Lucide-react icons used in components must be explicitly imported
+- Import pattern: `import { Info, Search, Upload } from 'lucide-react'`
+- Using an icon without importing it causes ReferenceError at runtime
+
+- ImportMode enum controls product/variant creation vs update behavior
+- `CREATE_ONLY`: Creates new records only, errors if SKU exists
+- `UPDATE_ONLY`: Updates existing records only, errors if SKU not found
+- `UPSERT`: Updates existing or creates new (default for flexibility)
+
+- Import uploads migrated from local filesystem to SeaweedFS via StorageService
+- ImportService and ZipExtractorService use `StorageService.uploadFile()` instead of `fs.writeFileSync()`
+- Files stored at keys like `imports/{year}/{month}/{timestamp}-{filename}`
+- Extracted files stored at `imports/{year}/{month}/extracted/{timestamp}-{filename}`
+- Cleanup methods delete from SeaweedFS instead of local filesystem
+
+- Products without variants are invisible across ALL display layers (admin and public)
+- Admin CellsPage CellSku/CellStock/CellPrice components compute values from variants only
+- Public LeafCategoryPage and ConsolidatedLeafCategoryPage return null for products with 0 variants
+- CSV import must create a default variant (via `ProductVariantRepository`) after creating each product
+- Frontend components should fall back to product-level data when no variants exist
+
+- `ProductService.create()` auto-generates SKU when null using `P-{8 chars}` format
+- `ProductService.create()` accepts optional `status` parameter (defaults to `DRAFT`)
+- CSV import passes `ProductStatus.ACTIVE` so imported products are immediately visible
+- Default variant SKU format: `V-{8 hex chars}` with `isDefault: true` and empty `attributes: {}`

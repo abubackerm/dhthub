@@ -162,6 +162,10 @@ export class DatabaseProvider {
     return this.prisma.auditLog;
   }
 
+  get productTableColumn(): PrismaDelegate<any> {
+    return this.prisma.productTableColumn;
+  }
+
   /**
    * Execute a callback within a database transaction.
    * Used for atomic operations like order creation + inventory reservation + payment record.
