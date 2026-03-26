@@ -62,6 +62,12 @@ export interface CategoryImportResult {
     sku: string;
     path: string;
   }>;
+  updatedCategories?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    path: string;
+  }>;
   errors: Array<{
     rowNumber: number;
     name?: string;
@@ -89,15 +95,22 @@ export interface CategoryUpdateImportResponse {
 
 export async function createCategoryImportJob(
   file: File,
-  mode: 'CREATE' | 'UPDATE',
+  mode: 'CREATE' | 'UPDATE' | 'EDIT',
 ): Promise<CategoryCreateImportResponse | CategoryUpdateImportResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  
+  if (mode === 'CREATE') {
+    formData.append('importType', 'CATEGORY_CREATE');
+  } else if (mode === 'UPDATE') {
+    formData.append('importType', 'CATEGORY_UPDATE');
+  } else if (mode === 'EDIT') {
+    formData.append('importType', 'CATEGORY_EDIT');
+  }
 
-  const url = new URL(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/catalog/categories/import`);
-  url.searchParams.set('importType', mode === 'CREATE' ? 'CATEGORY_CREATE' : 'CATEGORY_UPDATE');
+  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/import/jobs`;
 
-  const response = await fetch(url.toString(), {
+  const response = await fetch(url, {
     method: 'POST',
     body: formData,
     credentials: 'include',
@@ -112,11 +125,34 @@ export async function createCategoryImportJob(
 }
 
 export async function getCategoryImportResults(jobId: string): Promise<CategoryImportResult> {
-  return apiClient.get<CategoryImportResult>(`/v1/catalog/categories/import/${jobId}/results`);
+  const response = await apiClient.get<{
+    successRows: number;
+    failedRows: number;
+    errors: Array<{
+      rowNumber: number;
+      sku?: string;
+      message: string;
+    }>;
+  }>(`/v1/import/jobs/${jobId}/errors`);
+
+  // Transform backend error format to frontend format
+  return {
+    totalRows: response.successRows + response.failedRows,
+    successRows: response.successRows,
+    failedRows: response.failedRows,
+    createdCategories: [], // Populated from error records in full implementation
+    createdCells: [],
+    errors: response.errors.map((e) => ({
+      rowNumber: e.rowNumber,
+      sku: e.sku,
+      errorType: 'VALIDATION_ERROR' as const,
+      message: e.message,
+    })),
+  };
 }
 
 export async function downloadCategoryImportErrors(jobId: string): Promise<Blob> {
-  const endpoint = `/v1/catalog/categories/import/${jobId}/errors/download`;
+  const endpoint = `/v1/import/jobs/${jobId}/errors/download`;
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${endpoint}`,
     {
@@ -129,7 +165,7 @@ export async function downloadCategoryImportErrors(jobId: string): Promise<Blob>
     throw new Error(`Failed to download error CSV: ${response.statusText}`);
   }
 
-  const { content } = (await response.json()) as {
+  const { content } = await response.json() as {
     filename: string;
     contentType: string;
     content: string;

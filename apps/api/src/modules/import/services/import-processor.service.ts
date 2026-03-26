@@ -38,6 +38,16 @@ export class ImportProcessorService {
       return;
     }
 
+    // Skip category imports - handled by CategoryImportProcessorService
+    if (
+      event.importType === 'CATEGORY_CREATE' ||
+      event.importType === 'CATEGORY_UPDATE' ||
+      event.importType === 'CATEGORY_EDIT'
+    ) {
+      this.logger.log(`Skipping category job ${event.jobId} - handled by BullMQ worker`);
+      return;
+    }
+
     const workerId = `processor-${process.pid}`;
 
     try {

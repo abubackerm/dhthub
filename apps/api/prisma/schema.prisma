@@ -679,6 +679,9 @@ enum ImportType {
   CATALOG
   ATTRIBUTES
   IMAGES
+  CATEGORY_CREATE
+  CATEGORY_UPDATE
+  CATEGORY_EDIT
 }
 
 model ImportJob {

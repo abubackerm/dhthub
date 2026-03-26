@@ -13,7 +13,11 @@ import {
   Grid3x3,
   Image as ImageIcon,
   X,
+  Upload,
+  Copy,
+  Check,
 } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -119,6 +123,8 @@ interface CategoryTreeItemProps {
   onManageCells: (category: CategoryTreeNode) => void
   onManageSchema: (category: CategoryTreeNode) => void
   onDelete: (category: CategoryTreeNode) => void
+  copiedSku: string | null
+  onCopySku: (sku: string) => void
 }
 
 function CategoryTreeItem({
@@ -131,6 +137,8 @@ function CategoryTreeItem({
   onManageCells,
   onManageSchema,
   onDelete,
+  copiedSku,
+  onCopySku,
 }: CategoryTreeItemProps) {
   const hasChildren = category.children.length > 0
   const isExpanded = expandedIds.has(category.id)
@@ -187,9 +195,23 @@ function CategoryTreeItem({
 
         {/* SKU */}
         {category.sku && (
-          <span className="text-xs font-mono ml-2 px-2 py-0.5 rounded bg-muted/50">
-            {category.sku}
-          </span>
+          <div className="flex items-center gap-1">
+            <span 
+              className="text-xs font-mono ml-2 px-2 py-0.5 rounded bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+              onClick={() => handleCopySku(category.sku!)}
+              title="Click to copy SKU"
+            >
+              {category.sku}
+            </span>
+            {copiedSku === category.sku ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy 
+                className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                title="Copy SKU"
+              />
+            )}
+          </div>
         )}
 
         {/* Type badge */}
@@ -257,7 +279,7 @@ function CategoryTreeItem({
       </div>
 
       {/* Children */}
-      {hasChildren && isExpanded && (
+          {hasChildren && isExpanded && (
         <div className="relative">
           {category.children.map((child) => (
             <CategoryTreeItem
@@ -271,6 +293,8 @@ function CategoryTreeItem({
               onManageCells={onManageCells}
               onManageSchema={onManageSchema}
               onDelete={onDelete}
+              copiedSku={copiedSku}
+              onCopySku={onCopySku}
             />
           ))}
         </div>
@@ -296,6 +320,7 @@ export default function CategoriesPage() {
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>("")
+  const [copiedSku, setCopiedSku] = useState<string | null>(null)
 
   // Cell management state
   const [cellSheetOpen, setCellSheetOpen] = useState(false)
@@ -509,6 +534,18 @@ export default function CategoriesPage() {
     setFormData((prev) => ({ ...prev, imageUrl: undefined }))
   }
 
+  const handleCopySku = async (sku: string) => {
+    try {
+      await navigator.clipboard.writeText(sku)
+      setCopiedSku(sku)
+      toast.success(`SKU ${sku} copied to clipboard`)
+      setTimeout(() => setCopiedSku(null), 2000)
+    } catch (error) {
+      toast.error('Failed to copy SKU')
+      console.error(error)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6 p-6">
@@ -519,10 +556,18 @@ export default function CategoriesPage() {
               Build your catalog structure. Branches group items, Leaves hold products.
             </p>
           </div>
-          <Button onClick={handleOpenSheet} disabled>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Category
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild disabled>
+              <Link href="/dhthub-admin/categories/import">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Link>
+            </Button>
+            <Button onClick={handleOpenSheet} disabled>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
         </div>
         <Card>
           <CardContent className="flex items-center justify-center p-12">
@@ -543,10 +588,18 @@ export default function CategoriesPage() {
               Build your catalog structure. Branches group items, Leaves hold products.
             </p>
           </div>
-          <Button onClick={handleOpenSheet}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Category
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/dhthub-admin/categories/import">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Link>
+            </Button>
+            <Button onClick={handleOpenSheet}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
         </div>
         <Card>
           <CardContent className="flex items-center justify-center p-12">
@@ -569,10 +622,18 @@ export default function CategoriesPage() {
             Build your catalog structure. Branches group items, Leaves hold products.
           </p>
         </div>
-        <Button onClick={handleOpenSheet}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Category
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dhthub-admin/categories/import">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Link>
+          </Button>
+          <Button onClick={handleOpenSheet}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -601,6 +662,8 @@ export default function CategoriesPage() {
                   onManageCells={handleManageCells}
                   onManageSchema={handleManageSchema}
                   onDelete={handleDeleteCategory}
+                  copiedSku={copiedSku}
+                  onCopySku={handleCopySku}
                 />
               ))
             )}
@@ -734,7 +797,7 @@ export default function CategoriesPage() {
               <Label htmlFor="image">Category Image</Label>
               <div className="flex items-start gap-4">
                 {(imagePreview || formData.imageUrl) ? (
-                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border shrink-0 bg-muted">
                     <img
                       src={imagePreview || `/api/v1/storage${formData.imageUrl}`}
                       alt="Category image preview"

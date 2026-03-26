@@ -13,6 +13,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
+import { Readable } from 'stream';
 import { ImportService, UploadedFile } from '../services/import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImportErrorRepository } from '../repositories/import-error.repository';
@@ -22,6 +23,7 @@ import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { TemplatePackService } from '../services/template-pack.service';
+import { CsvParserService } from '../services/csv-parser.service';
 
 @Controller('import')
 @UseGuards(AuthGuard, RolesGuard)
@@ -32,6 +34,7 @@ export class ImportController {
     private readonly importJobService: ImportJobService,
     private readonly importErrorRepository: ImportErrorRepository,
     private readonly templatePackService: TemplatePackService,
+    private readonly csvParserService: CsvParserService,
   ) {}
 
   /**
@@ -65,12 +68,47 @@ export class ImportController {
     const createdBy = fields?.createdBy?.value as string | undefined;
     const mode = fields?.mode?.value as ImportMode | undefined;
     const warehouseId = fields?.warehouseId?.value as string | undefined;
+    const importType = fields?.importType?.value as ImportType | undefined;
 
     if (validateOnly === 'true') {
       // Validate-only mode only supports CSV for now
       if (!file.filename.endsWith('.csv')) {
         throw new BadRequestException('Validate only mode only supports CSV files');
       }
+      
+      // Skip product validation for category imports - just check CSV is readable
+      if (importType?.startsWith('CATEGORY_')) {
+        try {
+          const fileStream = Readable.from(file.buffer);
+          const headers = await this.csvParserService.getHeaders(fileStream);
+          return {
+            isValid: headers.length > 0,
+            totalRows: 0,
+            totalErrors: headers.length === 0 ? 1 : 0,
+            totalWarnings: 0,
+            errors: headers.length === 0 ? [{
+              rowNumber: 0,
+              field: 'headers',
+              message: 'CSV file has no headers',
+              severity: 'error',
+            }] : [],
+          };
+        } catch (error) {
+          return {
+            isValid: false,
+            totalRows: 0,
+            totalErrors: 1,
+            totalWarnings: 0,
+            errors: [{
+              rowNumber: 0,
+              field: 'file',
+              message: error instanceof Error ? error.message : String(error),
+              severity: 'error',
+            }],
+          };
+        }
+      }
+      
       const result = await this.importService.validateOnly(file, { createdBy });
       return {
         isValid: result.isValid,
@@ -85,7 +123,7 @@ export class ImportController {
     const isZip = file.filename.endsWith('.zip');
     const result = isZip
       ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId, importType: ImportType.CATALOG })
-      : await this.importService.uploadCsv(file, { createdBy, mode, warehouseId });
+      : await this.importService.uploadCsv(file, { createdBy, mode, warehouseId, importType });
 
     return {
       jobId: result.jobId,

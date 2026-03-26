@@ -11,10 +11,19 @@ import * as fs from 'fs';
 
 export interface CategoryImportResult {
   categoriesCreated: number;
+  categoriesUpdated: number;
   cellsCreated: number;
   processedRows: number;
   successRows: number;
   failedRows: number;
+  skippedRows: number;
+  skippedItems: Array<{
+    rowNumber: number;
+    name: string;
+    type: 'CATEGORY' | 'CELL';
+    reason: string;
+    sku?: string;
+  }>;
   errors: Array<{
     rowNumber: number;
     message: string;
@@ -93,10 +102,13 @@ export class CategoryImportService {
 
     const result: CategoryImportResult = {
       categoriesCreated: 0,
+      categoriesUpdated: 0,
       cellsCreated: 0,
       processedRows: 0,
       successRows: 0,
       failedRows: 0,
+      skippedRows: 0,
+      skippedItems: [],
       errors: [],
     };
 
@@ -164,6 +176,27 @@ export class CategoryImportService {
                 slug: existingCategory.slug,
                 type: 'CATEGORY',
               });
+              
+              // Track skipped item
+              result.skippedRows++;
+              result.skippedItems.push({
+                rowNumber: row.rowNumber,
+                name: categoryName,
+                type: 'CATEGORY',
+                reason: 'Category already exists',
+                sku: existingCategory.sku || undefined,
+              });
+              
+              // Store skipped item in database for persistence
+              await this.importErrorRepository.create({
+                jobId,
+                rowNumber: row.rowNumber,
+                message: `Skipped: Category already exists (${existingCategory.sku})`,
+                rawData: rowData,
+                sourceFile: filePath,
+              });
+              
+              this.logger.debug(`Skipped existing category: ${categoryName} (${existingCategory.sku})`);
               continue;
             }
 
@@ -239,7 +272,7 @@ export class CategoryImportService {
 
       await this.importJobService.markAsCompleted(jobId);
       this.logger.log(
-        `Category CREATE import completed: ${result.categoriesCreated} categories created, ${result.failedRows} errors`,
+        `Category CREATE import completed: ${result.categoriesCreated} categories created, ${result.skippedRows} skipped, ${result.failedRows} errors`,
       );
 
     } catch (error) {
@@ -260,10 +293,13 @@ export class CategoryImportService {
 
     const result: CategoryImportResult = {
       categoriesCreated: 0,
+      categoriesUpdated: 0,
       cellsCreated: 0,
       processedRows: 0,
       successRows: 0,
       failedRows: 0,
+      skippedRows: 0,
+      skippedItems: [],
       errors: [],
     };
 
@@ -320,7 +356,35 @@ export class CategoryImportService {
             // Create cell
             const existingCell = await this.cellRepo.findBySlug(slug);
             if (existingCell) {
-              throw new Error(`Cell with slug ${slug} already exists`);
+              // Track skipped item
+              result.skippedRows++;
+              result.skippedItems.push({
+                rowNumber: row.rowNumber,
+                name: name,
+                type: 'CELL',
+                reason: 'Cell already exists',
+                sku: existingCell.sku || undefined,
+              });
+              
+              // Store skipped item in database for persistence
+              await this.importErrorRepository.create({
+                jobId,
+                rowNumber: row.rowNumber,
+                message: `Skipped: Cell already exists (${existingCell.sku})`,
+                rawData: rowData,
+                sourceFile: filePath,
+              });
+              
+              this.logger.debug(`Skipped existing cell: ${name} (${existingCell.sku})`);
+              
+              await this.progressService.updateProgress({
+                jobId,
+                processedRows: result.processedRows,
+                successRows: result.successRows,
+                failedRows: result.failedRows,
+                lastProcessedRow: row.rowNumber,
+              });
+              continue;
             }
 
             const sku = this.generateSKU('C');
@@ -344,7 +408,35 @@ export class CategoryImportService {
             // Create child category
             const existingCategory = await this.categoryRepo.findBySlug(slug);
             if (existingCategory) {
-              throw new Error(`Category with slug ${slug} already exists`);
+              // Track skipped item
+              result.skippedRows++;
+              result.skippedItems.push({
+                rowNumber: row.rowNumber,
+                name: name,
+                type: 'CATEGORY',
+                reason: 'Category already exists',
+                sku: existingCategory.sku || undefined,
+              });
+              
+              // Store skipped item in database for persistence
+              await this.importErrorRepository.create({
+                jobId,
+                rowNumber: row.rowNumber,
+                message: `Skipped: Category already exists (${existingCategory.sku})`,
+                rawData: rowData,
+                sourceFile: filePath,
+              });
+              
+              this.logger.debug(`Skipped existing category: ${name} (${existingCategory.sku})`);
+              
+              await this.progressService.updateProgress({
+                jobId,
+                processedRows: result.processedRows,
+                successRows: result.successRows,
+                failedRows: result.failedRows,
+                lastProcessedRow: row.rowNumber,
+              });
+              continue;
             }
 
             const sku = this.generateSKU();
@@ -400,12 +492,158 @@ export class CategoryImportService {
 
       await this.importJobService.markAsCompleted(jobId);
       this.logger.log(
-        `Category UPDATE import completed: ${result.categoriesCreated} categories, ${result.cellsCreated} cells created, ${result.failedRows} errors`,
+        `Category UPDATE import completed: ${result.categoriesCreated} categories, ${result.cellsCreated} cells created, ${result.skippedRows} skipped, ${result.failedRows} errors`,
       );
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Category UPDATE import failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      await this.importJobService.markAsFailed(jobId);
+      throw error;
+    }
+
+    return result;
+  }
+
+  /**
+   * Process EDIT import - parse CSV, find by SKU, update name and regenerate slug
+   * Supports both Category and Cell SKUs
+   */
+  async processEditImport(jobId: string, filePath: string): Promise<CategoryImportResult> {
+    this.logger.log(`Processing category EDIT import for job: ${jobId}`);
+
+    const result: CategoryImportResult = {
+      categoriesCreated: 0,
+      categoriesUpdated: 0,
+      cellsCreated: 0,
+      processedRows: 0,
+      successRows: 0,
+      failedRows: 0,
+      skippedRows: 0,
+      skippedItems: [],
+      errors: [],
+    };
+
+    const workerId = `worker-${process.pid}`;
+
+    try {
+      await this.importJobService.markAsProcessing(jobId, workerId);
+
+      // Count total rows
+      const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+      const totalRows = await this.csvParserService.countRows(stream);
+      await this.importJobService.updateTotalRows(jobId, totalRows);
+      this.logger.log(`Total rows to process: ${totalRows}`);
+
+      // Parse CSV
+      const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+      const rows = await this.csvParserService.parseToArray(fileStream);
+
+      for (const row of rows) {
+        result.processedRows++;
+        const rowData = row.data;
+
+        try {
+          const sku = rowData.sku?.trim();
+          const newName = rowData.new_name?.trim();
+
+          if (!sku) {
+            throw new Error('SKU is required');
+          }
+          if (!newName) {
+            throw new Error('new_name is required');
+          }
+
+          // Generate new slug from new_name
+          const newSlug = this.generateSlug(newName);
+
+          // Try to find category by SKU first
+          const category = await this.categoryRepo.findBySku(sku);
+
+          if (category) {
+            // Check for slug conflicts (skip if same slug as current)
+            if (newSlug !== category.slug) {
+              const existingBySlug = await this.categoryRepo.findBySlug(newSlug);
+              if (existingBySlug && existingBySlug.id !== category.id) {
+                throw new Error(`Slug "${newSlug}" is already in use by another category`);
+              }
+            }
+
+            // Update category
+            await this.categoryRepo.update(category.id, {
+              name: newName,
+              slug: newSlug,
+            });
+
+            result.categoriesUpdated++;
+            result.successRows++;
+
+            this.logger.debug(`Updated category: ${sku} -> ${newName} (${newSlug})`);
+          } else {
+            // Try to find cell by SKU
+            const cell = await this.cellRepo.findBySku(sku);
+            if (!cell) {
+              throw new Error(`Category or Cell with SKU ${sku} not found`);
+            }
+
+            // Check for slug conflicts (skip if same slug as current)
+            if (newSlug !== cell.slug) {
+              const existingBySlug = await this.cellRepo.findBySlug(newSlug);
+              if (existingBySlug && existingBySlug.id !== cell.id) {
+                throw new Error(`Slug "${newSlug}" is already in use by another cell`);
+              }
+            }
+
+            // Update cell
+            await this.cellRepo.update(cell.id, {
+              name: newName,
+              slug: newSlug,
+            });
+
+            result.categoriesUpdated++;
+            result.successRows++;
+
+            this.logger.debug(`Updated cell: ${sku} -> ${newName} (${newSlug})`);
+          }
+
+          // Update progress
+          await this.progressService.updateProgress({
+            jobId,
+            processedRows: result.processedRows,
+            successRows: result.successRows,
+            failedRows: result.failedRows,
+            lastProcessedRow: row.rowNumber,
+          });
+
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          result.failedRows++;
+          result.errors.push({
+            rowNumber: row.rowNumber,
+            message: errorMessage,
+            rowData,
+          });
+
+          await this.importErrorRepository.create({
+            jobId,
+            rowNumber: row.rowNumber,
+            message: errorMessage,
+            rawData: rowData,
+            sourceFile: filePath,
+          });
+
+          this.logger.error(`Error processing row ${row.rowNumber}: ${errorMessage}`);
+        }
+      }
+
+      await this.importJobService.markAsCompleted(jobId);
+      this.logger.log(
+        `Category EDIT import completed: ${result.categoriesUpdated} items updated, ${result.failedRows} errors`,
+      );
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Category EDIT import failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
       await this.importJobService.markAsFailed(jobId);
       throw error;
     }

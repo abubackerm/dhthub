@@ -285,6 +285,58 @@ export class ImportWorkerController {
   }
 
   /**
+   * Worker API: Process category EDIT import (called by BullMQ worker)
+   * POST /v1/import/worker/process-category-edit
+   */
+  @Post('process-category-edit')
+  async processCategoryEdit(@Body() body: { jobId: string; fileUrl: string }) {
+    const { jobId, fileUrl } = body;
+
+    this.logger.log(`[CategoryImport] Received EDIT request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+
+    let actualFileUrl = fileUrl;
+    if (!actualFileUrl) {
+      this.logger.warn(`fileUrl not provided in request, retrieving from database for job ${jobId}`);
+      const job = await this.importJobService.findById(jobId);
+      actualFileUrl = job.fileUrl;
+      this.logger.log(`[CategoryImport] Retrieved fileUrl from database: "${actualFileUrl}"`);
+    }
+
+    if (!actualFileUrl) {
+      throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
+    }
+
+    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+
+    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+
+    if (!fs.existsSync(filePath)) {
+      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
+    }
+
+    try {
+      const result = await this.categoryImportService.processEditImport(jobId, filePath);
+
+      this.logger.log(
+        `[CategoryImport] EDIT completed for job ${jobId}: ${result.categoriesUpdated} categories updated, ${result.failedRows} errors`,
+      );
+
+      return {
+        success: true,
+        jobId,
+        categoriesUpdated: result.categoriesUpdated,
+        processedRows: result.processedRows,
+        failedRows: result.failedRows,
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
+      throw error;
+    }
+  }
+
+  /**
    * Count total image files in ZIP without processing them
    */
   private async countImagesInZip(zipPath: string): Promise<number> {

@@ -9,7 +9,7 @@ interface CategoryImportJobData {
   fileName?: string;
   fileSize?: number;
   workerId: string;
-  importType: 'CATEGORY_CREATE' | 'CATEGORY_UPDATE';
+  importType: 'CATEGORY_CREATE' | 'CATEGORY_UPDATE' | 'CATEGORY_EDIT';
 }
 
 /**
@@ -72,6 +72,8 @@ class CategoryImportWorker {
         await this.processCreateImport(jobId, fileUrl, fileName);
       } else if (importType === 'CATEGORY_UPDATE') {
         await this.processUpdateImport(jobId, fileUrl, fileName);
+      } else if (importType === 'CATEGORY_EDIT') {
+        await this.processEditImport(jobId, fileUrl, fileName);
       } else {
         throw new Error(`Unknown importType: ${importType}`);
       }
@@ -115,6 +117,22 @@ class CategoryImportWorker {
     await this.callApi('/v1/import/worker/process-category-update', { jobId, fileUrl });
     
     this.logger.log(`[category-update] Job ${jobId} completed`);
+  }
+
+  /**
+   * Process EDIT category import
+   */
+  private async processEditImport(
+    jobId: string,
+    fileUrl: string,
+    fileName?: string,
+  ): Promise<void> {
+    this.logger.log(`[category-edit] Processing job ${jobId}, file: ${fileName || fileUrl}`);
+
+    // Call API to process category EDIT import
+    await this.callApi('/v1/import/worker/process-category-edit', { jobId, fileUrl });
+    
+    this.logger.log(`[category-edit] Job ${jobId} completed`);
   }
 
   /**

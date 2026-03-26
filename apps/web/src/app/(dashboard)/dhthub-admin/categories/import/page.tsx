@@ -47,7 +47,7 @@ function getStatusVariant(status: string): "default" | "destructive" | "outline"
   }
 }
 
-type ImportMode = 'CREATE' | 'UPDATE'
+type ImportMode = 'CREATE' | 'UPDATE' | 'EDIT'
 
 interface CategoryImportFormProps {
   mode: ImportMode
@@ -107,7 +107,7 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
         successRows: 0,
         failedRows: 0,
         lastProcessedRow: 0,
-        type: mode === 'CREATE' ? 'CATEGORY_CREATE' : 'CATEGORY_UPDATE',
+        type: mode === 'CREATE' ? 'CATEGORY_CREATE' : mode === 'UPDATE' ? 'CATEGORY_UPDATE' : 'CATEGORY_EDIT',
         status: "PENDING",
         lockedAt: null,
         lockedBy: null,
@@ -131,15 +131,25 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
 
   const downloadTemplateMutation = useMutation({
     mutationFn: async () => {
-      const template = mode === 'CREATE'
-        ? `main_branch,branch1,branch2,branch3,branch4,branch5,branch6\nElectronics,Phones,Smartphones,\nElectronics,Phones,Feature Phones,\nElectronics,Computers,Laptops,Gaming`
-        : `sku,name,cell\nCG-A1B2C3D4,iPhone 15,x\nCG-A1B2C3D4,Samsung Galaxy,x\nCG-E5F6G7H8,Accessories,`
+      let template = ''
+      let filename = ''
+      
+      if (mode === 'CREATE') {
+        template = `main_branch,branch1,branch2,branch3,branch4,branch5,branch6\nElectronics,Phones,Smartphones,\nElectronics,Phones,Feature Phones,\nElectronics,Computers,Laptops,Gaming`
+        filename = 'categories-create-template.csv'
+      } else if (mode === 'UPDATE') {
+        template = `sku,name,cell\nCG-A1B2C3D4,iPhone 15,x\nCG-A1B2C3D4,Samsung Galaxy,x\nCG-E5F6G7H8,Accessories,`
+        filename = 'categories-update-template.csv'
+      } else if (mode === 'EDIT') {
+        template = `sku,new_name\nCG-A1B2C3D4,Smartphones\nCG-E5F6G7H8,Laptops & PCs`
+        filename = 'categories-edit-template.csv'
+      }
 
       const blob = new Blob([template], { type: 'text/csv' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = mode === 'CREATE' ? 'categories-create-template.csv' : 'categories-update-template.csv'
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -198,11 +208,13 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{mode === 'CREATE' ? 'Create Categories' : 'Update Categories'}</CardTitle>
+        <CardTitle>{mode === 'CREATE' ? 'Create Categories' : mode === 'UPDATE' ? 'Update Categories' : 'Edit Categories'}</CardTitle>
         <CardDescription>
           {mode === 'CREATE'
             ? 'Upload a CSV file to create category hierarchies. Each row represents a path in the category tree.'
-            : 'Upload a CSV file to add child categories or cells to existing categories using their SKU.'}
+            : mode === 'UPDATE'
+            ? 'Upload a CSV file to add child categories or cells to existing categories using their SKU.'
+            : 'Upload a CSV file to edit existing category names. Categories are identified by SKU.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -290,6 +302,9 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
               {importResult.createdCategories.length > 0 && (
                 <div className="text-blue-600">Categories created: {importResult.createdCategories.length}</div>
               )}
+              {importResult.updatedCategories && importResult.updatedCategories.length > 0 && (
+                <div className="text-green-600">Categories updated: {importResult.updatedCategories.length}</div>
+              )}
               {importResult.createdCells.length > 0 && (
                 <div className="text-blue-600">Cells created: {importResult.createdCells.length}</div>
               )}
@@ -345,6 +360,27 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
                       <div key={cell.id} className="border-b border-border/30 py-2 last:border-0">
                         <div className="font-medium">{cell.name}</div>
                         <div className="text-muted-foreground">SKU: {cell.sku} | Path: {cell.path}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Updated Categories */}
+            {importResult.updatedCategories && importResult.updatedCategories.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base text-green-600">
+                    Categories Updated ({importResult.updatedCategories.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-48 overflow-y-auto text-xs space-y-1">
+                    {importResult.updatedCategories.map((category) => (
+                      <div key={category.id} className="border-b border-border/30 py-2 last:border-0">
+                        <div className="font-medium">{category.name}</div>
+                        <div className="text-muted-foreground">SKU: {category.sku} | Path: {category.path}</div>
                       </div>
                     ))}
                   </div>
@@ -432,6 +468,10 @@ export default function CategoryImportPage() {
             <Upload className="h-4 w-4" />
             Update Categories
           </TabsTrigger>
+          <TabsTrigger value="edit" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Edit Categories
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="create" className="mt-4">
@@ -440,6 +480,10 @@ export default function CategoryImportPage() {
         
         <TabsContent value="update" className="mt-4">
           <CategoryImportForm mode="UPDATE" />
+        </TabsContent>
+        
+        <TabsContent value="edit" className="mt-4">
+          <CategoryImportForm mode="EDIT" />
         </TabsContent>
       </Tabs>
     </div>

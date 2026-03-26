@@ -28,10 +28,12 @@ export class CategoryImportProcessorService {
       return;
     }
 
-    // Only process CATEGORY_CREATE or CATEGORY_UPDATE import types
+    // Only process CATEGORY_CREATE, CATEGORY_UPDATE, or CATEGORY_EDIT import types
     if (
       !event.importType ||
-      (event.importType !== 'CATEGORY_CREATE' && event.importType !== 'CATEGORY_UPDATE')
+      (event.importType !== 'CATEGORY_CREATE' &&
+       event.importType !== 'CATEGORY_UPDATE' &&
+       event.importType !== 'CATEGORY_EDIT')
     ) {
       return;
     }

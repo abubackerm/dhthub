@@ -76,6 +76,7 @@ export class ImportService {
       enqueueJob?: boolean;
       mode?: ImportMode;
       warehouseId?: string;
+      importType?: ImportType;
     },
   ): Promise<UploadResult> {
     if (!file) {
@@ -134,6 +135,7 @@ export class ImportService {
       mode: options?.mode ?? undefined,
       warehouseId: options?.warehouseId ?? undefined,
       originalFilePath: relativePath.replace(/\\/g, '/'),
+      importType: options?.importType,
     });
 
     this.logger.log(`CSV upload complete: job ${job.id}, ${totalRows} rows`);
