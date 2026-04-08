@@ -515,6 +515,97 @@ export class CategoryRepository {
     };
   }
 
+  async findAggregatedFilterData(categoryId: string): Promise<{
+    filterableAttributes: any[];
+    variants: any[];
+  }> {
+    const client = this.getClient();
+
+    const category = await client.category.findUnique({
+      where: { id: categoryId },
+      select: { id: true, path: true },
+    });
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const leafCategories = await client.category.findMany({
+      where: {
+        path: { startsWith: `${category.path}.` },
+        children: { none: {} },
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    const leafCategoryIds = leafCategories.map((lc) => lc.id);
+
+    const [filterableAttributes, variants] = await Promise.all([
+      client.categoryAttribute.findMany({
+        where: {
+          categoryId: { in: leafCategoryIds },
+          attribute: { isFilterable: true },
+        },
+        include: {
+          attribute: {
+            include: {
+              unit: true,
+              options: { orderBy: { sortOrder: 'asc' } },
+            },
+          },
+        },
+        orderBy: { attribute: { sortOrder: 'asc' } },
+      }),
+      client.productVariant.findMany({
+        where: {
+          product: {
+            status: 'active',
+            cell: { categoryId: { in: leafCategoryIds } },
+          },
+        },
+        select: {
+          id: true,
+          sku: true,
+          price: true,
+          quantity: true,
+          attributeValues: {
+            include: {
+              attribute: { include: { unit: true } },
+              option: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              cell: {
+                select: { id: true, name: true },
+              },
+            },
+          },
+        },
+        orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+      }),
+    ]);
+
+    const uniqueFilterableAttributes = filterableAttributes.reduce(
+      (acc: any[], attr: any) => {
+        if (!acc.find((a: any) => a.attribute.id === attr.attribute.id)) {
+          acc.push(attr);
+        }
+        return acc;
+      },
+      [] as any[],
+    );
+
+    return {
+      filterableAttributes: uniqueFilterableAttributes,
+      variants,
+    };
+  }
+
   async getSkuMap(): Promise<Map<string, string>> {
     const categories = await this.getClient().category.findMany({
       where: {

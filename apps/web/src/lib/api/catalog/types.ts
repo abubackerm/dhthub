@@ -392,6 +392,24 @@ export interface ConsolidatedLeafPageView {
   filterableAttributes: LeafFilterableAttributeView[];
 }
 
+export interface AggregatedFilterVariantView {
+  id: string;
+  sku: string;
+  price: number | null;
+  quantity: number;
+  attributeValues: LeafAttributeValueView[];
+  productId: string;
+  productName: string;
+  productSlug: string;
+  cellId: string;
+  cellName: string;
+}
+
+export interface AggregatedFilterDataView {
+  filterableAttributes: LeafFilterableAttributeView[];
+  variants: AggregatedFilterVariantView[];
+}
+
 // ============================================
 // Product Detail Types
 // ============================================

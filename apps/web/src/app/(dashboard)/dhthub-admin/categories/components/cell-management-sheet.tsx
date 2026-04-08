@@ -151,7 +151,7 @@ function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: C
         </button>
         <div className="flex items-center gap-3 flex-1">
           {imageUrl ? (
-            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
+            <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border shrink-0 bg-muted">
               <img
                 src={imageUrl}
                 alt={cell.name}
@@ -162,7 +162,7 @@ function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: C
               />
             </div>
           ) : (
-            <div className="w-16 h-16 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center shrink-0">
               <ImageIcon className="h-5 w-5 text-muted-foreground mb-1" />
               <span className="text-[10px] text-muted-foreground">No image</span>
             </div>
@@ -564,7 +564,7 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                 <Label htmlFor="cell-image">Cell Image</Label>
                 <div className="flex items-start gap-4">
                   {(imagePreview || cellFormData.imageUrl) ? (
-                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
                       <img
                         src={imagePreview || cellFormData.imageUrl}
                         alt="Cell image preview"
@@ -581,7 +581,7 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                       </Button>
                     </div>
                   ) : (
-                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center shrink-0">
                       <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
                       <span className="text-xs text-muted-foreground">No image</span>
                     </div>
@@ -684,7 +684,7 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                 <Label htmlFor="edit-cell-image">Cell Image</Label>
                 <div className="flex items-start gap-4">
                   {(imagePreview || cellFormData.imageUrl) ? (
-                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted flex-shrink-0">
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
                       <img
                         src={imagePreview || cellFormData.imageUrl}
                         alt="Cell image preview"
@@ -701,7 +701,7 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                       </Button>
                     </div>
                   ) : (
-                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-border bg-muted flex flex-col items-center justify-center shrink-0">
                       <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
                       <span className="text-xs text-muted-foreground">No image</span>
                     </div>

@@ -22,6 +22,7 @@ import {
   CategoryTreeView,
   LeafPageView,
   ConsolidatedLeafPageView,
+  AggregatedFilterDataView,
 } from '../dto';
 import { Cell } from '../../cell/dto/views/cell.view';
 
@@ -102,6 +103,15 @@ export class CategoriesController {
       throw new NotFoundException(`Category with slug "${slug}" not found`);
     }
     return ConsolidatedLeafPageView.fromPrisma(data);
+  }
+
+  @Get(':slug/filter-data')
+  async getAggregatedFilterData(@Param('slug') slug: string): Promise<AggregatedFilterDataView> {
+    const data = await this.categoryService.getAggregatedFilterData(slug);
+    if (!data) {
+      throw new NotFoundException(`Category with slug "${slug}" not found`);
+    }
+    return AggregatedFilterDataView.fromPrisma(data);
   }
 
   @Get(':id')

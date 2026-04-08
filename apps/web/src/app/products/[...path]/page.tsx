@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CategoryIcon } from "@/components/public/CategoryIcon";
 import { getCategoryTree, getCellsByCategorySlug } from "@/lib/api/catalog";
 import { getProductBySlug } from "@/lib/api/catalog/products";
-import { getCategoryIconName } from "@/lib/utils/category-icon-map";
 import { LeafCategoryPage } from "@/components/public/LeafCategory";
 import { ProductDetailPage } from "@/components/public/ProductDetail";
 import { ConsolidatedLeafCategoryPage } from "@/components/public/LeafCategory/ConsolidatedLeafCategoryPage";
+import { BranchCategoryPage } from "@/components/public/BranchCategoryPage";
+import { EmptyLeafPage } from "@/components/public/EmptyLeafPage";
 import type { Cell } from "@/lib/api/catalog";
 import type { ProductDetailView } from "@/lib/api/catalog/types";
 
@@ -112,54 +111,12 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     }
 
     // Traditional branch page with subcategory links
-    const activeChildren = currentCategory.children.filter((c: any) => c.isActive);
-
     return (
-      <div className="catalog-page">
-        {/* Breadcrumb */}
-        <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
-          <Link href="/products" className="catalog-breadcrumb__link">Products</Link>
-          {path.map((slug, index) => (
-            <span key={slug}>
-              <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
-              <span className="catalog-breadcrumb__current" aria-current="page">
-                {pathNames[index] || slug}
-              </span>
-            </span>
-          ))}
-        </nav>
-
-        {/* Category title */}
-        <h1 className="catalog-page__title">{currentCategory.name}</h1>
-
-        {/* Grid of child categories */}
-        <div className="catalog-grid">
-          {activeChildren.map((child: any) => (
-            <Link
-              key={child.id}
-              href={`/products/${path.join('/')}/${child.slug}`}
-              className="catalog-grid__cell"
-            >
-              <div className="catalog-grid__icon">
-                <CategoryIcon
-                  iconName={getCategoryIconName(child.name)}
-                  className="w-12 h-12 text-gray-600"
-                  strokeWidth={1.5}
-                />
-              </div>
-              <span className="catalog-grid__label">{child.name}</span>
-            </Link>
-          ))}
-        </div>
-
-        {activeChildren.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground text-lg">
-              No subcategories available at this time.
-            </p>
-          </div>
-        )}
-      </div>
+      <BranchCategoryPage
+        category={currentCategory}
+        pathNames={pathNames}
+        pathSlugs={path}
+      />
     );
   }
 
@@ -169,33 +126,11 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
   // If there are no cells yet, show a placeholder message
   if (cells.length === 0) {
     return (
-      <div className="catalog-page">
-        {/* Breadcrumb */}
-        <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
-          <Link href="/products" className="catalog-breadcrumb__link">Products</Link>
-          {path.map((slug, index) => (
-            <span key={slug}>
-              <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
-              <span className="catalog-breadcrumb__current" aria-current="page">
-                {pathNames[index] || slug}
-              </span>
-            </span>
-          ))}
-        </nav>
-
-        {/* Category title */}
-        <h1 className="catalog-page__title">{currentCategory.name}</h1>
-
-        {currentCategory.description && (
-          <p className="text-muted-foreground mb-6 max-w-3xl">{currentCategory.description}</p>
-        )}
-
-        <div className="text-center py-16">
-          <p className="text-muted-foreground text-lg">
-            Products are being added to this category. Check back soon!
-          </p>
-        </div>
-      </div>
+      <EmptyLeafPage
+        category={currentCategory}
+        pathNames={pathNames}
+        pathSlugs={path}
+      />
     );
   }
 

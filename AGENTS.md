@@ -193,3 +193,9 @@
 - `ProductService.create()` accepts optional `status` parameter (defaults to `DRAFT`)
 - CSV import passes `ProductStatus.ACTIVE` so imported products are immediately visible
 - Default variant SKU format: `V-{8 hex chars}` with `isDefault: true` and empty `attributes: {}`
+
+- `category_attributes` table must be populated for filter sidebar to work on category pages
+- `processVariantBatch()` must auto-create `category_attributes` via upsert with `@@unique([categoryId, attributeId])`
+- `category_attributes` table schema has only: id, category_id, attribute_id, created_at (no is_required, sort_order, or updated_at)
+- Filter sidebar queries filter on `attribute: { isFilterable: true }` joined through `category_attributes`
+- Categories missing `category_attributes` links will show empty filter sidebar even if attributes exist on variants

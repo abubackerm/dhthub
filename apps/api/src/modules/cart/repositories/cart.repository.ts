@@ -27,15 +27,15 @@ export class CartRepository {
     return tx ?? this.db;
   }
 
-  async findByUserId(userId: string): Promise<CartEntity | null> {
-    return this.getClient().cart.findUnique({
-      where: { userId },
-    });
-  }
-
   async findById(id: string): Promise<CartEntity | null> {
     return this.getClient().cart.findUnique({
       where: { id },
+    });
+  }
+
+  async findActiveByUserId(userId: string): Promise<CartEntity | null> {
+    return this.getClient().cart.findFirst({
+      where: { userId, isActive: true },
     });
   }
 
@@ -56,9 +56,9 @@ export class CartRepository {
     }) as unknown as CartWithItems | null;
   }
 
-  async findByUserIdWithItems(userId: string): Promise<CartWithItems | null> {
-    return this.getClient().cart.findUnique({
-      where: { userId },
+  async findActiveByUserIdWithItems(userId: string): Promise<CartWithItems | null> {
+    return this.getClient().cart.findFirst({
+      where: { userId, isActive: true },
       include: {
         items: {
           include: {
@@ -73,36 +73,48 @@ export class CartRepository {
     }) as unknown as CartWithItems | null;
   }
 
-  async create(
-    data: {
-      userId: string;
-      createdBy?: string;
-    },
-  ): Promise<CartEntity> {
+  async getOrCreateActiveCart(userId: string): Promise<CartEntity> {
+    const existing = await this.findActiveByUserId(userId);
+    if (existing) return existing;
+
     return this.getClient().cart.create({
       data: {
-        userId: data.userId,
-        createdBy: data.createdBy,
+        userId,
+        isActive: true,
       },
+    });
+  }
+
+  async createActiveCart(userId: string): Promise<CartEntity> {
+    return this.getClient().cart.create({
+      data: {
+        userId,
+        isActive: true,
+      },
+    });
+  }
+
+  async markAsInactive(id: string): Promise<CartEntity> {
+    return this.getClient().cart.update({
+      where: { id },
+      data: { isActive: false },
     });
   }
 
   async markSubmitted(id: string): Promise<CartEntity> {
     return this.getClient().cart.update({
       where: { id },
-      data: { submittedAt: new Date() },
+      data: {
+        submittedAt: new Date(),
+        isActive: false,
+        status: 'SUBMITTED',
+      },
     });
   }
 
   async delete(id: string): Promise<CartEntity> {
     return this.getClient().cart.delete({
       where: { id },
-    });
-  }
-
-  async deleteByUserId(userId: string): Promise<CartEntity> {
-    return this.getClient().cart.delete({
-      where: { userId },
     });
   }
 }

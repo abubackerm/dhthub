@@ -6,7 +6,6 @@ export class CartView {
   userId: string;
   items: CartItemView[];
   itemCount: number;
-  submittedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -16,7 +15,6 @@ export class CartView {
     view.userId = entity.userId;
     view.items = items;
     view.itemCount = items.length;
-    view.submittedAt = entity.submittedAt;
     view.createdAt = entity.createdAt;
     view.updatedAt = entity.updatedAt;
     return view;

@@ -23,7 +23,6 @@ export interface CartView {
   userId: string;
   items: CartItemView[];
   itemCount: number;
-  submittedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

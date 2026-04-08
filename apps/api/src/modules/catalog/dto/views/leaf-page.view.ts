@@ -261,6 +261,49 @@ export interface LeafCategoryView {
   filterableAttributes: LeafFilterableAttributeView[];
 }
 
+export interface AggregatedFilterVariantView {
+  id: string;
+  sku: string;
+  price: number | null;
+  quantity: number;
+  attributeValues: LeafAttributeValueView[];
+  productId: string;
+  productName: string;
+  productSlug: string;
+  cellId: string;
+  cellName: string;
+}
+
+export class AggregatedFilterDataView {
+  filterableAttributes: LeafFilterableAttributeView[];
+  variants: AggregatedFilterVariantView[];
+
+  static fromPrisma(data: {
+    filterableAttributes: any[];
+    variants: any[];
+  }): AggregatedFilterDataView {
+    const view = new AggregatedFilterDataView();
+    view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
+      LeafPageView.mapFilterableAttribute(attr),
+    );
+    view.variants = data.variants.map((variant: any) => ({
+      id: variant.id,
+      sku: variant.sku,
+      price: variant.price,
+      quantity: variant.quantity,
+      attributeValues: (variant.attributeValues || []).map((av: any) =>
+        LeafPageView.mapAttributeValue(av),
+      ),
+      productId: variant.product.id,
+      productName: variant.product.name,
+      productSlug: variant.product.slug,
+      cellId: variant.product.cell.id,
+      cellName: variant.product.cell.name,
+    }));
+    return view;
+  }
+}
+
 export class ConsolidatedLeafPageView {
   category: {
     id: string;

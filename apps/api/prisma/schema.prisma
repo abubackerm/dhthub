@@ -755,18 +755,25 @@ model ImportError {
 // CART MODULE - Shopping Cart Management
 // ============================================
 
+enum CartStatus {
+  ACTIVE
+  SUBMITTED
+  ABANDONED
+}
+
 model Cart {
-  id          String     @id @default(cuid())
-  userId      String     @map("user_id")
-  submittedAt DateTime?  @map("submitted_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  createdBy   String?    @map("created_by")
-  updatedBy   String?    @map("updated_by")
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  isActive    Boolean     @default(true) @map("is_active")
+  status      CartStatus  @default(ACTIVE) @map("status")
+  submittedAt DateTime?   @map("submitted_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  createdBy   String?     @map("created_by")
+  updatedBy   String?     @map("updated_by")
 
   items       CartItem[]
 
-  @@unique([userId])
   @@index([userId])
   @@map("carts")
 }

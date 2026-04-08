@@ -159,6 +159,17 @@ export class CategoryService extends BaseService {
     return this.categoryRepo.findConsolidatedLeafData(category.id);
   }
 
+  async getAggregatedFilterData(slug: string): Promise<{
+    filterableAttributes: any[];
+    variants: any[];
+  } | null> {
+    const category = await this.categoryRepo.findBySlug(slug);
+    if (!category || !category.isActive) {
+      return null;
+    }
+    return this.categoryRepo.findAggregatedFilterData(category.id);
+  }
+
   async search(
     query: string,
     limit: number = 20,

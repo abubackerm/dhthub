@@ -6,6 +6,7 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { authClient } from '@/lib/auth-client';
 import { ApiError } from '../client';
 import {
   getCart,
@@ -21,10 +22,14 @@ import {
 const CART_QUERY_KEY = ['cart'] as const;
 
 export function useCart(): UseQueryResult<CartView, Error> {
+  const { data: session } = authClient.useSession();
+  const isAuthenticated = !!session?.user;
+
   return useQuery({
     queryKey: CART_QUERY_KEY,
     queryFn: getCart,
     staleTime: 1000 * 60, // 1 minute
+    enabled: isAuthenticated,
   });
 }
 

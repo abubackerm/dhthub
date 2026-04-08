@@ -6,6 +6,7 @@ import type {
   UpdateCategoryInput,
   LeafPageView,
   ConsolidatedLeafPageView,
+  AggregatedFilterDataView,
 } from './types';
 
 export async function getCategories(): Promise<Category[]> {
@@ -26,6 +27,10 @@ export async function getLeafPageData(slug: string): Promise<LeafPageView> {
 
 export async function getConsolidatedLeafData(slug: string): Promise<ConsolidatedLeafPageView> {
   return apiClient.get<ConsolidatedLeafPageView>(`/v1/catalog/categories/${slug}/consolidated-leaf-data`);
+}
+
+export async function getAggregatedFilterData(slug: string): Promise<AggregatedFilterDataView> {
+  return apiClient.get<AggregatedFilterDataView>(`/v1/catalog/categories/${slug}/filter-data`);
 }
 
 export async function createCategory(

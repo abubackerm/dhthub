@@ -16,12 +16,14 @@ import {
   deleteCategory,
   getLeafPageData,
   getConsolidatedLeafData,
+  getAggregatedFilterData,
   type Category,
   type CategoryTreeNode,
   type CreateCategoryInput,
   type UpdateCategoryInput,
   type LeafPageView,
   type ConsolidatedLeafPageView,
+  type AggregatedFilterDataView,
 } from './';
 
 export const CATEGORIES_QUERY_KEY = ['categories'];
@@ -67,6 +69,15 @@ export function useConsolidatedLeafData(slug: string): UseQueryResult<Consolidat
   return useQuery({
     queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'consolidated', slug],
     queryFn: () => getConsolidatedLeafData(slug),
+    enabled: !!slug,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useAggregatedFilterData(slug: string): UseQueryResult<AggregatedFilterDataView, Error> {
+  return useQuery({
+    queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'filter-data', slug],
+    queryFn: () => getAggregatedFilterData(slug),
     enabled: !!slug,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });

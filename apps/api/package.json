@@ -16,10 +16,14 @@
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "storage:make-public": "tsx src/scripts/set-bucket-public.ts"
+    "storage:make-public": "tsx src/scripts/set-bucket-public.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1012.0",
+    "@aws-sdk/client-s3": "^3.1026.0",
+    "@aws-sdk/lib-storage": "^3.1026.0",
     "@fastify/multipart": "^9.0.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.0",
@@ -47,6 +51,7 @@
     "fastify": "^5.0.0",
     "ioredis": "^5.6.1",
     "meilisearch": "^0.55.0",
+    "mime-types": "^3.0.2",
     "p-limit": "^7.3.0",
     "pg": "^8.19.0",
     "reflect-metadata": "^0.2.2",
@@ -60,11 +65,15 @@
     "@nestjs/testing": "^11.1.14",
     "@types/adm-zip": "^0.5.5",
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.18.0",
     "@types/unzipper": "^0.10.11",
     "@types/uuid": "^11.0.0",
+    "jest": "^30.3.0",
     "prisma": "^7.4.2",
+    "ts-jest": "^29.4.9",
     "tsx": "^4.21.0",
     "typescript": "^5.8.0"
   }

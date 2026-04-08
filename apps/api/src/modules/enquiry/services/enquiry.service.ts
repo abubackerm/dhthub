@@ -1,12 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BaseService } from '@shared/domain';
+import { BaseService, TransactionalExecutor } from '@shared/domain';
 import { ENQUIRY_EVENTS } from '@shared/events';
 import {
   EnquiryNotFoundError,
   EnquiryCannotBeModifiedError,
-  CartAlreadySubmittedError,
 } from '../domain/errors';
+import { CartNotActiveError } from '../../cart/domain/errors/cart.errors';
 import { EnquiryRepository, EnquiryItemRepository, EnquiryWithItems } from '../repositories';
 import { CartRepository } from '../../cart/repositories/cart.repository';
 import { ProductVariantRepository, ProductRepository } from '../../catalog/repositories';
@@ -19,6 +19,8 @@ import { EnquiryCreatedEvent, EnquiryStatusUpdatedEvent } from '../events';
 export class EnquiryService extends BaseService {
   constructor(
     eventEmitter: EventEmitter2,
+    @Inject('TransactionalExecutor')
+    private readonly txExecutor: TransactionalExecutor,
     private readonly enquiryRepo: EnquiryRepository,
     private readonly enquiryItemRepo: EnquiryItemRepository,
     private readonly cartRepo: CartRepository,
@@ -29,21 +31,20 @@ export class EnquiryService extends BaseService {
   }
 
   async createFromCart(userId: string, dto: CreateEnquiryFromCartDto, user?: any): Promise<EnquiryView> {
-    const cart = await this.cartRepo.findByUserIdWithItems(userId);
+    const cart = await this.cartRepo.findActiveByUserIdWithItems(userId);
 
     if (!cart) {
       throw new EnquiryNotFoundError(`Cart for user ${userId} not found`);
     }
 
-    if (cart.submittedAt) {
-      throw new CartAlreadySubmittedError(cart.id);
+    if (!cart.isActive) {
+      throw new CartNotActiveError(cart.id);
     }
 
     if (!cart.items || cart.items.length === 0) {
       throw new EnquiryCannotBeModifiedError(cart.id, 'Cannot create enquiry from empty cart');
     }
 
-    // Use user's email and name if not provided in DTO
     const customerName = dto.customerName || user?.name || user?.email?.split('@')[0] || 'Customer';
     const email = dto.email || user?.email;
 
@@ -71,9 +72,11 @@ export class EnquiryService extends BaseService {
       qty: item.qty,
     }));
 
-    await this.enquiryItemRepo.createManyWithDetails(enquiryItems);
-
-    await this.cartRepo.markSubmitted(cart.id);
+    await this.txExecutor.execute(async () => {
+      await this.enquiryItemRepo.createManyWithDetails(enquiryItems);
+      await this.cartRepo.markSubmitted(cart.id);
+      await this.cartRepo.createActiveCart(userId);
+    });
 
     this.emit(ENQUIRY_EVENTS.ENQUIRY_CREATED, new EnquiryCreatedEvent(
       enquiry.id,

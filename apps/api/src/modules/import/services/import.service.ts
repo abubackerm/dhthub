@@ -91,7 +91,7 @@ export class ImportService {
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const storageKey = `/imports/${year}/${month}/${timestamp}-${originalname}`;
+    const storageKey = `imports/${year}/${month}/${timestamp}-${originalname}`;
     const fileUrl = await this.storageService.uploadFile(
       storageKey,
       file.buffer,
@@ -162,23 +162,50 @@ export class ImportService {
       throw new BadRequestException('ZIP file too large');
     }
 
-    this.logger.log(`Uploading ZIP file: ${originalname} (${file.size} bytes)`);
+    const fileSizeKB = (file.size / 1024).toFixed(2);
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+
+    this.logger.log(`[uploadZip] Starting ZIP file upload`);
+    this.logger.log(`[uploadZip]   - Filename: ${originalname}`);
+    this.logger.log(`[uploadZip]   - Size: ${file.size} bytes (${fileSizeKB} KB, ${fileSizeMB} MB)`);
+    this.logger.log(`[uploadZip]   - MIME type: ${file.mimetype}`);
+    this.logger.log(`[uploadZip]   - Import type: ${options?.importType || 'CATALOG'}`);
+    this.logger.log(`[uploadZip]   - Mode: ${options?.mode || 'UPSERT'}`);
+    this.logger.log(`[uploadZip]   - Strategy: ${options?.strategy || 'replace'}`);
+    this.logger.log(`[uploadZip]   - Created by: ${options?.createdBy || 'unknown'}`);
 
     // Save file to SeaweedFS
     const timestamp = Date.now();
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const storageKey = `/imports/${year}/${month}/${timestamp}-${originalname}`;
+    const storageKey = `imports/${year}/${month}/${timestamp}-${originalname}`;
+
+    this.logger.log(`[uploadZip] Uploading to SeaweedFS...`);
+    this.logger.log(`[uploadZip]   - Storage key: ${storageKey}`);
+    this.logger.log(`[uploadZip]   - Timestamp: ${timestamp}`);
+
+    const uploadStartTime = Date.now();
     const fileUrl = await this.storageService.uploadFile(
       storageKey,
       file.buffer,
       'application/zip',
     );
+    const uploadDuration = Date.now() - uploadStartTime;
 
-    this.logger.debug(`File uploaded to SeaweedFS: ${fileUrl}`);
+    this.logger.log(`[uploadZip] SeaweedFS upload complete`);
+    this.logger.log(`[uploadZip]   - File URL: ${fileUrl}`);
+    this.logger.log(`[uploadZip]   - Upload duration: ${uploadDuration}ms`);
+
+    // Wait 3 seconds to allow SeaweedFS to fully process the file
+    this.logger.log(`[uploadZip] Waiting 3 seconds for SeaweedFS to fully process uploaded file...`);
+    const waitStartTime = Date.now();
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    this.logger.log(`[uploadZip] Wait complete (${Date.now() - waitStartTime}ms elapsed)`);
 
     // Create import job (will process ZIP later in worker)
+    this.logger.log(`[uploadZip] Creating import job...`);
+
     const job = await this.importJobService.create({
       fileUrl,
       fileName: originalname,
@@ -192,7 +219,15 @@ export class ImportService {
       importType: options?.importType,
     });
 
-    this.logger.log(`ZIP upload complete: job ${job.id}`);
+    this.logger.log(`[uploadZip] Import job created successfully`);
+    this.logger.log(`[uploadZip]   - Job ID: ${job.id}`);
+    this.logger.log(`[uploadZip]   - Job status: ${job.status}`);
+    this.logger.log(`[uploadZip]   - Job type: ${job.type}`);
+    this.logger.log(`[uploadZip]   - Import type: ${job.importType}`);
+    this.logger.log(`[uploadZip] ZIP upload complete: job ${job.id}`);
+
+    const totalDuration = Date.now() - timestamp;
+    this.logger.log(`[uploadZip] Total operation duration: ${totalDuration}ms (upload: ${uploadDuration}ms + wait: 3000ms + job creation: ${totalDuration - uploadDuration - 3000}ms)`);
 
     return {
       jobId: job.id,

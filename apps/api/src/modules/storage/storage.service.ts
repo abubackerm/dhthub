@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
+import { Readable } from 'stream';
 import { IStorageService } from './storage.interface';
 
 @Injectable()
@@ -46,7 +48,7 @@ export class StorageService implements IStorageService {
 
       await this.s3Client.send(command);
       this.logger.log(`Successfully uploaded file: ${key}`);
-      return `${this.endpoint}/${this.bucketName}${key}`;
+      return `${this.endpoint}/${this.bucketName}/${key}`;
     } catch (error) {
       this.logger.error(`Failed to upload file: ${key}`, error);
       throw error;
@@ -54,7 +56,7 @@ export class StorageService implements IStorageService {
   }
 
   async getFileUrl(key: string): Promise<string> {
-    return `${this.endpoint}/${this.bucketName}${key}`;
+    return `${this.endpoint}/${this.bucketName}/${key.replace(/^\//, '')}`;
   }
 
   async getFile(key: string): Promise<Buffer> {
@@ -88,6 +90,45 @@ export class StorageService implements IStorageService {
       this.logger.log(`Successfully deleted file: ${key}`);
     } catch (error) {
       this.logger.error(`Failed to delete file: ${key}`, error);
+      throw error;
+    }
+  }
+
+  async getFileStream(key: string): Promise<Readable> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+      const response = await this.s3Client.send(command);
+      if (!response.Body) {
+        throw new Error(`Empty response body for file: ${key}`);
+      }
+      return response.Body as Readable;
+    } catch (error) {
+      this.logger.error(`Failed to get file stream: ${key}`, error);
+      throw error;
+    }
+  }
+
+  async uploadStream(key: string, body: Readable, contentType: string): Promise<string> {
+    try {
+      const upload = new Upload({
+        client: this.s3Client,
+        params: {
+          Bucket: this.bucketName,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+        },
+        queueSize: 4,
+        partSize: 5 * 1024 * 1024,
+      });
+      await upload.done();
+      this.logger.log(`Successfully uploaded stream: ${key}`);
+      return `${this.endpoint}/${this.bucketName}/${key}`;
+    } catch (error) {
+      this.logger.error(`Failed to upload stream: ${key}`, error);
       throw error;
     }
   }

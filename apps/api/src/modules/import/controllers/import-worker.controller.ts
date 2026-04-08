@@ -6,6 +6,7 @@ import { ImportJobService } from '../services/import-job.service';
 import { ImageImportService, ImageUploadStrategy } from '../services/image-import.service';
 import { CategoryImportService } from '../services/category-import.service';
 import { ImportJobStatus } from '../entities/import-job-status.enum';
+import { StorageService } from '@modules/storage/storage.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import unzipper from 'unzipper';
@@ -27,6 +28,7 @@ export class ImportWorkerController {
     private readonly importJobService: ImportJobService,
     private readonly imageImportService: ImageImportService,
     private readonly categoryImportService: CategoryImportService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -51,10 +53,18 @@ export class ImportWorkerController {
       throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
     }
 
-    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
-    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+    let filePath: string;
+    let isTempFile = false;
 
-    this.logger.log(`[processCatalog] Resolved file path: ${filePath}`);
+    if (this.isSeaweedFSUrl(actualFileUrl)) {
+      filePath = await this.downloadFromSeaweedFS(actualFileUrl);
+      isTempFile = true;
+      this.logger.log(`[processCatalog] Downloaded file from SeaweedFS to temp: ${filePath}`);
+    } else {
+      const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+      filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+      this.logger.log(`[processCatalog] Resolved file path: ${filePath}`);
+    }
 
     if (!fs.existsSync(filePath)) {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
@@ -63,6 +73,12 @@ export class ImportWorkerController {
     let extractedFiles: ExtractedFiles | undefined;
 
     try {
+      // Validate ZIP file before processing
+      this.logger.log(`[processCatalog] Validating ZIP file for job ${jobId}`);
+      this.logger.log(`[processCatalog] ZIP file path: ${filePath}`);
+      await this.validateZipFile(filePath, 'catalog', false);
+      this.logger.log(`[processCatalog] ZIP validation passed for job ${jobId}`);
+
       const zipBuffer = fs.readFileSync(filePath);
       extractedFiles = await this.zipExtractorService.extract(zipBuffer, 'CATALOG');
 
@@ -79,6 +95,9 @@ export class ImportWorkerController {
       if (extractedFiles) {
         await this.zipExtractorService.cleanup(extractedFiles).catch(() => {});
       }
+      if (isTempFile) {
+        await this.cleanupTempFile(filePath);
+      }
     }
   }
 
@@ -94,6 +113,7 @@ export class ImportWorkerController {
   /**
    * Worker API: Process image import (called by BullMQ worker)
    * POST /v1/import/worker/process-images
+   * Uses pure streaming - no temp files written to disk
    */
   @Post('process-images')
   async processImages(@Body() body: { jobId: string; fileUrl: string; strategy?: 'skip' | 'replace' }) {
@@ -122,7 +142,6 @@ export class ImportWorkerController {
     let actualFileUrl = fileUrl;
     if (!actualFileUrl) {
       this.logger.warn(`fileUrl not provided in request, retrieving from database for job ${jobId}`);
-      const job = await this.importJobService.findById(jobId);
       actualFileUrl = job.fileUrl;
       this.logger.log(`[processImages] Retrieved fileUrl from database: "${actualFileUrl}"`);
     }
@@ -131,21 +150,21 @@ export class ImportWorkerController {
       throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
     }
 
-    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
-    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
-
-    this.logger.log(`[processImages] Resolved file path: ${filePath}`);
-
-    if (!fs.existsSync(filePath)) {
-      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
-    }
+    // Extract storage key from URL (handle URL-encoded paths)
+    // URL format: http://localhost:8333/catalog/imports/...
+    // Storage key: imports/... (without /catalog prefix, no leading slash)
+    const urlParts = new URL(actualFileUrl);
+    const storageKey = decodeURIComponent(urlParts.pathname).replace(/^\/[^/]+\//, '');
+    
+    this.logger.log(`[ImageImport] Extracted storage key: ${storageKey}`);
 
     try {
-      // Count total images in ZIP first
-      const totalImages = await this.countImagesInZip(filePath);
-      this.logger.log(`[processImages] Found ${totalImages} images in ZIP`);
+      // Get stream from SeaweedFS
+      this.logger.log(`[ImageImport] Getting stream from SeaweedFS for key: ${storageKey}`);
+      const zipStream = await this.storageService.getFileStream(storageKey);
+      this.logger.log(`[ImageImport] Successfully obtained stream from SeaweedFS`);
 
-      // Set total count and mark job as processing
+      // Set initial progress and mark job as processing
       await this.importJobService.updateProgress(jobId, {
         processedRows: 0,
         successRows: 0,
@@ -154,9 +173,31 @@ export class ImportWorkerController {
       await this.importJobService.markAsProcessing(jobId, `image-worker-${process.pid}`);
 
       const uploadStrategy: ImageUploadStrategy = strategy === 'skip' ? ImageUploadStrategy.SKIP : ImageUploadStrategy.REPLACE;
-      const result = await this.imageImportService.processImageZip(filePath, uploadStrategy);
+      this.logger.log(`[processImages] Starting image processing with strategy: ${uploadStrategy}`);
+      this.logger.log(`[processImages] Calling imageImportService.processImageZip with stream`);
+
+      // Pass stream to service for processing
+      const result = await this.imageImportService.processImageZip(zipStream, uploadStrategy);
+
+      this.logger.log(`[processImages] ImageImportService returned results:`);
+      this.logger.log(`[processImages]   - Processed: ${result.processed.length} images`);
+      this.logger.log(`[processImages]   - Skipped: ${result.skipped.length} images`);
+      this.logger.log(`[processImages]   - Total: ${result.total} images`);
+
+      if (result.processed.length > 0) {
+        this.logger.log(`[processImages]   - First few processed SKUs: ${result.processed.slice(0, 5).map(p => p.sku).join(', ')}`);
+      }
+      if (result.skipped.length > 0) {
+        this.logger.log(`[processImages]   - First few skipped SKUs: ${result.skipped.slice(0, 5).map(s => s.sku).join(', ')}`);
+      }
 
       this.logger.log(`[processImages] Processed ${result.processed.length} images, skipped ${result.skipped.length} for job ${jobId}`);
+
+      // Final safety check
+      if (result.processed.length === 0) {
+        this.logger.error('[ImageImport] NO IMAGES PROCESSED');
+        throw new BadRequestException('No images found in ZIP');
+      }
 
       // Update job with actual counts
       await this.importJobService.updateProgress(jobId, {
@@ -168,15 +209,25 @@ export class ImportWorkerController {
       // Mark job as completed
       await this.importJobService.markAsCompleted(jobId);
 
-    this.logger.log(`[ImageImport] Marking job ${jobId} as completed with ${result.processed.length} processed, ${result.skipped.length} skipped`);
+      this.logger.log(`[ImageImport] Marking job ${jobId} as completed with ${result.processed.length} processed, ${result.skipped.length} skipped`);
 
-    return { success: true, jobId, processedCount: result.processed.length, skippedCount: result.skipped.length, totalImages: result.total };
+      return { success: true, jobId, processedCount: result.processed.length, skippedCount: result.skipped.length, totalImages: result.total };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+      
+      // Check for NoSuchKey error (permanent 404 - no retry)
+      const isNoSuchKey = error && typeof error === 'object' && 'Code' in error && (error as any).Code === 'NoSuchKey';
+      if (isNoSuchKey) {
+        this.logger.error(`[ImageImport] ZIP file not found in storage: ${storageKey}`);
+        await this.importJobService.markAsFailed(jobId);
+        throw new BadRequestException(`ZIP file not found in storage: ${storageKey}`);
+      }
+      
       this.logger.error(`[ImageImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       await this.importJobService.markAsFailed(jobId);
       throw error;
     }
+    // No finally block - no temp files to clean up with streaming
   }
 
   /**
@@ -201,16 +252,30 @@ export class ImportWorkerController {
       throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
     }
 
-    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
-    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+    let filePath: string;
+    let isTempFile = false;
 
-    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    if (this.isSeaweedFSUrl(actualFileUrl)) {
+      filePath = await this.downloadFromSeaweedFS(actualFileUrl);
+      isTempFile = true;
+      this.logger.log(`[CategoryImport] Downloaded file from SeaweedFS to temp: ${filePath}`);
+    } else {
+      const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+      filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+      this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    }
 
     if (!fs.existsSync(filePath)) {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
     }
 
     try {
+      // Validate ZIP file before processing
+      this.logger.log(`[CategoryImport] Validating ZIP file for CREATE job ${jobId}`);
+      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+      await this.validateZipFile(filePath, 'category-create', false);
+      this.logger.log(`[CategoryImport] ZIP validation passed for CREATE job ${jobId}`);
+
       const result = await this.categoryImportService.processCreateImport(jobId, filePath);
 
       this.logger.log(
@@ -228,6 +293,10 @@ export class ImportWorkerController {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
+    } finally {
+      if (isTempFile) {
+        await this.cleanupTempFile(filePath);
+      }
     }
   }
 
@@ -253,16 +322,30 @@ export class ImportWorkerController {
       throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
     }
 
-    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
-    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+    let filePath: string;
+    let isTempFile = false;
 
-    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    if (this.isSeaweedFSUrl(actualFileUrl)) {
+      filePath = await this.downloadFromSeaweedFS(actualFileUrl);
+      isTempFile = true;
+      this.logger.log(`[CategoryImport] Downloaded file from SeaweedFS to temp: ${filePath}`);
+    } else {
+      const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+      filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+      this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    }
 
     if (!fs.existsSync(filePath)) {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
     }
 
     try {
+      // Validate ZIP file before processing
+      this.logger.log(`[CategoryImport] Validating ZIP file for UPDATE job ${jobId}`);
+      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+      await this.validateZipFile(filePath, 'category-update', false);
+      this.logger.log(`[CategoryImport] ZIP validation passed for UPDATE job ${jobId}`);
+
       const result = await this.categoryImportService.processUpdateImport(jobId, filePath);
 
       this.logger.log(
@@ -281,6 +364,10 @@ export class ImportWorkerController {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
+    } finally {
+      if (isTempFile) {
+        await this.cleanupTempFile(filePath);
+      }
     }
   }
 
@@ -306,16 +393,30 @@ export class ImportWorkerController {
       throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
     }
 
-    const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
-    const filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+    let filePath: string;
+    let isTempFile = false;
 
-    this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    if (this.isSeaweedFSUrl(actualFileUrl)) {
+      filePath = await this.downloadFromSeaweedFS(actualFileUrl);
+      isTempFile = true;
+      this.logger.log(`[CategoryImport] Downloaded file from SeaweedFS to temp: ${filePath}`);
+    } else {
+      const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+      filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+      this.logger.log(`[CategoryImport] Resolved file path: ${filePath}`);
+    }
 
     if (!fs.existsSync(filePath)) {
       throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
     }
 
     try {
+      // Validate ZIP file before processing
+      this.logger.log(`[CategoryImport] Validating ZIP file for EDIT job ${jobId}`);
+      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+      await this.validateZipFile(filePath, 'category-edit', false);
+      this.logger.log(`[CategoryImport] ZIP validation passed for EDIT job ${jobId}`);
+
       const result = await this.categoryImportService.processEditImport(jobId, filePath);
 
       this.logger.log(
@@ -333,23 +434,119 @@ export class ImportWorkerController {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[CategoryImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
+    } finally {
+      if (isTempFile) {
+        await this.cleanupTempFile(filePath);
+      }
     }
   }
 
   /**
-   * Count total image files in ZIP without processing them
+   * Validate ZIP file before processing
+   * Checks: file exists, valid ZIP structure, contains images (optional)
+   * @param zipPath Path to ZIP file
+   * @param importType Type of import (for logging)
+   * @param requireImages Whether ZIP must contain images (default: true)
    */
-  private async countImagesInZip(zipPath: string): Promise<number> {
-    const directory = await unzipper.Open.file(zipPath);
-    let count = 0;
+  private async validateZipFile(zipPath: string, importType: string, requireImages: boolean = true): Promise<void> {
+    this.logger.log(`[DEBUG] Validating ZIP: ${zipPath}`);
+    let debugDirectory: any;
+    try {
+      debugDirectory = await unzipper.Open.file(zipPath);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorStr = `Invalid ZIP file structure: ${errorMsg}`;
+      this.logger.error(`[DEBUG] ${errorStr}`);
+      throw new BadRequestException(errorStr);
+    }
+    this.logger.log(`[DEBUG] ZIP TOTAL ENTRIES: ${debugDirectory.files.length}`);
+    for (const file of debugDirectory.files) {
+      this.logger.log(`[DEBUG] ZIP ENTRY: ${file.path}`);
+    }
 
-    for (const file of directory.files) {
-      if (this.isValidImageFile(file.path)) {
-        count++;
+    this.logger.log(`[validateZipFile] Starting validation for ${importType} import: ${zipPath}`);
+    this.logger.log(`[validateZipFile] Require images: ${requireImages}`);
+
+    // 1. Check file exists
+    if (!fs.existsSync(zipPath)) {
+      const error = `ZIP file not found: ${zipPath}`;
+      this.logger.error(`[validateZipFile] ${error}`);
+      throw new BadRequestException(error);
+    }
+
+    // 2. Check file size
+    const stats = fs.statSync(zipPath);
+    const fileSizeBytes = stats.size;
+    const fileSizeKB = (fileSizeBytes / 1024).toFixed(2);
+
+    if (fileSizeBytes === 0) {
+      const error = `ZIP file is empty (0 bytes): ${zipPath}`;
+      this.logger.error(`[validateZipFile] ${error}`);
+      throw new BadRequestException(error);
+    }
+
+    this.logger.log(`[validateZipFile] File exists and has size: ${fileSizeBytes} bytes (${fileSizeKB} KB)`);
+
+    // 3. Validate ZIP structure (already opened above as debugDirectory)
+    this.logger.log(`[validateZipFile] ZIP structure is valid. Total entries: ${debugDirectory.files.length}`);
+
+    // 4. Check if ZIP contains files
+    const fileEntries = debugDirectory.files.filter((f: any) => f.type !== 'Directory');
+    if (fileEntries.length === 0) {
+      const error = `ZIP file contains no files (only directories or empty)`;
+      this.logger.error(`[validateZipFile] ${error}`);
+      throw new BadRequestException(error);
+    }
+
+    // 5. Check if ZIP contains images (if required)
+    let imageCount = 0;
+    const imageFiles: string[] = [];
+    const nonImageFiles: string[] = [];
+
+    for (const file of debugDirectory.files) {
+      if (file.type === 'Directory') continue;
+
+      const fileName = file.path;
+      const isImage = this.isValidImageFile(fileName);
+
+      if (isImage) {
+        imageCount++;
+        imageFiles.push(fileName);
+      } else {
+        nonImageFiles.push(fileName);
       }
     }
 
-    return count;
+    this.logger.log(`[validateZipFile] ZIP content analysis:`);
+    this.logger.log(`[validateZipFile]   - Total files: ${fileEntries.length}`);
+    this.logger.log(`[validateZipFile]   - Image files: ${imageCount}`);
+    this.logger.log(`[validateZipFile]   - Non-image files: ${nonImageFiles.length}`);
+
+    if (requireImages && imageCount === 0) {
+      const error = `ZIP file contains no valid image files. Found ${nonImageFiles.length} non-image files: ${nonImageFiles.slice(0, 5).join(', ') || 'none'}`;
+      this.logger.error(`[validateZipFile] ${error}`);
+      throw new BadRequestException(error);
+    }
+
+    // 6. Log sample files
+    if (imageFiles.length > 0) {
+      const sampleCount = Math.min(10, imageFiles.length);
+      this.logger.log(`[validateZipFile] Sample image files (${sampleCount} of ${imageFiles}):`);
+      for (let i = 0; i < sampleCount; i++) {
+        const fileName = imageFiles[i];
+        const basename = path.basename(fileName);
+        const inSubfolder = fileName.includes('/');
+        this.logger.log(`[validateZipFile]   [${i + 1}] "${basename}" ${inSubfolder ? '(in subfolder)' : '(root)'}`);
+      }
+      if (imageFiles.length > sampleCount) {
+        this.logger.log(`[validateZipFile]   ... and ${imageFiles.length - sampleCount} more`);
+      }
+    } else if (nonImageFiles.length > 0) {
+      const sampleCount = Math.min(5, nonImageFiles.length);
+      this.logger.log(`[validateZipFile] Sample non-image files (${sampleCount} of ${nonImageFiles.length}): ${nonImageFiles.slice(0, sampleCount).join(', ')}`);
+    }
+
+    this.logger.log(`[validateZipFile] Validation passed for ${importType} import: ${zipPath}`);
   }
 
   /**
@@ -357,6 +554,131 @@ export class ImportWorkerController {
    */
   private isValidImageFile(filePath: string): boolean {
     const ext = path.extname(filePath).toLowerCase();
-    return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext);
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    const isValid = validExtensions.includes(ext);
+    
+    if (isValid) {
+      this.logger.debug(`[isValidImageFile] Valid image: "${filePath}" (extension: "${ext}")`);
+    } else {
+      this.logger.debug(`[isValidImageFile] Invalid image: "${filePath}" (extension: "${ext}")`);
+    }
+    
+    return isValid;
+  }
+
+  /**
+   * Check if the given fileUrl is a SeaweedFS URL
+   */
+  private isSeaweedFSUrl(fileUrl: string): boolean {
+    return fileUrl.startsWith('http://') || fileUrl.startsWith('https://');
+  }
+
+  /**
+   * Download a file from SeaweedFS URL to local temp storage
+   * Implements retry logic with exponential backoff and file integrity checks
+   */
+  private async downloadFromSeaweedFS(fileUrl: string): Promise<string> {
+    const maxRetries = 3;
+    const baseDelay = 1000; // 1 second
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const urlParts = new URL(fileUrl);
+        // Extract storage key by removing bucket name from pathname
+        // URL format: http://localhost:8333/catalog/imports/...
+        // Storage key: imports/... (without /catalog prefix, no leading slash)
+        const bucketName = 'catalog';
+        let storageKey = urlParts.pathname;
+        if (storageKey.startsWith(`/${bucketName}/`)) {
+          storageKey = storageKey.substring(bucketName.length + 2); // Remove '/catalog/'
+        } else if (storageKey.startsWith(`/${bucketName}`)) {
+          storageKey = storageKey.substring(bucketName.length + 1); // Remove '/catalog'
+        }
+        // Ensure no leading slash
+        storageKey = storageKey.replace(/^\//, '');
+
+        this.logger.log(`[downloadFromSeaweedFS] Attempt ${attempt}/${maxRetries}: Downloading from SeaweedFS`);
+        this.logger.log(`[downloadFromSeaweedFS] Original pathname: ${urlParts.pathname}`);
+        this.logger.log(`[downloadFromSeaweedFS] Storage key (stripped): ${storageKey}`);
+        this.logger.log(`[downloadFromSeaweedFS] Full URL: ${fileUrl}`);
+
+        const buffer = await this.storageService.getFile(storageKey);
+
+        // File integrity check: buffer must be at least 1000 bytes
+        if (buffer.length < 1000) {
+          const error = `Downloaded file too small (${buffer.length} bytes), likely not ready or incomplete`;
+          this.logger.error(`[downloadFromSeaweedFS] ${error}`);
+          throw new Error(error);
+        }
+
+        const fileSize = buffer.length;
+        const fileSizeKB = (fileSize / 1024).toFixed(2);
+        const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+
+        this.logger.log(`[downloadFromSeaweedFS] Downloaded buffer size: ${fileSize} bytes (${fileSizeKB} KB, ${fileSizeMB} MB)`);
+
+        const tempDir = path.join(process.cwd(), 'uploads', 'import', 'temp');
+        await fs.promises.mkdir(tempDir, { recursive: true });
+
+        const tempFilePath = path.join(tempDir, `${Date.now()}-${path.basename(storageKey)}`);
+        await fs.promises.writeFile(tempFilePath, buffer);
+
+        this.logger.log(`[downloadFromSeaweedFS] File written to temp: ${tempFilePath}`);
+
+        // File integrity check: verify ZIP can be opened
+        try {
+          this.logger.log(`[downloadFromSeaweedFS] Validating ZIP structure...`);
+          await unzipper.Open.file(tempFilePath);
+          this.logger.log(`[downloadFromSeaweedFS] ZIP structure is valid`);
+        } catch (zipError) {
+          const errorMsg = zipError instanceof Error ? zipError.message : String(zipError);
+          const error = `ZIP file is corrupted or incomplete: ${errorMsg}`;
+          this.logger.error(`[downloadFromSeaweedFS] ${error}`);
+          throw new Error(error);
+        }
+
+        // Verify file was written correctly
+        const stats = fs.statSync(tempFilePath);
+        this.logger.log(`[downloadFromSeaweedFS] File size on disk: ${stats.size} bytes`);
+
+        if (stats.size !== fileSize) {
+          this.logger.warn(`[downloadFromSeaweedFS] File size mismatch! Buffer: ${fileSize} bytes, Disk: ${stats.size} bytes`);
+        }
+
+        return tempFilePath;
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`[downloadFromSeaweedFS] Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+
+        if (attempt === maxRetries) {
+          this.logger.error(`[downloadFromSeaweedFS] All ${maxRetries} attempts failed. Final error: ${errorMsg}`);
+          if (error instanceof Error && error.stack) {
+            this.logger.error(`[downloadFromSeaweedFS] Stack trace: ${error.stack}`);
+          }
+          throw error;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        this.logger.log(`[downloadFromSeaweedFS] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    // This line should never be reached due to logic above
+    throw new Error('downloadFromSeaweedFS: Unexpected code path reached');
+  }
+
+  /**
+   * Clean up a temp file
+   */
+  private async cleanupTempFile(filePath: string): Promise<void> {
+    try {
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+        this.logger.debug(`[cleanupTempFile] Cleaned up temp file: ${filePath}`);
+      }
+    } catch (error) {
+      this.logger.warn(`[cleanupTempFile] Failed to clean up temp file ${filePath}: ${error}`);
+    }
   }
 }

@@ -20,12 +20,3 @@ export class EnquiryCannotBeModifiedError extends InvalidOperationError {
     );
   }
 }
-
-export class CartAlreadySubmittedError extends InvalidOperationError {
-  constructor(cartId: string) {
-    super(
-      `Cart has already been submitted for enquiry: ${cartId}`,
-      'CART_ALREADY_SUBMITTED',
-    );
-  }
-}

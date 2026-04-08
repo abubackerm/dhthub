@@ -5,10 +5,11 @@ import { ImportJobService } from './import-job.service';
 import { ImportErrorRepository } from '../repositories/import-error.repository';
 import { ExtractedFiles } from '../dto';
 import * as fs from 'fs';
+import * as path from 'path';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImageImportService } from './image-import.service';
 import { createHash } from 'crypto';
-import { Readable } from 'stream';
+import { StorageService } from '../../storage/storage.service';
 
 const SYSTEM_FIELDS = ['product_sku', 'sku', 'price', 'stock'];
 
@@ -81,6 +82,7 @@ export interface VariantBatchItem {
 export class CatalogImportService {
   private readonly logger = new Logger(CatalogImportService.name);
   private readonly batchSize = 500;
+  private tempFiles: string[] = [];
 
   constructor(
     private readonly db: DatabaseProvider,
@@ -89,6 +91,7 @@ export class CatalogImportService {
     private readonly importErrorRepository: ImportErrorRepository,
     private readonly eventEmitter: EventEmitter2,
     private readonly imageImportService: ImageImportService,
+    private readonly storageService: StorageService,
   ) {}
 
   private async updateJobProgress(
@@ -181,6 +184,9 @@ export class CatalogImportService {
 
       await this.importJobService.markAsFailed(jobId);
       throw error;
+    } finally {
+      // Clean up temp files
+      await this.cleanupTempFiles();
     }
   }
 
@@ -189,10 +195,17 @@ export class CatalogImportService {
    * Products/attributes are supporting data; variants represent the actual items imported.
    */
   private async countTotalRows(extractedFiles: ExtractedFiles): Promise<number> {
-    if (!extractedFiles.variants || !fs.existsSync(extractedFiles.variants)) {
+    if (!extractedFiles.variants) {
       return 0;
     }
-    const stream = fs.createReadStream(extractedFiles.variants, { encoding: 'utf8' });
+
+    // Download if URL
+    const { localPath } = await this.downloadIfUrl(extractedFiles.variants);
+
+    if (!fs.existsSync(localPath)) {
+      return 0;
+    }
+    const stream = fs.createReadStream(localPath, { encoding: 'utf8' });
     return this.csvParserService.countRows(stream);
   }
 
@@ -265,8 +278,14 @@ export class CatalogImportService {
 
     this.logger.log(`Loaded ${Object.keys(context.productMap).length} existing products from database`);
 
-    const fileStream = Readable.from(fileBuffer);
-    const result = await this.step3_importVariants(fileStream, context, jobId);
+    // Write buffer to temp file and process it
+    const tempDir = path.join(process.cwd(), 'uploads', 'import', 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    const tempFilePath = path.join(tempDir, `${Date.now()}-standalone-variants.csv`);
+    await fs.promises.writeFile(tempFilePath, fileBuffer);
+    this.tempFiles.push(tempFilePath);
+
+    const result = await this.step3_importVariants(tempFilePath, context, jobId);
 
     await this.importJobService.updateProgress(jobId, {
       processedRows: result.processed,
@@ -288,8 +307,11 @@ export class CatalogImportService {
     filePath: string,
     jobId: string,
   ): Promise<{ productMap: ProductMap; processed: number; success: number; failed: number }> {
+    // Download if URL
+    const { localPath } = await this.downloadIfUrl(filePath);
+
     const productMap: ProductMap = {};
-    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const fileStream = fs.createReadStream(localPath, { encoding: 'utf8' });
     let processedCount = 0;
     let successCount = 0;
     let errorCount = 0;
@@ -502,8 +524,11 @@ export class CatalogImportService {
    * Step 2: Import attributes from CSV
    */
   private async step2_importAttributes(filePath: string, jobId: string): Promise<AttributeMap> {
+    // Download if URL
+    const { localPath } = await this.downloadIfUrl(filePath);
+
     const attributeMap: AttributeMap = {};
-    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    const fileStream = fs.createReadStream(localPath, { encoding: 'utf8' });
 
     try {
       for await (const { data, rowNumber } of this.csvParserService.parseStream(fileStream)) {
@@ -571,19 +596,20 @@ export class CatalogImportService {
    * Step 3: Import variants from CSV
    */
   private async step3_importVariants(
-    streamOrPath: string | Readable,
+    filePath: string,
     context: ImportContext,
     jobId: string,
   ): Promise<{ processed: number; success: number; failed: number }> {
-    const fileStream = typeof streamOrPath === 'string'
-      ? fs.createReadStream(streamOrPath, { encoding: 'utf8' })
-      : streamOrPath;
+    // Download if URL
+    const { localPath } = await this.downloadIfUrl(filePath);
+
+    const fileStream = fs.createReadStream(localPath, { encoding: 'utf8' });
     let batch: VariantBatchItem[] = [];
     let processedCount = 0;
     let successCount = 0;
     let errorCount = 0;
 
-    this.logger.log(`Starting to process variants file: ${typeof streamOrPath === 'string' ? streamOrPath : '<buffer>'}`);
+    this.logger.log(`Starting to process variants file: ${filePath}`);
 
     try {
       for await (const { data, rowNumber } of this.csvParserService.parseStream(fileStream)) {
@@ -666,6 +692,8 @@ export class CatalogImportService {
     let successCount = 0;
 
     await this.db.$transaction(async (prisma) => {
+      const categoryAttributePairs = new Set<string>();
+
       for (const item of batch) {
         try {
           // Check if variant already exists
@@ -762,6 +790,7 @@ export class CatalogImportService {
             }
 
             await this.createAttributeValue(prisma, variant.id, attribute.id, finalValue, attribute.dataType);
+            categoryAttributePairs.add(attribute.id);
           }
 
           successCount++;
@@ -770,6 +799,44 @@ export class CatalogImportService {
           const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger.error(`Failed to import variant ${item.sku}: ${errorMessage}`);
         }
+      }
+
+      // Auto-create category_attribute links for all attributes used in this batch
+      if (categoryAttributePairs.size > 0) {
+        const productIds = [...new Set(batch.map((item) => item.productId))];
+        const productsWithCategory = await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: {
+            id: true,
+            cell: { select: { categoryId: true } },
+          },
+        });
+
+        const productIdToCategoryId = new Map<string, string>();
+        for (const p of productsWithCategory) {
+          if (p.cell?.categoryId) {
+            productIdToCategoryId.set(p.id, p.cell.categoryId);
+          }
+        }
+
+        const categoryIds = [...new Set(productIdToCategoryId.values())];
+        const attributeIds = [...categoryAttributePairs];
+
+        for (const categoryId of categoryIds) {
+          for (const attributeId of attributeIds) {
+            await prisma.categoryAttribute.upsert({
+              where: {
+                categoryId_attributeId: { categoryId, attributeId },
+              },
+              create: { categoryId, attributeId },
+              update: {},
+            });
+          }
+        }
+
+        this.logger.log(
+          `Created/verified ${categoryIds.length * attributeIds.length} category-attribute links across ${categoryIds.length} categories`,
+        );
       }
     });
 
@@ -824,7 +891,10 @@ export class CatalogImportService {
    * Step 4: Import images from CSV
    */
   private async step4_importImages(filePath: string, jobId: string): Promise<void> {
-    const fileStream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    // Download if URL
+    const { localPath } = await this.downloadIfUrl(filePath);
+
+    const fileStream = fs.createReadStream(localPath, { encoding: 'utf8' });
 
     try {
       // Collect all image URLs first
@@ -924,5 +994,59 @@ export class CatalogImportService {
       rawData: rawData ?? null,
       sourceFile: sourceFile ?? null,
     });
+  }
+
+  /**
+   * Check if a path is a SeaweedFS URL
+   */
+  private isSeaweedFSUrl(path: string): boolean {
+    return path.startsWith('http://') || path.startsWith('https://');
+  }
+
+  /**
+   * Download file from SeaweedFS URL to local temp directory if it's a URL,
+   * otherwise return the original local path.
+   */
+  private async downloadIfUrl(filePath: string): Promise<{ localPath: string; isTemp: boolean }> {
+    if (!this.isSeaweedFSUrl(filePath)) {
+      return { localPath: filePath, isTemp: false };
+    }
+
+    // Extract storage key from URL
+    const urlParts = new URL(filePath);
+    const storageKey = urlParts.pathname;
+
+    this.logger.log(`Downloading file from SeaweedFS: ${storageKey}`);
+
+    // Download to temp file
+    const buffer = await this.storageService.getFile(storageKey);
+    const tempDir = path.join(process.cwd(), 'uploads', 'import', 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    const tempFilePath = path.join(tempDir, `${Date.now()}-${path.basename(storageKey)}`);
+    await fs.promises.writeFile(tempFilePath, buffer);
+
+    // Track temp file for cleanup
+    this.tempFiles.push(tempFilePath);
+
+    this.logger.log(`Downloaded to temp file: ${tempFilePath}`);
+
+    return { localPath: tempFilePath, isTemp: true };
+  }
+
+  /**
+   * Clean up all temporary files
+   */
+  private async cleanupTempFiles(): Promise<void> {
+    for (const tempFile of this.tempFiles) {
+      try {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+          this.logger.debug(`Cleaned up temp file: ${tempFile}`);
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to cleanup temp file ${tempFile}: ${error}`);
+      }
+    }
+    this.tempFiles = [];
   }
 }

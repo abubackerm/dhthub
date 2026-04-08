@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { BaseService } from '@shared/domain';
+import { BaseService, TransactionalExecutor } from '@shared/domain';
 import { CART_EVENTS } from '@shared/events';
 import {
   CartNotFoundError,
   CartItemNotFoundError,
-  CartAlreadySubmittedError,
+  CartNotActiveError,
 } from '../domain/errors';
 import { CartRepository, CartItemRepository, CartWithItems } from '../repositories';
 import { ProductVariantRepository, ProductRepository } from '../../catalog/repositories';
@@ -19,6 +19,8 @@ export class CartService extends BaseService {
 
   constructor(
     eventEmitter: EventEmitter2,
+    @Inject('TransactionalExecutor')
+    private readonly txExecutor: TransactionalExecutor,
     private readonly cartRepo: CartRepository,
     private readonly cartItemRepo: CartItemRepository,
     private readonly variantRepo: ProductVariantRepository,
@@ -28,31 +30,20 @@ export class CartService extends BaseService {
   }
 
   private ensureCartEditable(cart: CartWithItems): void {
-    if (cart.submittedAt) {
-      throw new CartAlreadySubmittedError(cart.id);
+    if (!cart.isActive) {
+      throw new CartNotActiveError(cart.id);
     }
   }
 
   async getCart(userId: string): Promise<CartView> {
-    let cart = await this.cartRepo.findByUserIdWithItems(userId);
-
-    if (!cart) {
-      await this.cartRepo.create({
-        userId,
-      });
-
-      const fetchedCart = await this.cartRepo.findByUserIdWithItems(userId);
-      if (!fetchedCart) {
-        throw new CartNotFoundError(userId);
-      }
-
-      cart = fetchedCart;
-
-      this.emit(CART_EVENTS.CART_CREATED, { cartId: cart.id, userId });
+    const cart = await this.cartRepo.getOrCreateActiveCart(userId);
+    const cartWithItems = await this.cartRepo.findByIdWithItems(cart.id);
+    if (!cartWithItems) {
+      throw new CartNotFoundError(userId);
     }
 
-    const items = await this.buildCartItems(cart);
-    return CartView.fromEntity(cart, items);
+    const items = await this.buildCartItems(cartWithItems);
+    return CartView.fromEntity(cartWithItems, items);
   }
 
   async addItem(
@@ -65,24 +56,13 @@ export class CartService extends BaseService {
       throw new CartItemNotFoundError(variantId);
     }
 
-    let cart = await this.cartRepo.findByUserIdWithItems(userId);
-
-    if (!cart) {
-      await this.cartRepo.create({
-        userId,
-      });
-
-      const fetchedCart = await this.cartRepo.findByUserIdWithItems(userId);
-      if (!fetchedCart) {
-        throw new CartNotFoundError(userId);
-      }
-
-      cart = fetchedCart;
-
-      this.emit(CART_EVENTS.CART_CREATED, { cartId: cart.id, userId });
+    const cart = await this.cartRepo.getOrCreateActiveCart(userId);
+    const cartWithItems = await this.cartRepo.findByIdWithItems(cart.id);
+    if (!cartWithItems) {
+      throw new CartNotFoundError(userId);
     }
 
-    this.ensureCartEditable(cart);
+    this.ensureCartEditable(cartWithItems);
 
     const existingItem = await this.cartItemRepo.findByCartAndVariant(cart.id, variantId);
 
@@ -122,12 +102,17 @@ export class CartService extends BaseService {
       throw new CartItemNotFoundError(itemId);
     }
 
-    const cart = await this.cartRepo.findByUserIdWithItems(userId);
-    if (!cart || cart.id !== cartItem.cartId) {
+    const cart = await this.cartRepo.getOrCreateActiveCart(userId);
+    if (cart.id !== cartItem.cartId) {
       throw new CartNotFoundError(userId);
     }
 
-    this.ensureCartEditable(cart);
+    const cartWithItems = await this.cartRepo.findByIdWithItems(cart.id);
+    if (!cartWithItems) {
+      throw new CartNotFoundError(userId);
+    }
+
+    this.ensureCartEditable(cartWithItems);
 
     const variant = await this.variantRepo.findById(cartItem.variantId);
     if (!variant) {
@@ -154,12 +139,17 @@ export class CartService extends BaseService {
       throw new CartItemNotFoundError(itemId);
     }
 
-    const cart = await this.cartRepo.findByUserIdWithItems(userId);
-    if (!cart || cart.id !== cartItem.cartId) {
+    const cart = await this.cartRepo.getOrCreateActiveCart(userId);
+    if (cart.id !== cartItem.cartId) {
       throw new CartNotFoundError(userId);
     }
 
-    this.ensureCartEditable(cart);
+    const cartWithItems = await this.cartRepo.findByIdWithItems(cart.id);
+    if (!cartWithItems) {
+      throw new CartNotFoundError(userId);
+    }
+
+    this.ensureCartEditable(cartWithItems);
 
     await this.cartItemRepo.delete(itemId);
 
@@ -174,7 +164,7 @@ export class CartService extends BaseService {
   }
 
   async clearCart(userId: string): Promise<CartView> {
-    const cart = await this.cartRepo.findByUserIdWithItems(userId);
+    const cart = await this.cartRepo.findActiveByUserIdWithItems(userId);
     if (!cart) {
       throw new CartNotFoundError(userId);
     }
@@ -194,24 +184,13 @@ export class CartService extends BaseService {
   }
 
   async bulkAddItems(userId: string, dto: BulkAddCartItemsDto): Promise<CartView> {
-    let cart = await this.cartRepo.findByUserIdWithItems(userId);
-
-    if (!cart) {
-      await this.cartRepo.create({
-        userId,
-      });
-
-      const fetchedCart = await this.cartRepo.findByUserIdWithItems(userId);
-      if (!fetchedCart) {
-        throw new CartNotFoundError(userId);
-      }
-
-      cart = fetchedCart;
-
-      this.emit(CART_EVENTS.CART_CREATED, { cartId: cart.id, userId });
+    const cart = await this.cartRepo.getOrCreateActiveCart(userId);
+    const cartWithItems = await this.cartRepo.findByIdWithItems(cart.id);
+    if (!cartWithItems) {
+      throw new CartNotFoundError(userId);
     }
 
-    this.ensureCartEditable(cart);
+    this.ensureCartEditable(cartWithItems);
 
     for (const itemDto of dto.items) {
       const variant = await this.variantRepo.findBySku(itemDto.sku);
@@ -254,14 +233,17 @@ export class CartService extends BaseService {
   }
 
   async submitCart(userId: string): Promise<CartView> {
-    const cart = await this.cartRepo.findByUserIdWithItems(userId);
+    const cart = await this.cartRepo.findActiveByUserIdWithItems(userId);
     if (!cart) {
       throw new CartNotFoundError(userId);
     }
 
     this.ensureCartEditable(cart);
 
-    await this.cartRepo.markSubmitted(cart.id);
+    await this.txExecutor.execute(async () => {
+      await this.cartRepo.markSubmitted(cart.id);
+      await this.cartRepo.createActiveCart(userId);
+    });
 
     this.emit(CART_EVENTS.CART_SUBMITTED, {
       cartId: cart.id,
@@ -269,8 +251,8 @@ export class CartService extends BaseService {
       itemCount: cart.items.length,
     });
 
-    const items = await this.buildCartItems(cart);
-    return CartView.fromEntity(cart, items);
+    const newCart = await this.cartRepo.getOrCreateActiveCart(userId);
+    return CartView.fromEntity(newCart);
   }
 
   private async buildCartItems(cart: CartWithItems): Promise<CartItemView[]> {
