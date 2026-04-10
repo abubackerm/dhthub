@@ -58,7 +58,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
-import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
+
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 
 import {
   useCategoryTree,
@@ -141,6 +142,25 @@ function countMixedBranches(categories: CategoryTreeNode[]): number {
     count += countMixedBranches(cat.children);
   }
   return count;
+}
+
+function countDescendants(category: CategoryTreeNode): {
+  totalCategories: number
+  totalCells: number
+  totalProducts: number
+} {
+  let totalCategories = 0
+  let totalCells = category.cellCount ?? 0
+  let totalProducts = category.productCount
+
+  for (const child of category.children) {
+    const counts = countDescendants(child)
+    totalCategories += 1 + counts.totalCategories
+    totalCells += counts.totalCells
+    totalProducts += counts.totalProducts
+  }
+
+  return { totalCategories, totalCells, totalProducts }
 }
 
 interface CategoryTreeItemProps {
@@ -352,7 +372,7 @@ export default function CategoriesPage() {
   const createMutation = useCreateCategory()
   const updateMutation = useUpdateCategory()
   const deleteMutation = useDeleteCategory()
-  const { confirm } = useConfirmDialog()
+
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     return new Set<string>()
@@ -368,6 +388,9 @@ export default function CategoriesPage() {
   const [copiedSku, setCopiedSku] = useState<string | null>(null)
   const [uploadTimeoutError, setUploadTimeoutError] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<CategoryTreeNode | null>(null)
 
   // Cell management state
   const [cellSheetOpen, setCellSheetOpen] = useState(false)
@@ -432,25 +455,8 @@ export default function CategoriesPage() {
     setCellSheetOpen(true)
   }
 
-  const handleDeleteCategory = async (category: CategoryTreeNode) => {
-    const children = category.children || [];  // Safety fallback
-    if (children.length > 0) {
-      toast.error(`Cannot delete "${category.name}" because it has ${children.length} subcategories. Delete or move subcategories first.`)
-      return
-    }
-
-    const confirmed = await confirm({
-      title: "Delete Category",
-      description: `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
-      variant: "destructive",
-      confirmLabel: "Delete",
-      cancelLabel: "Cancel",
-    })
-
-    if (confirmed) {
-      console.log('Deleting category:', { id: category.id, name: category.name })
-      deleteMutation.mutate(category.id)
-    }
+  const handleDeleteCategory = (category: CategoryTreeNode) => {
+    setDeleteTarget(category)
   }
 
   const handleNameChange = (name: string) => {
@@ -941,6 +947,45 @@ export default function CategoriesPage() {
           category={selectedCategoryForCells}
         />
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title="Delete Category"
+        description={`Are you sure you want to delete "${deleteTarget?.name ?? ""}"? This action cannot be undone and will permanently remove all associated data.`}
+        warningDetails={
+          deleteTarget
+            ? (() => {
+                const counts = countDescendants(deleteTarget)
+                const details: string[] = []
+                if (counts.totalCategories > 0) {
+                  details.push(`${counts.totalCategories} subcategor${counts.totalCategories === 1 ? 'y' : 'ies'}`)
+                }
+                if (counts.totalCells > 0) {
+                  details.push(`${counts.totalCells} cell${counts.totalCells === 1 ? '' : 's'}`)
+                }
+                if (counts.totalProducts > 0) {
+                  details.push(`${counts.totalProducts} product${counts.totalProducts === 1 ? '' : 's'}`)
+                }
+                if (details.length === 0) {
+                  details.push("No subcategories, cells, or products found")
+                }
+                return details
+              })()
+            : undefined
+        }
+        confirmLabel="Delete Category"
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteMutation.mutate(deleteTarget.id)
+            setDeleteTarget(null)
+          }
+        }}
+        isPending={deleteMutation.isPending}
+      />
 
       <Dialog open={uploadTimeoutError} onOpenChange={setUploadTimeoutError}>
         <DialogContent>

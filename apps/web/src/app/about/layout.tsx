@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DHTHeader } from "../(home)/components/dht-header";
 import { DHTFooter } from "../(home)/components/dht-footer";
+import { AboutClientLayout } from "./about-client-layout";
 
 export const metadata: Metadata = {
     title: "About Us | Dynamic Hub Trading",
@@ -13,10 +14,12 @@ export default function AboutLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen flex flex-col">
-            <DHTHeader />
-            <main className="flex-1">{children}</main>
-            <DHTFooter />
-        </div>
+        <AboutClientLayout>
+            <div className="min-h-screen flex flex-col">
+                <DHTHeader />
+                <main className="flex-1">{children}</main>
+                <DHTFooter />
+            </div>
+        </AboutClientLayout>
     );
 }

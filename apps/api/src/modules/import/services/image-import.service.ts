@@ -578,6 +578,11 @@ export class ImageImportService {
         categorySku
       );
 
+      if (position === 1) {
+        await this.categoryRepository.updateImage(categoryId, storagePath);
+        this.logger.log(`[ImageImport] Updated Category.imageUrl for categoryId=${categoryId}`);
+      }
+
       this.logger.log(`[ImageImport] Created/updated category image: id=${created.id}, categoryId=${categoryId}, sku=${categorySku}`);
 
       return {

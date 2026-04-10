@@ -64,6 +64,7 @@ export interface AttributeView {
   sortOrder: number;
   filterType: AttributeFilterType;
   unitId: string | null;
+  unitSymbol: string | null;
   isFilterable: boolean;
   isRequired: boolean;
   createdAt: string;

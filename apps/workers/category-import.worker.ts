@@ -50,11 +50,32 @@ class CategoryImportWorker {
 
     this.worker.on('failed', (job: BullJob | undefined, error: Error) => {
       this.logger.error(`Category import job ${job?.id} failed: ${error.message}`, error.stack);
+
+      // Mark the job as FAILED in the DB so the frontend stops polling
+      if (job?.data?.jobId) {
+        this.markJobFailedInDb(job.data.jobId, error.message).catch((err) => {
+          this.logger.error(`[category-import] Failed to mark job ${job?.data?.jobId} as failed in DB: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
     });
 
     this.worker.on('error', (error) => {
       this.logger.error(`CategoryImportWorker error: ${error.message}`, error.stack);
     });
+  }
+
+  /**
+   * Notify the API to mark a job as FAILED in the database
+   */
+  private async markJobFailedInDb(jobId: string, errorMessage: string): Promise<void> {
+    try {
+      await axios.post(`${this.apiBaseUrl}/v1/import/worker/mark-failed`, { jobId, errorMessage });
+      this.logger.log(`[category-import] Job ${jobId} marked as FAILED in DB`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[category-import] Failed to call mark-failed API for job ${jobId}: ${msg}`);
+      throw err;
+    }
   }
 
   /**
@@ -137,38 +158,19 @@ class CategoryImportWorker {
 
   /**
    * Call API endpoint with job data
+   * No internal retry — BullMQ handles retries with exponential backoff (3 attempts, 5s base)
    */
   private async callApi(endpoint: string, data: any): Promise<void> {
-    const maxRetries = 3;
-    let lastError: Error | null = null;
+    const response = await axios.post(`${this.apiBaseUrl}${endpoint}`, data, {
+      timeout: 300000, // 5 minute timeout for category imports
+    });
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await axios.post(`${this.apiBaseUrl}${endpoint}`, data, {
-          timeout: 300000, // 5 minute timeout for category imports
-        });
-
-        if (response.status >= 200 && response.status < 300) {
-          this.logger.log(`API call to ${endpoint} succeeded (status ${response.status})`);
-          return;
-        }
-
-        throw new Error(`API returned status ${response.status}`);
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        this.logger.warn(`API call to ${endpoint} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}`);
-
-        if (attempt < maxRetries) {
-          await this.sleep(2000 * attempt); // Exponential backoff: 2s, 4s, 6s
-        }
-      }
+    if (response.status >= 200 && response.status < 300) {
+      this.logger.log(`API call to ${endpoint} succeeded (status ${response.status})`);
+      return;
     }
 
-    throw lastError || new Error(`Failed to call API endpoint ${endpoint}`);
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    throw new Error(`API returned status ${response.status}`);
   }
 
   /**

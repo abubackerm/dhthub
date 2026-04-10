@@ -782,52 +782,6 @@ function ProductVariantsDrawer({
                 </Table>
               )}
             </div>
-
-            {/* Product Image */}
-            {product.primaryImageUrl && (
-              <div>
-                <h4 className="text-sm font-semibold mb-3">Product Image</h4>
-                <div className="relative w-full aspect-video bg-muted rounded-lg overflow-hidden">
-                  <img
-                    src={product.primaryImageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Images */}
-            <div>
-              <h4 className="text-sm font-semibold mb-3">Variant Thumbnails</h4>
-              <div className="grid grid-cols-4 gap-2">
-                {variants.slice(0, 4).map((variant, i) => {
-                  const primaryImage = variant.images?.find(img => img.isPrimary) || variant.images?.[0]
-                  return (
-                    <div
-                      key={variant.id || i}
-                      className="aspect-square bg-muted rounded-md overflow-hidden flex items-center justify-center"
-                    >
-                      {primaryImage?.url ? (
-                        <img
-                          src={primaryImage.url}
-                          alt={primaryImage.altText || variant.sku || 'Variant image'}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      ) : (
-                        <Package className="h-8 w-8 text-muted-foreground" />
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1047,7 +1001,7 @@ function EditVariantDialog({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Price ($)</label>
+                <label className="text-sm font-medium">Price</label>
                 <Input
                   type="number"
                   step="0.01"

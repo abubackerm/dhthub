@@ -198,6 +198,13 @@ export class CategoryRepository {
     });
   }
 
+  async updateImage(categoryId: string, imageUrl: string): Promise<CategoryEntity> {
+    return this.getClient().category.update({
+      where: { id: categoryId },
+      data: { imageUrl },
+    });
+  }
+
   async delete(id: string): Promise<CategoryEntity> {
     return this.getClient().category.delete({
       where: { id },
@@ -604,6 +611,40 @@ export class CategoryRepository {
       filterableAttributes: uniqueFilterableAttributes,
       variants,
     };
+  }
+
+  async deleteCascade(id: string): Promise<void> {
+    // Collect all descendant category IDs (the category itself + all children recursively)
+    const allIds: string[] = [id];
+    let offset = 0;
+    while (offset < allIds.length) {
+      const children = await this.db.category.findMany({
+        where: { parentId: { in: allIds.slice(offset) } },
+        select: { id: true },
+      });
+      for (const child of children) {
+        allIds.push(child.id);
+      }
+      offset = allIds.length - children.length;
+      if (children.length === 0) break;
+    }
+
+    // Delete all category images and category-attribute links for the entire subtree
+    await this.db.$transaction(async (tx) => {
+      await tx.categoryImage.deleteMany({
+        where: { categoryId: { in: allIds } },
+      });
+      await tx.categoryAttribute.deleteMany({
+        where: { categoryId: { in: allIds } },
+      });
+
+      // Delete categories in reverse order (leaves first) to avoid FK violations
+      // on the self-referencing parent relation
+      const reversedIds = [...allIds].reverse();
+      for (const categoryId of reversedIds) {
+        await tx.category.delete({ where: { id: categoryId } });
+      }
+    });
   }
 
   async getSkuMap(): Promise<Map<string, string>> {

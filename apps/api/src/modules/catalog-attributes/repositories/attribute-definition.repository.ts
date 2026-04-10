@@ -15,6 +15,9 @@ export class AttributeDefinitionRepository {
   async findById(id: string): Promise<AttributeDefinitionEntity | null> {
     return this.getClient().attributeDefinition.findUnique({
       where: { id },
+      include: {
+        unit: { select: { id: true, name: true, symbol: true } },
+      },
     });
   }
 
@@ -119,6 +122,9 @@ export class AttributeDefinitionRepository {
         take,
         where,
         orderBy: { sortOrder: 'asc' },
+        include: {
+          unit: { select: { id: true, name: true, symbol: true } },
+        },
       }),
       this.getClient().attributeDefinition.count({ where }),
     ]);

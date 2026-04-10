@@ -6,7 +6,6 @@ import {
   CategoryNotFoundError,
   CategorySlugAlreadyExistsError,
   CategoryCircularReferenceError,
-  CategoryHasChildrenError,
 } from '@shared/domain/errors';
 import { CategoryRepository, CategoryWithCells } from '../repositories/category.repository';
 import { CategoryEntity } from '../entities/category.entity';
@@ -288,12 +287,7 @@ export class CategoryService extends BaseService {
       throw new CategoryNotFoundError(id);
     }
 
-    const children = await this.categoryRepo.findChildren(id);
-    if (children.length > 0) {
-      throw new CategoryHasChildrenError(category.name, children.length);
-    }
-
-    await this.categoryRepo.delete(id);
+    await this.categoryRepo.deleteCascade(id);
   }
 
   async getTree(): Promise<CategoryEntity[]> {

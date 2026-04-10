@@ -49,6 +49,12 @@ function getStatusVariant(status: string): "default" | "destructive" | "outline"
 
 type ImportMode = 'CREATE' | 'UPDATE' | 'EDIT'
 
+const SESSION_STORAGE_KEY_PREFIX = 'category-import-job'
+
+function getSessionStorageKey(mode: ImportMode): string {
+  return `${SESSION_STORAGE_KEY_PREFIX}-${mode}`
+}
+
 interface CategoryImportFormProps {
   mode: ImportMode
 }
@@ -60,6 +66,44 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
   const [isPolling, setIsPolling] = useState(false)
   const [importResult, setImportResult] = useState<CategoryImportResult | null>(null)
 
+  // Restore polling state from sessionStorage on mount (survives page refresh)
+  useEffect(() => {
+    const storageKey = getSessionStorageKey(mode)
+    const storedJobId = sessionStorage.getItem(storageKey)
+    if (!storedJobId) return
+
+    let cancelled = false
+
+    getImportJob(storedJobId)
+      .then((job) => {
+        if (cancelled) return
+        if (job.status === 'PENDING' || job.status === 'PROCESSING') {
+          setImportJob(job)
+          setIsPolling(true)
+        } else {
+          // Terminal state — clean up sessionStorage and fetch results if completed
+          sessionStorage.removeItem(storageKey)
+          if (job.status === 'COMPLETED') {
+            setImportJob(job)
+            getCategoryImportResults(storedJobId)
+              .then((results) => {
+                if (!cancelled) setImportResult(results)
+              })
+              .catch((err) => console.error('Failed to fetch import results:', err))
+          }
+        }
+      })
+      .catch((err) => {
+        // Job not found or API error — clean up stale sessionStorage
+        console.error('Failed to restore import job:', err)
+        sessionStorage.removeItem(storageKey)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [mode])
+
   useEffect(() => {
     if (!isPolling || !importJob) return
 
@@ -70,6 +114,7 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
 
         if (updated.status === "COMPLETED" || updated.status === "FAILED" || updated.status === "CANCELLED") {
           setIsPolling(false)
+          sessionStorage.removeItem(getSessionStorageKey(mode))
 
           // Fetch detailed results when completed
           if (updated.status === "COMPLETED") {
@@ -90,7 +135,7 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [isPolling, importJob, queryClient])
+  }, [isPolling, importJob, queryClient, mode])
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -121,6 +166,7 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
       }
       setImportJob(job)
       setIsPolling(true)
+      sessionStorage.setItem(getSessionStorageKey(mode), job.id)
       toast.success(`Import job created: ${result.jobId}. Processing will begin shortly.`)
     },
     onError: (error) => {
@@ -203,6 +249,7 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
     setImportJob(null)
     setIsPolling(false)
     setImportResult(null)
+    sessionStorage.removeItem(getSessionStorageKey(mode))
   }
 
   return (

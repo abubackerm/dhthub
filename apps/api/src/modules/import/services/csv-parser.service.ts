@@ -118,19 +118,17 @@ export class CsvParserService {
   }
 
   /**
-   * Count total data rows in CSV file (excludes header and empty rows)
+   * Count total data rows in CSV file (excludes header only)
+   * Must match parseToArray behavior — counts all rows the parser emits,
+   * including empty rows, so totalRows stays consistent with processedRows.
    */
   async countRows(fileStream: Readable): Promise<number> {
     let count = 0;
     const parserStream = csvParser();
 
     try {
-      for await (const row of fileStream.pipe(parserStream)) {
-        const values = Object.values(row as Record<string, string>);
-        const hasData = values.some((v) => v !== undefined && v !== null && v.trim() !== '');
-        if (hasData) {
-          count++;
-        }
+      for await (const _row of fileStream.pipe(parserStream)) {
+        count++;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

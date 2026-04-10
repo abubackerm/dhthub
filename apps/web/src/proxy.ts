@@ -15,6 +15,8 @@ const publicRoutes = [
   "/landing",
   "/products",
   "/contact",
+  "/about",
+  "/cart",
   "/errors",
 ];
 
@@ -102,17 +104,18 @@ export default async function proxy(request: NextRequest) {
 
   const sessionData = await getSession(request);
 
-  if (!sessionData) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
   if (isAdminOnlyRoute(pathname)) {
+    if (!sessionData) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
     const role = sessionData.user?.role;
     if (role !== "admin" && role !== "super_admin") {
       return NextResponse.redirect(new URL("/errors/forbidden", request.url));
     }
+  }
+
+  if (!sessionData) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

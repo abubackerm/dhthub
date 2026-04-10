@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAggregatedFilterData } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
 import { CategoryIcon } from "@/components/public/CategoryIcon";
@@ -71,11 +72,21 @@ export function BranchCategoryPage({
             className="catalog-grid__cell"
           >
             <div className="catalog-grid__icon">
-              <CategoryIcon
-                iconName={getCategoryIconName(child.name)}
-                className="w-12 h-12 text-gray-600"
-                strokeWidth={1.5}
-              />
+              {child.imageUrl ? (
+                <Image
+                  src={child.imageUrl}
+                  alt={child.name}
+                  width={128}
+                  height={128}
+                  className="w-full h-full"
+                />
+              ) : (
+                <CategoryIcon
+                  iconName={getCategoryIconName(child.name)}
+                  className="w-12 h-12 text-gray-600"
+                  strokeWidth={1.5}
+                />
+              )}
             </div>
             <span className="catalog-grid__label">{child.name}</span>
           </Link>

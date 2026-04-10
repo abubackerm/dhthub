@@ -21,6 +21,7 @@ export class AttributeDefinitionEntity extends BaseEntity {
   sortOrder: number;
   filterType: AttributeFilterType | null;
   unitId: string | null;
+  unit?: { id: string; name: string; symbol: string } | null;
   isFilterable: boolean;
   isRequired: boolean;
 }

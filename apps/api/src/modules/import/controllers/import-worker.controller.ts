@@ -270,11 +270,15 @@ export class ImportWorkerController {
     }
 
     try {
-      // Validate ZIP file before processing
-      this.logger.log(`[CategoryImport] Validating ZIP file for CREATE job ${jobId}`);
-      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
-      await this.validateZipFile(filePath, 'category-create', false);
-      this.logger.log(`[CategoryImport] ZIP validation passed for CREATE job ${jobId}`);
+      // Validate ZIP file before processing (skip for plain CSV files)
+      if (filePath.endsWith('.zip')) {
+        this.logger.log(`[CategoryImport] Validating ZIP file for CREATE job ${jobId}`);
+        this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+        await this.validateZipFile(filePath, 'category-create', false);
+        this.logger.log(`[CategoryImport] ZIP validation passed for CREATE job ${jobId}`);
+      } else {
+        this.logger.log(`[CategoryImport] Skipping ZIP validation for CREATE job ${jobId} (CSV file detected)`);
+      }
 
       const result = await this.categoryImportService.processCreateImport(jobId, filePath);
 
@@ -340,11 +344,15 @@ export class ImportWorkerController {
     }
 
     try {
-      // Validate ZIP file before processing
-      this.logger.log(`[CategoryImport] Validating ZIP file for UPDATE job ${jobId}`);
-      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
-      await this.validateZipFile(filePath, 'category-update', false);
-      this.logger.log(`[CategoryImport] ZIP validation passed for UPDATE job ${jobId}`);
+      // Validate ZIP file before processing (skip for plain CSV files)
+      if (filePath.endsWith('.zip')) {
+        this.logger.log(`[CategoryImport] Validating ZIP file for UPDATE job ${jobId}`);
+        this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+        await this.validateZipFile(filePath, 'category-update', false);
+        this.logger.log(`[CategoryImport] ZIP validation passed for UPDATE job ${jobId}`);
+      } else {
+        this.logger.log(`[CategoryImport] Skipping ZIP validation for UPDATE job ${jobId} (CSV file detected)`);
+      }
 
       const result = await this.categoryImportService.processUpdateImport(jobId, filePath);
 
@@ -411,11 +419,15 @@ export class ImportWorkerController {
     }
 
     try {
-      // Validate ZIP file before processing
-      this.logger.log(`[CategoryImport] Validating ZIP file for EDIT job ${jobId}`);
-      this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
-      await this.validateZipFile(filePath, 'category-edit', false);
-      this.logger.log(`[CategoryImport] ZIP validation passed for EDIT job ${jobId}`);
+      // Validate ZIP file before processing (skip for plain CSV files)
+      if (filePath.endsWith('.zip')) {
+        this.logger.log(`[CategoryImport] Validating ZIP file for EDIT job ${jobId}`);
+        this.logger.log(`[CategoryImport] ZIP file path: ${filePath}`);
+        await this.validateZipFile(filePath, 'category-edit', false);
+        this.logger.log(`[CategoryImport] ZIP validation passed for EDIT job ${jobId}`);
+      } else {
+        this.logger.log(`[CategoryImport] Skipping ZIP validation for EDIT job ${jobId} (CSV file detected)`);
+      }
 
       const result = await this.categoryImportService.processEditImport(jobId, filePath);
 
@@ -438,6 +450,26 @@ export class ImportWorkerController {
       if (isTempFile) {
         await this.cleanupTempFile(filePath);
       }
+    }
+  }
+
+  /**
+   * Worker API: Mark an import job as FAILED (called by BullMQ workers on exhaustion)
+   * POST /v1/import/worker/mark-failed
+   */
+  @Post('mark-failed')
+  async markJobFailed(@Body() body: { jobId: string; errorMessage?: string }) {
+    const { jobId, errorMessage } = body;
+
+    this.logger.error(`[mark-failed] Marking job ${jobId} as FAILED${errorMessage ? `: ${errorMessage}` : ''}`);
+
+    try {
+      await this.importJobService.markAsFailed(jobId);
+      return { success: true, jobId };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[mark-failed] Failed to mark job ${jobId}: ${msg}`);
+      throw error;
     }
   }
 
@@ -588,7 +620,7 @@ export class ImportWorkerController {
         // URL format: http://localhost:8333/catalog/imports/...
         // Storage key: imports/... (without /catalog prefix, no leading slash)
         const bucketName = 'catalog';
-        let storageKey = urlParts.pathname;
+        let storageKey = decodeURIComponent(urlParts.pathname);
         if (storageKey.startsWith(`/${bucketName}/`)) {
           storageKey = storageKey.substring(bucketName.length + 2); // Remove '/catalog/'
         } else if (storageKey.startsWith(`/${bucketName}`)) {
@@ -604,13 +636,6 @@ export class ImportWorkerController {
 
         const buffer = await this.storageService.getFile(storageKey);
 
-        // File integrity check: buffer must be at least 1000 bytes
-        if (buffer.length < 1000) {
-          const error = `Downloaded file too small (${buffer.length} bytes), likely not ready or incomplete`;
-          this.logger.error(`[downloadFromSeaweedFS] ${error}`);
-          throw new Error(error);
-        }
-
         const fileSize = buffer.length;
         const fileSizeKB = (fileSize / 1024).toFixed(2);
         const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
@@ -625,16 +650,18 @@ export class ImportWorkerController {
 
         this.logger.log(`[downloadFromSeaweedFS] File written to temp: ${tempFilePath}`);
 
-        // File integrity check: verify ZIP can be opened
-        try {
-          this.logger.log(`[downloadFromSeaweedFS] Validating ZIP structure...`);
-          await unzipper.Open.file(tempFilePath);
-          this.logger.log(`[downloadFromSeaweedFS] ZIP structure is valid`);
-        } catch (zipError) {
-          const errorMsg = zipError instanceof Error ? zipError.message : String(zipError);
-          const error = `ZIP file is corrupted or incomplete: ${errorMsg}`;
-          this.logger.error(`[downloadFromSeaweedFS] ${error}`);
-          throw new Error(error);
+        // ZIP integrity check: only validate ZIP structure for .zip files
+        if (tempFilePath.endsWith('.zip')) {
+          try {
+            this.logger.log(`[downloadFromSeaweedFS] Validating ZIP structure...`);
+            await unzipper.Open.file(tempFilePath);
+            this.logger.log(`[downloadFromSeaweedFS] ZIP structure is valid`);
+          } catch (zipError) {
+            const errorMsg = zipError instanceof Error ? zipError.message : String(zipError);
+            const error = `ZIP file is corrupted or incomplete: ${errorMsg}`;
+            this.logger.error(`[downloadFromSeaweedFS] ${error}`);
+            throw new Error(error);
+          }
         }
 
         // Verify file was written correctly

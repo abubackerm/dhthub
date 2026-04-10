@@ -267,13 +267,22 @@ export class CartService extends BaseService {
       products.map((p) => [p.id, p]),
     );
 
+    // IMPORTANT: Stock source = product_variants.quantity
+    // InventoryService (inventory_levels table) is NOT used yet.
+    // Do NOT switch to inventory_levels until full migration is complete.
+    // Both admin UI and cart must use the SAME stock source to avoid overselling.
+    const USE_INVENTORY_SERVICE = false;
+
     return cart.items
       .map((item: CartWithItems['items'][number]): CartItemView | null => {
         const variant = variantMap.get(item.variantId);
         if (!variant) return null;
         const product = productMap.get(variant.productId);
         if (!product) return null;
-        return CartItemView.fromEntity(item, variant, product, 0);
+        const availableStock = USE_INVENTORY_SERVICE
+          ? 0
+          : variant.quantity;
+        return CartItemView.fromEntity(item, variant, product, availableStock);
       })
       .filter((item): item is CartItemView => item !== null);
   }

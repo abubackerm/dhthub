@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCategoryTree } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
 import {
@@ -16,7 +16,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import type { CategoryTreeNode } from "@/lib/api/catalog/types";
 import type {
@@ -26,8 +25,12 @@ import type {
 
 export function CatalogSidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const { filterData } = useFilterContext();
     const { data: categoryTree, isLoading, error } = useCategoryTree();
+
+    const selectedCategory = searchParams.get("category");
 
     // Show categories on /products, filters on all other pages
     const showCategories = pathname === "/products";
@@ -48,10 +51,18 @@ export function CatalogSidebar() {
         );
     }
 
-    // Show categories on /products
-    const topLevelCategories = categoryTree?.filter(
+    // Show categories on /products, sorted A-Z
+    const topLevelCategories = (categoryTree?.filter(
         (cat: CategoryTreeNode) => cat.depth === 0 && cat.children.length > 0 && cat.isActive
-    ) ?? [];
+    ) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+
+    const handleCategoryClick = (slug: string) => {
+        if (selectedCategory === slug) {
+            router.replace("/products");
+        } else {
+            router.replace(`/products?category=${slug}`);
+        }
+    };
 
     return (
         <aside className="catalog-sidebar">
@@ -68,18 +79,16 @@ export function CatalogSidebar() {
                         <li className="catalog-sidebar__link">No categories available</li>
                     ) : (
                         topLevelCategories.map((category) => {
-                            const href = `/products/${category.slug}`;
-                            const isActive =
-                                pathname === href || pathname.startsWith(href + "/");
+                            const isActive = selectedCategory === category.slug;
 
                             return (
                                 <li key={category.id}>
-                                    <Link
-                                        href={href}
-                                        className={`catalog-sidebar__link ${isActive ? "catalog-sidebar__link--active" : ""}`}
+                                    <button
+                                        onClick={() => handleCategoryClick(category.slug)}
+                                        className={`catalog-sidebar__link w-full text-left cursor-pointer ${isActive ? "catalog-sidebar__link--active" : ""}`}
                                     >
                                         {category.name}
-                                    </Link>
+                                    </button>
                                 </li>
                             );
                         })

@@ -1,17 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { CategoryIcon } from "@/components/public/CategoryIcon";
 import { useCategoryTree } from "@/lib/api/catalog";
 import { getCategoryIconName } from "@/lib/utils/category-icon-map";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function ProductsPage() {
   const { data: categories = [], isLoading } = useCategoryTree();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  // Filter for top-level (root) categories that are active
+  const selectedCategorySlug = searchParams.get("category");
+
+  // Filter for top-level (root) categories that are active, sorted A-Z
   const topLevelCategories = categories.filter(
     (cat) => cat.depth === 0 && cat.isActive
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  // When a category is selected via sidebar, show only that category's children
+  const displayCategories = selectedCategorySlug
+    ? topLevelCategories.filter((cat) => cat.slug === selectedCategorySlug)
+    : topLevelCategories;
+
+  const selectedCategory = selectedCategorySlug
+    ? topLevelCategories.find((cat) => cat.slug === selectedCategorySlug)
+    : null;
+
+  const clearSelection = () => {
+    router.replace("/products");
+  };
 
   if (isLoading) {
     return (
@@ -44,20 +63,51 @@ export default function ProductsPage() {
         <span className="catalog-breadcrumb__sep" aria-hidden="true">
           &gt;
         </span>
-        <span className="catalog-breadcrumb__current" aria-current="page">All Categories</span>
+        {selectedCategory ? (
+          <>
+            <button
+              onClick={clearSelection}
+              className="catalog-breadcrumb__link hover:text-(--dht-red) cursor-pointer"
+            >
+              All Categories
+            </button>
+            <span className="catalog-breadcrumb__sep" aria-hidden="true">
+              &gt;
+            </span>
+            <span className="catalog-breadcrumb__current" aria-current="page">{selectedCategory.name}</span>
+          </>
+        ) : (
+          <span className="catalog-breadcrumb__current" aria-current="page">All Categories</span>
+        )}
       </nav>
 
+      {/* Category title when filtered */}
+      {selectedCategory && (
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="catalog-page__title">{selectedCategory.name}</h1>
+          <button
+            onClick={clearSelection}
+            className="text-sm text-muted-foreground hover:text-(--dht-red) transition-colors cursor-pointer"
+          >
+            Show all categories
+          </button>
+        </div>
+      )}
+
       {/* Each top-level category rendered as a section */}
-      {topLevelCategories.map((category) => {
+      {displayCategories.map((category) => {
         const activeChildren = category.children.filter((c) => c.isActive);
 
         return (
           <div key={category.id} className="catalog-section">
-            <h2 className="catalog-section__title">
-              <Link href={`/products/${category.slug}`} className="catalog-section__title-link">
-                {category.name}
-              </Link>
-            </h2>
+            {/* Only show section heading when viewing all categories */}
+            {!selectedCategory && (
+              <h2 className="catalog-section__title">
+                <Link href={`/products/${category.slug}`} className="catalog-section__title-link">
+                  {category.name}
+                </Link>
+              </h2>
+            )}
 
             <div className="catalog-grid">
               {activeChildren.map((child) => (
@@ -67,11 +117,21 @@ export default function ProductsPage() {
                   className="catalog-grid__cell"
                 >
                   <div className="catalog-grid__icon">
-                    <CategoryIcon
-                      iconName={getCategoryIconName(child.name)}
-                      className="w-12 h-12 text-gray-600"
-                      strokeWidth={1.5}
-                    />
+                    {child.imageUrl ? (
+                      <Image
+                        src={child.imageUrl}
+                        alt={child.name}
+                        width={128}
+                        height={128}
+                        className="w-full h-full"
+                      />
+                    ) : (
+                      <CategoryIcon
+                        iconName={getCategoryIconName(child.name)}
+                        className="w-12 h-12 text-gray-600"
+                        strokeWidth={1.5}
+                      />
+                    )}
                   </div>
                   <span className="catalog-grid__label">{child.name}</span>
                 </Link>
@@ -81,7 +141,15 @@ export default function ProductsPage() {
         );
       })}
 
-      {topLevelCategories.length === 0 && (
+      {displayCategories.length === 0 && selectedCategory && (
+        <div className="text-center py-16">
+          <p className="text-muted-foreground text-lg">
+            Category not found.
+          </p>
+        </div>
+      )}
+
+      {topLevelCategories.length === 0 && !selectedCategory && (
         <div className="text-center py-16">
           <p className="text-muted-foreground text-lg">
             No categories available at this time.

@@ -258,6 +258,10 @@ function AttributeDetails({
           <span>{getFilterLabel(record.attribute.filterType)}</span>
         </div>
         <div className="grid gap-1">
+          <span className="text-muted-foreground">Unit</span>
+          <span>{record.attribute.unitSymbol || "-"}</span>
+        </div>
+        <div className="grid gap-1">
           <span className="text-muted-foreground">Required</span>
           <span>{record.attribute.isRequired ? "Yes" : "No"}</span>
         </div>
@@ -912,6 +916,7 @@ export default function AttributesPage() {
                         <TableHead>Type</TableHead>
                         <TableHead>Group</TableHead>
                         <TableHead>Filter</TableHead>
+                        <TableHead>Unit</TableHead>
                         <TableHead>Required</TableHead>
                         <TableHead className="w-[140px] text-right">Actions</TableHead>
                       </TableRow>
@@ -928,6 +933,7 @@ export default function AttributesPage() {
                           </TableCell>
                           <TableCell>{attribute.group || "-"}</TableCell>
                           <TableCell>{getFilterLabel(attribute.filterType)}</TableCell>
+                          <TableCell>{attribute.unitSymbol || "-"}</TableCell>
                           <TableCell>
                             {attribute.isRequired ? (
                               <Check className="h-4 w-4 text-(--dht-green)" />
@@ -1079,6 +1085,7 @@ export default function AttributesPage() {
                     <TableHead>Slug</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Filter</TableHead>
+                    <TableHead>Unit</TableHead>
                     <TableHead>Required</TableHead>
                     <TableHead>Options</TableHead>
                     <TableHead className="w-[140px] text-right">Actions</TableHead>
@@ -1097,6 +1104,7 @@ export default function AttributesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{getFilterLabel(record.attribute.filterType)}</TableCell>
+                      <TableCell>{record.attribute.unitSymbol || "-"}</TableCell>
                       <TableCell>
                         {record.attribute.isRequired ? (
                           <Check className="h-4 w-4 text-(--dht-green)" />

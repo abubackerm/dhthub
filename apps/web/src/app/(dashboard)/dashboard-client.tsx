@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ConfirmDialogProvider } from "@/providers/confirm-dialog-provider"
 import { SidebarConfigProvider, useSidebarConfig } from "@/contexts/sidebar-context"
+import { AuthProvider } from "@/providers/auth-provider"
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { config } = useSidebarConfig()
@@ -66,12 +67,14 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
 export function DashboardComponent({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
-      <ConfirmDialogProvider>
-        <SidebarConfigProvider>
-          <DashboardInner>{children}</DashboardInner>
-        </SidebarConfigProvider>
-      </ConfirmDialogProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider defaultTheme="system" storageKey="nextjs-ui-theme">
+        <ConfirmDialogProvider>
+          <SidebarConfigProvider>
+            <DashboardInner>{children}</DashboardInner>
+          </SidebarConfigProvider>
+        </ConfirmDialogProvider>
+      </ThemeProvider>
+    </AuthProvider>
   )
 }
