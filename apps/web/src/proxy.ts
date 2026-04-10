@@ -14,6 +14,7 @@ const publicRoutes = [
   "/reset-password",
   "/landing",
   "/products",
+  "/contact",
   "/errors",
 ];
 

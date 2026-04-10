@@ -131,6 +131,7 @@ export class CategoriesController {
       dto.imageUrl,
       dto.sortOrder,
       dto.isActive,
+      dto.sku,
     );
     return CategoryView.fromEntity(category);
   }
@@ -147,6 +148,7 @@ export class CategoriesController {
       imageUrl: dto.imageUrl,
       sortOrder: dto.sortOrder,
       isActive: dto.isActive,
+      sku: dto.sku,
     });
     return CategoryView.fromEntity(category);
   }

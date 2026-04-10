@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   ChevronRight,
   Grid3x3,
@@ -11,6 +11,7 @@ import {
   PlusCircle,
   X,
   Image as ImageIcon,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -222,6 +223,9 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>("")
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [uploadTimeoutError, setUploadTimeoutError] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const cells = cellsData || []
 
@@ -294,14 +298,22 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
 
     let imageUrl = cellFormData.imageUrl
 
+    // Detect if image was explicitly removed (had image before, now cleared without new upload)
+    const imageRemoved = !imageFile && cellFormData.imageUrl === undefined && editingCell?.imageUrl;
+
     if (imageFile) {
+      setIsUploading(true)
       try {
         const formData = new FormData()
         formData.append('file', imageFile)
+        formData.append('entityType', 'cell')
+        formData.append('sku', cellFormData.sku || editingCell?.sku || '')
+        formData.append('position', '1')
 
-        const uploadResponse = await fetch('/api/v1/storage/upload', {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/storage/upload`, {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         })
 
         if (!uploadResponse.ok) {
@@ -313,9 +325,17 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
 
         toast.success('Image uploaded successfully')
       } catch (error) {
-        toast.error('Failed to upload image')
-        console.error(error)
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          setImageFile(null)
+          setImagePreview("")
+          if (imageInputRef.current) imageInputRef.current.value = ''
+          setUploadTimeoutError(true)
+        } else {
+          toast.error('Failed to upload image')
+        }
         return
+      } finally {
+        setIsUploading(false)
       }
     }
 
@@ -326,7 +346,8 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
       description: cellFormData.description || undefined,
       sortOrder: cellFormData.sortOrder,
       isActive: cellFormData.isActive,
-      imageUrl,
+      ...(imageRemoved ? { imageUrl: null } : {}),
+      ...(!imageRemoved && imageUrl ? { imageUrl } : {}),
       categoryId: category.id,
     }
 
@@ -589,10 +610,12 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                   <div className="flex-1 space-y-2">
                     <Input
                       id="cell-image"
+                      ref={imageInputRef}
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
                       className="cursor-pointer"
+                      disabled={isUploading}
                     />
                     <p className="text-xs text-muted-foreground">
                       Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
@@ -613,11 +636,11 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveCell} disabled={createMutation.isPending}>
-              {createMutation.isPending && (
+            <Button onClick={handleSaveCell} disabled={isUploading || createMutation.isPending}>
+              {isUploading || createMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Create Cell
+              ) : null}
+              {isUploading ? "Uploading..." : "Create Cell"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -709,10 +732,12 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
                   <div className="flex-1 space-y-2">
                     <Input
                       id="edit-cell-image"
+                      ref={imageInputRef}
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
                       className="cursor-pointer"
+                      disabled={isUploading}
                     />
                     <p className="text-xs text-muted-foreground">
                       Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
@@ -734,11 +759,30 @@ export function CellManagementSheet({ open, onClose, category }: CellManagementS
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveCell} disabled={updateMutation.isPending}>
-              {updateMutation.isPending && (
+            <Button onClick={handleSaveCell} disabled={isUploading || updateMutation.isPending}>
+              {isUploading || updateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Update Cell
+              ) : null}
+              {isUploading ? "Uploading..." : "Update Cell"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={uploadTimeoutError} onOpenChange={setUploadTimeoutError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Upload Timed Out
+            </DialogTitle>
+            <DialogDescription>
+              The file upload timed out. The file may be corrupted, too large, or in an unsupported format. Please try a different file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadTimeoutError(false)}>
+              Dismiss
             </Button>
           </DialogFooter>
         </DialogContent>

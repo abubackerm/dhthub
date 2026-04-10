@@ -67,7 +67,6 @@ interface DataTableProps {
   onCreateUser: (data: {
     name: string
     email: string
-    password: string
     role: Exclude<UserRole, "super_admin">
   }) => Promise<void>
 }

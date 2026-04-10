@@ -50,6 +50,7 @@ export interface LeafCellView {
   slug: string;
   description: string | null;
   sortOrder: number;
+  imageUrl: string | null;
   images: { url: string; altText: string | null; isPrimary: boolean }[];
   products: LeafProductView[];
 }
@@ -114,6 +115,7 @@ export class LeafPageView {
       slug: cell.slug,
       description: cell.description,
       sortOrder: cell.sortOrder,
+      imageUrl: LeafPageView.normalizeImageUrl(cell.imageUrl),
       images: (cell.images || []).map((img: any) => {
         // Normalize storage path - remove full URL and /catalog prefix if present
         let storagePath = img.storagePath;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import {
   ArrowLeft,
@@ -10,8 +10,30 @@ import {
   Trash2,
   Package,
   ChevronRight,
+  Upload,
+  Loader2,
+  GripVertical,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { restrictToParentElement } from "@dnd-kit/modifiers"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +53,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   useCategoryTree,
   useCells,
   useProducts,
@@ -41,6 +71,7 @@ import {
   useAddVariantImage,
   useUpdateImage,
   useRemoveImage,
+  useReorderVariantImages,
   getVariantImages,
   type CategoryTreeNode,
   type Cell,
@@ -81,6 +112,7 @@ export default function CellProductsPage() {
   const addImageMutation = useAddVariantImage()
   const updateImageMutation = useUpdateImage()
   const removeImageMutation = useRemoveImage()
+  const reorderImagesMutation = useReorderVariantImages()
   const { confirm } = useConfirmDialog()
 
   const [editVariantOpen, setEditVariantOpen] = useState(false)
@@ -296,6 +328,23 @@ export default function CellProductsPage() {
     }
   }
 
+  const handleReorderImages = (imageIds: string[]) => {
+    if (!selectedProduct || !editingVariant) return
+    reorderImagesMutation.mutate(
+      { productId: selectedProduct.id, variantId: editingVariant.id, imageIds },
+      {
+        onSuccess: () => {
+          setVariantImages(prev => {
+            const reordered = imageIds
+              .map(id => prev.find(img => img.id === id))
+              .filter(Boolean)
+            return reordered
+          })
+        },
+      },
+    )
+  }
+
   const handleGoBack = () => {
     router.push(`/dhthub-admin/products/leaves/${leafId}/cells`)
   }
@@ -353,7 +402,7 @@ export default function CellProductsPage() {
           <div className="text-xs text-muted-foreground uppercase tracking-wide">Price Range</div>
           <div className="text-lg font-semibold">
             {aggregatedStats.minPrice !== null && aggregatedStats.maxPrice !== null
-              ? `$${aggregatedStats.minPrice.toFixed(2)} - $${aggregatedStats.maxPrice.toFixed(2)}`
+              ? `SAR ${aggregatedStats.minPrice.toFixed(2)} - SAR ${aggregatedStats.maxPrice.toFixed(2)}`
               : "-"}
           </div>
         </div>
@@ -452,7 +501,7 @@ export default function CellProductsPage() {
                     <TableCell>
                       <span className="text-sm">
                         {minPrice !== null && maxPrice !== null
-                          ? `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+                          ? `SAR ${minPrice.toFixed(2)} - SAR ${maxPrice.toFixed(2)}`
                           : "-"}
                       </span>
                     </TableCell>
@@ -516,8 +565,12 @@ export default function CellProductsPage() {
         onAddImage={handleAddImage}
         onUpdateImage={handleUpdateImage}
         onRemoveImage={handleRemoveImage}
+        onReorderImages={handleReorderImages}
         isUpdating={updateVariantMutation.isPending}
         isAddingImage={addImageMutation.isPending}
+        isReordering={reorderImagesMutation.isPending}
+        productId={selectedProduct?.id || ''}
+        variantId={editingVariant?.id || ''}
       />
 
       {/* Edit Product Dialog */}
@@ -613,7 +666,7 @@ function ProductVariantsDrawer({
                 <div>
                   <span className="text-muted-foreground">Price:</span>
                   <span className="ml-2">
-                    {selectedVariant.price != null ? `$${selectedVariant.price.toFixed(2)}` : "-"}
+                    {selectedVariant.price != null ? `SAR ${selectedVariant.price.toFixed(2)}` : "-"}
                   </span>
                 </div>
                 <div>
@@ -687,7 +740,7 @@ function ProductVariantsDrawer({
                         </TableCell>
                         <TableCell>{variant.name}</TableCell>
                         <TableCell>
-                          {variant.price != null ? `$${variant.price.toFixed(2)}` : "-"}
+                          {variant.price != null ? `SAR ${variant.price.toFixed(2)}` : "-"}
                         </TableCell>
                         <TableCell>{variant.quantity}</TableCell>
                         <TableCell>
@@ -791,9 +844,15 @@ interface EditVariantDialogProps {
   onAddImage: (url: string, altText?: string) => void
   onUpdateImage: (imageId: string, data: any) => void
   onRemoveImage: (imageId: string) => void
+  onReorderImages: (imageIds: string[]) => void
   isUpdating: boolean
   isAddingImage: boolean
+  isReordering: boolean
+  productId: string
+  variantId: string
 }
+
+type UploadState = 'idle' | 'uploading' | 'error';
 
 function EditVariantDialog({
   open,
@@ -804,8 +863,12 @@ function EditVariantDialog({
   onAddImage,
   onUpdateImage,
   onRemoveImage,
+  onReorderImages,
   isUpdating,
   isAddingImage,
+  isReordering,
+  productId,
+  variantId,
 }: EditVariantDialogProps) {
   const [formData, setFormData] = useState({
     sku: '',
@@ -817,8 +880,40 @@ function EditVariantDialog({
 
   const [newImageUrl, setNewImageUrl] = useState('')
   const [newImageAlt, setNewImageAlt] = useState('')
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const [uploadState, setUploadState] = useState<UploadState>('idle')
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadTimeoutError, setUploadTimeoutError] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageCountRef = useRef(images.length)
+  const [localImages, setLocalImages] = useState(images)
 
-  // Update form data when variant changes
+  useEffect(() => {
+    setLocalImages(images)
+    imageCountRef.current = images.length
+  }, [images])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setLocalImages((prev) => {
+      const oldIndex = prev.findIndex((img) => img.id === active.id)
+      const newIndex = prev.findIndex((img) => img.id === over.id)
+      const reordered = arrayMove(prev, oldIndex, newIndex)
+      const ids = reordered.map((img) => img.id)
+      onReorderImages(ids)
+      return reordered
+    })
+  }
+
   useEffect(() => {
     setFormData({
       sku: variant.sku || '',
@@ -843,6 +938,62 @@ function EditVariantDialog({
       setNewImageAlt('')
     }
   }
+
+  const handleFileUpload = useCallback(async (files: FileList) => {
+    if (!files.length || !productId || !variantId) return
+
+    setUploadState('uploading')
+    setUploadError(null)
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('entityType', 'variant')
+      formData.append('sku', variant.sku || '')
+      formData.append('position', String(imageCountRef.current + i + 1))
+
+      try {
+        const response = await fetch(`${apiUrl}/v1/storage/upload`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+          signal: AbortSignal.timeout(60_000),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Upload failed (${response.status})`)
+        }
+
+        const result = await response.json()
+        onAddImage(result.url, file.name)
+        imageCountRef.current++
+        setUploadState('idle')
+      } catch (err) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+          setUploadTimeoutError(true)
+          setUploadState('idle')
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        } else {
+          const message = err instanceof Error ? err.message : 'Upload failed'
+          setUploadError(message)
+          setUploadState('error')
+        }
+        return
+      }
+
+      if (i < files.length - 1) {
+        await new Promise((res) => setTimeout(res, 200))
+      }
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [productId, variantId, variant, onAddImage])
 
   if (!open) return null
 
@@ -934,73 +1085,115 @@ function EditVariantDialog({
             <h3 className="text-sm font-semibold">Variant Images</h3>
             
             {/* Add New Image */}
-            <div className="flex gap-2">
-              <Input
-                value={newImageUrl}
-                onChange={(e) => setNewImageUrl(e.target.value)}
-                placeholder="Image URL"
-                className="flex-1"
+            <div className="space-y-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) handleFileUpload(e.target.files)
+                }}
               />
-              <Input
-                value={newImageAlt}
-                onChange={(e) => setNewImageAlt(e.target.value)}
-                placeholder="Alt text (optional)"
-                className="w-48"
-              />
-              <Button
-                type="button"
-                onClick={handleAddImage}
-                disabled={!newImageUrl || isAddingImage}
-              >
-                Add
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadState === 'uploading'}
+                  className="flex-1"
+                >
+                  {uploadState === 'uploading' ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Images
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                >
+                  {showUrlInput ? 'Hide URL input' : 'From URL'}
+                </Button>
+              </div>
+
+              {uploadState === 'error' && uploadError && (
+                <div className="flex items-center justify-between rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <span>{uploadError}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {showUrlInput && (
+                <div className="flex gap-2">
+                  <Input
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    placeholder="Image URL"
+                    className="flex-1"
+                  />
+                  <Input
+                    value={newImageAlt}
+                    onChange={(e) => setNewImageAlt(e.target.value)}
+                    placeholder="Alt text (optional)"
+                    className="w-48"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddImage}
+                    disabled={!newImageUrl || isAddingImage}
+                  >
+                    Add
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Existing Images */}
-            {images.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {images.map((image) => (
-                  <div key={image.id} className="border rounded-lg p-3 space-y-2">
-                    <div className="aspect-square bg-muted rounded-md overflow-hidden">
-                      <img
-                        src={image.url}
-                        alt={image.altText || 'Variant image'}
-                        className="w-full h-full object-cover"
+            {/* Existing Images - Drag and Drop */}
+            {localImages.length > 0 && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+                modifiers={[restrictToParentElement]}
+              >
+                <SortableContext
+                  items={localImages.map((img) => img.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="grid grid-cols-3 gap-4">
+                    {localImages.map((image, index) => (
+                      <SortableImageItem
+                        key={image.id}
+                        image={image}
+                        index={index}
+                        disabled={isReordering}
+                        onUpdateImage={onUpdateImage}
+                        onRemoveImage={onRemoveImage}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Input
-                        value={image.altText || ''}
-                        onChange={(e) => onUpdateImage(image.id, { altText: e.target.value })}
-                        placeholder="Alt text"
-                        className="text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onUpdateImage(image.id, { isPrimary: !image.isPrimary })}
-                          className="flex-1"
-                        >
-                          {image.isPrimary ? 'Primary' : 'Set Primary'}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => onRemoveImage(image.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
 
-            {images.length === 0 && (
+            {localImages.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 No images added yet. Add images above.
               </div>
@@ -1018,12 +1211,113 @@ function EditVariantDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isUpdating}
+              disabled={uploadState === 'uploading' || isUpdating}
             >
-              {isUpdating ? 'Saving...' : 'Save Changes'}
+              {uploadState === 'uploading' ? 'Uploading...' : isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </form>
+      </div>
+
+      <Dialog open={uploadTimeoutError} onOpenChange={setUploadTimeoutError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Upload Timed Out
+            </DialogTitle>
+            <DialogDescription>
+              The file upload timed out. The file may be corrupted, too large, or in an unsupported format. Please try a different file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadTimeoutError(false)}>
+              Dismiss
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+interface SortableImageItemProps {
+  image: any
+  index: number
+  disabled: boolean
+  onUpdateImage: (imageId: string, data: any) => void
+  onRemoveImage: (imageId: string) => void
+}
+
+function SortableImageItem({ image, index, disabled, onUpdateImage, onRemoveImage }: SortableImageItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: image.id, disabled })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted text-muted-foreground"
+          {...attributes}
+          {...listeners}
+          disabled={disabled}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <span className="text-xs text-muted-foreground font-medium">#{index + 1}</span>
+        {image.isPrimary && (
+          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+            Primary
+          </span>
+        )}
+      </div>
+      <div className="aspect-square bg-muted rounded-md overflow-hidden">
+        <img
+          src={image.url}
+          alt={image.altText || 'Variant image'}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="space-y-2">
+        <Input
+          value={image.altText || ''}
+          onChange={(e) => onUpdateImage(image.id, { altText: e.target.value })}
+          placeholder="Alt text"
+          className="text-sm"
+        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onUpdateImage(image.id, { isPrimary: !image.isPrimary })}
+            className="flex-1"
+          >
+            {image.isPrimary ? 'Primary' : 'Set Primary'}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => onRemoveImage(image.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   )

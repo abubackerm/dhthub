@@ -19,6 +19,26 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   try {
+    // Seed currencies
+    console.log('🌱 Seeding currencies...');
+    const currencies = [
+      { code: 'SAR', symbol: 'SAR', decimals: 2 },
+      { code: 'EUR', symbol: '€', decimals: 2 },
+      { code: 'INR', symbol: '₹', decimals: 2 },
+      { code: 'AED', symbol: 'د.إ', decimals: 2 },
+    ];
+
+    for (const currency of currencies) {
+      await prisma.currency.upsert({
+        where: { code: currency.code },
+        update: {},
+        create: currency,
+      });
+      console.log(`✅ Upserted currency: ${currency.code}`);
+    }
+    console.log('✨ Currency seeding completed!');
+
+    // Seed super admin user
     const existing = await prisma.user.findUnique({
       where: { email: SUPER_ADMIN_EMAIL },
     });

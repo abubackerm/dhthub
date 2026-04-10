@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import type { ProductDetailView, CategoryTreeNode } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
+import { useRequireAuth } from "@/providers/auth-provider";
 
 interface ProductDetailProps {
   product: ProductDetailView;
@@ -44,6 +45,7 @@ export function ProductDetailPage({
 }: ProductDetailProps) {
   const router = useRouter();
   const addToCart = useAddToCart();
+  const { requireAuth } = useRequireAuth();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     (product.variants || []).find((v) => v.isDefault)?.id || (product.variants || [])[0]?.id || null
   );
@@ -254,7 +256,7 @@ export function ProductDetailPage({
                         <span>{variant.name || variant.sku}</span>
                         {variant.price != null && (
                           <span className="text-muted-foreground">
-                            - ${variant.price.toFixed(2)}
+                            - SAR {variant.price.toFixed(2)}
                           </span>
                         )}
                         {variant.quantity <= 0 && (
@@ -273,10 +275,10 @@ export function ProductDetailPage({
           {/* Price */}
           <div className="border-t border-b py-4">
             <div className="flex items-baseline gap-3">
-              <p className="text-3xl font-bold text-foreground">${price.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-foreground">SAR {price.toFixed(2)}</p>
               {compareAtPrice && compareAtPrice > price && (
                 <p className="text-lg text-muted-foreground line-through">
-                  ${compareAtPrice.toFixed(2)}
+                  SAR {compareAtPrice.toFixed(2)}
                 </p>
               )}
             </div>
@@ -348,7 +350,9 @@ export function ProductDetailPage({
               disabled={!inStock || !selectedVariantId}
               onClick={() => {
                 if (selectedVariantId) {
-                  addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
+                  requireAuth(() => {
+                    addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
+                  });
                 }
               }}
             >
@@ -361,7 +365,7 @@ export function ProductDetailPage({
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <TruckIcon className="w-4 h-4 text-muted-foreground" />
-              <span>Free shipping on orders over $50</span>
+              <span>Free shipping on orders over SAR 50</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Package className="w-4 h-4 text-muted-foreground" />

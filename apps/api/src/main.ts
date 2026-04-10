@@ -4,16 +4,20 @@ import {
   NestFastifyApplication,
   FastifyAdapter,
 } from '@nestjs/platform-fastify';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import multipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter, LoggingInterceptor } from '@shared/infrastructure';
-import { auth } from './modules/auth/auth';
+import { auth, setAuthEventEmitter } from './modules/auth/auth';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter(),
+    new FastifyAdapter({ requestTimeout: 30_000 }),
   );
+
+  const eventEmitter = app.get(EventEmitter2);
+  setAuthEventEmitter(eventEmitter);
 
   const fastify = app.getHttpAdapter().getInstance();
 

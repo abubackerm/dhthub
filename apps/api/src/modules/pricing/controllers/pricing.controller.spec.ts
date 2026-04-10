@@ -10,7 +10,7 @@ describe('PricingController', () => {
     id: 'price-1',
     variantId: 'variant-1',
     currencyId: 'currency-1',
-    currency: { code: 'USD', symbol: '$', decimals: 2 },
+    currency: { code: 'SAR', symbol: 'SAR', decimals: 2 },
     tiers: [
       { id: 'tier-1', minQty: 1, maxQty: 9, unitPrice: 0.42 },
       { id: 'tier-2', minQty: 10, maxQty: 49, unitPrice: 0.31 },
@@ -20,8 +20,8 @@ describe('PricingController', () => {
   const mockPricingResult = {
     priceId: 'price-1',
     variantId: 'variant-1',
-    currencyCode: 'USD',
-    currencySymbol: '$',
+    currencyCode: 'SAR',
+    currencySymbol: 'SAR',
     decimals: 2,
     unitPrice: 0.31,
     totalPrice: 7.75,
@@ -59,7 +59,7 @@ describe('PricingController', () => {
   describe('createVariantPricing', () => {
     it('should create pricing for variant', async () => {
       const dto = {
-        currency: 'USD',
+        currency: 'SAR',
         tiers: [
           { minQty: 1, maxQty: 9, unitPrice: 0.42 },
           { minQty: 10, maxQty: 49, unitPrice: 0.31 },
@@ -70,18 +70,18 @@ describe('PricingController', () => {
 
       expect(service.createVariantPricing).toHaveBeenCalledWith(
         'variant-1',
-        'USD',
+        'SAR',
         dto.tiers,
       );
       expect(result).toBeDefined();
-      expect(result.currency).toBe('USD');
+      expect(result.currency).toBe('SAR');
     });
   });
 
   describe('replaceVariantPricing', () => {
     it('should replace pricing for variant', async () => {
       const dto = {
-        currency: 'USD',
+        currency: 'SAR',
         tiers: [
           { minQty: 1, maxQty: 9, unitPrice: 0.45 },
           { minQty: 10, maxQty: 49, unitPrice: 0.35 },
@@ -92,7 +92,7 @@ describe('PricingController', () => {
 
       expect(service.replaceVariantPricing).toHaveBeenCalledWith(
         'variant-1',
-        'USD',
+        'SAR',
         dto.tiers,
       );
       expect(result).toBeDefined();
@@ -101,22 +101,22 @@ describe('PricingController', () => {
 
   describe('getVariantPricing', () => {
     it('should return pricing for variant', async () => {
-      const result = await controller.getVariantPricing('variant-1', 'USD');
+      const result = await controller.getVariantPricing('variant-1', 'SAR');
 
-      expect(service.getVariantPricing).toHaveBeenCalledWith('variant-1', 'USD');
+      expect(service.getVariantPricing).toHaveBeenCalledWith('variant-1', 'SAR');
       expect(result).toBeDefined();
-      expect(result.currency).toBe('USD');
+      expect(result.currency).toBe('SAR');
       expect(result.tiers).toHaveLength(2);
     });
   });
 
   describe('getPriceForQuantity', () => {
     it('should calculate price for quantity', async () => {
-      const query = { currency: 'USD', qty: 25 };
+      const query = { currency: 'SAR', qty: 25 };
 
       const result = await controller.getPriceForQuantity('variant-1', query);
 
-      expect(service.getPriceForQuantity).toHaveBeenCalledWith('variant-1', 'USD', 25);
+      expect(service.getPriceForQuantity).toHaveBeenCalledWith('variant-1', 'SAR', 25);
       expect(result).toBeDefined();
       expect(result.unitPrice).toBe(0.31);
       expect(result.totalPrice).toBe(7.75);

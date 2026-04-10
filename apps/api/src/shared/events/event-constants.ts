@@ -7,6 +7,8 @@ export const AUTH_EVENTS = {
   MEMBERSHIP_CREATED: 'auth.membership.created',
   MEMBERSHIP_STATUS_CHANGED: 'auth.membership.status_changed',
   ROLE_CREATED: 'auth.role.created',
+  PASSWORD_RESET_REQUESTED: 'auth.password_reset.requested',
+  USER_CREATED_BY_ADMIN: 'auth.user.created_by_admin',
 } as const;
 
 export const CATALOG_EVENTS = {

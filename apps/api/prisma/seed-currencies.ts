@@ -15,7 +15,7 @@ async function main() {
   console.log('🌱 Seeding currencies...');
 
   const currencies = [
-    { code: 'USD', symbol: '$', decimals: 2 },
+    { code: 'SAR', symbol: 'SAR', decimals: 2 },
     { code: 'EUR', symbol: '€', decimals: 2 },
     { code: 'INR', symbol: '₹', decimals: 2 },
     { code: 'AED', symbol: 'د.إ', decimals: 2 },

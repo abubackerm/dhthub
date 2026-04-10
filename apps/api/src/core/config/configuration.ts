@@ -28,6 +28,20 @@ export default () => ({
     port: parseInt(process.env.MEILISEARCH_PORT || '7700', 10),
     masterKey: process.env.MEILISEARCH_MASTER_KEY || '',
   },
+  microsoft: {
+    tenantId: process.env.MS_TENANT_ID,
+    clientId: process.env.MS_CLIENT_ID,
+    clientSecret: process.env.MS_CLIENT_SECRET,
+  },
+  email: {
+    from: process.env.EMAIL_FROM,
+    fromName: process.env.EMAIL_FROM_NAME || 'DHT',
+    adminRecipient: process.env.EMAIL_ADMIN_RECIPIENT,
+  },
+  recaptcha: {
+    secretKey: process.env.RECAPTCHA_SECRET_KEY,
+    skip: process.env.SKIP_RECAPTCHA === 'true',
+  },
   minio: {
     endpoint: process.env.MINIO_ENDPOINT || 'localhost',
     port: parseInt(process.env.MINIO_API_PORT || '9000', 10),

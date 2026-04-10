@@ -104,15 +104,15 @@ function CellPrice({ cellId }: CellPriceProps) {
       if (productPrices.length === 0) return "-"
       const minPrice = Math.min(...productPrices)
       const maxPrice = Math.max(...productPrices)
-      if (minPrice === maxPrice) return `$${minPrice.toFixed(2)}`
-      return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+      if (minPrice === maxPrice) return `SAR ${minPrice.toFixed(2)}`
+      return `SAR ${minPrice.toFixed(2)} - SAR ${maxPrice.toFixed(2)}`
     }
 
     const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)
 
-    if (minPrice === maxPrice) return `$${minPrice.toFixed(2)}`
-    return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`
+    if (minPrice === maxPrice) return `SAR ${minPrice.toFixed(2)}`
+    return `SAR ${minPrice.toFixed(2)} - SAR ${maxPrice.toFixed(2)}`
   }, [productsData])
 
   return <span className="text-sm">{priceRange}</span>

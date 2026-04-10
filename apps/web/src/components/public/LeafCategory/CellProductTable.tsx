@@ -21,6 +21,7 @@ import type {
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
+import { useRequireAuth } from "@/providers/auth-provider";
 
 interface CellProductTableProps {
   products: LeafProductView[];
@@ -38,6 +39,7 @@ export function CellProductTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
+  const { requireAuth } = useRequireAuth();
 
   // Get visible attributes for table columns.
   // Use product-level tableColumns (at_head) for ordering when available,
@@ -299,7 +301,7 @@ export function CellProductTable({
                   {/* Price */}
                   <TableCell className="p-2 text-right">
                     {variant.price != null ? (
-                      <span className="font-semibold text-sm">${variant.price.toFixed(2)}</span>
+                      <span className="font-semibold text-sm">SAR {variant.price.toFixed(2)}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
@@ -314,7 +316,9 @@ export function CellProductTable({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (variant.id) {
-                          addToCart.mutate({ variantId: variant.id, qty: 1 });
+                          requireAuth(() => {
+                            addToCart.mutate({ variantId: variant.id, qty: 1 });
+                          });
                         }
                       }}
                     >

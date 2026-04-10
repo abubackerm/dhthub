@@ -32,17 +32,23 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>
 
+interface LoginForm1Props extends React.ComponentProps<"div"> {
+  theme?: "dht";
+  onSuccess?: () => void;
+}
+
 export function LoginForm1({
   className,
   theme,
+  onSuccess,
   ...props
-}: React.ComponentProps<"div"> & { theme?: "dht" }) {
+}: LoginForm1Props) {
   const isDht = theme === "dht";
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: "test@example.com",
-      password: "password",
+      email: "",
+      password: "",
     },
   })
 
@@ -65,7 +71,11 @@ export function LoginForm1({
         return
       }
 
-      window.location.href = "/dhthub-admin"
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.reload();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong")
     } finally {
@@ -98,7 +108,7 @@ export function LoginForm1({
                         <FormControl>
                           <Input
                             type="email"
-                            placeholder="test@example.com"
+                            placeholder="name@example.com"
                             {...field}
                           />
                         </FormControl>

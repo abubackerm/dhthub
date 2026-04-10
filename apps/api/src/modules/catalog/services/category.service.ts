@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseService } from '@shared/domain';
 import { CATALOG_EVENTS } from '@shared/events';
@@ -11,13 +11,17 @@ import {
 import { CategoryRepository, CategoryWithCells } from '../repositories/category.repository';
 import { CategoryEntity } from '../entities/category.entity';
 import { CategoryCreatedEvent, CategoryUpdatedEvent } from '../events';
+import { StorageService } from '@modules/storage/storage.service';
 import { randomBytes } from 'crypto';
 
 @Injectable()
 export class CategoryService extends BaseService {
+  private readonly logger = new Logger(CategoryService.name);
+
   constructor(
     eventEmitter: EventEmitter2,
     private readonly categoryRepo: CategoryRepository,
+    @Optional() private readonly storageService?: StorageService,
   ) {
     super(eventEmitter);
   }
@@ -188,6 +192,7 @@ export class CategoryService extends BaseService {
       sortOrder: number;
       isActive: boolean;
       updatedBy: string;
+      sku: string;
     }>,
   ): Promise<CategoryEntity> {
     const category = await this.categoryRepo.findById(id);
@@ -211,6 +216,11 @@ export class CategoryService extends BaseService {
           to: data[typedKey],
         };
       }
+    }
+
+    // Clean up old image from SeaweedFS if imageUrl is being changed or set to null
+    if (data.imageUrl !== undefined && category.imageUrl && data.imageUrl !== category.imageUrl) {
+      await this.deleteStorageFile(category.imageUrl);
     }
 
     const updatedCategory = await this.categoryRepo.update(id, data);
@@ -313,5 +323,15 @@ export class CategoryService extends BaseService {
     }
 
     return rootCategories;
+  }
+
+  private async deleteStorageFile(imageUrl: string): Promise<void> {
+    if (!this.storageService || !imageUrl) return;
+    const storageKey = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
+    try {
+      await this.storageService.deleteFile(storageKey);
+    } catch (error) {
+      this.logger.warn(`Failed to delete old file from SeaweedFS: ${storageKey}`, error);
+    }
   }
 }

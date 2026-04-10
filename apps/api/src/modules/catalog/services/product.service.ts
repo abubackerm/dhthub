@@ -1,4 +1,4 @@
-import { Injectable, Optional, NotFoundException } from '@nestjs/common';
+import { Injectable, Optional, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseService } from '@shared/domain';
@@ -29,6 +29,7 @@ import {
 } from '../events';
 import { VariantAttributeService } from '@modules/catalog-attributes/services/variant-attribute.service';
 import { CellRepository } from '@modules/cell';
+import { StorageService } from '@modules/storage/storage.service';
 
 interface AttributeValue {
   attributeId: string;
@@ -64,6 +65,8 @@ interface ProductWithRelations extends ProductEntity {
 
 @Injectable()
 export class ProductService extends BaseService {
+  private readonly logger = new Logger(ProductService.name);
+
   constructor(
     eventEmitter: EventEmitter2,
     private readonly productRepo: ProductRepository,
@@ -73,6 +76,7 @@ export class ProductService extends BaseService {
     private readonly configService: ConfigService,
     @Optional() private readonly variantAttributeService?: VariantAttributeService,
     @Optional() private readonly cellRepo?: CellRepository,
+    @Optional() private readonly storageService?: StorageService,
   ) {
     super(eventEmitter);
   }
@@ -701,12 +705,15 @@ export class ProductService extends BaseService {
       );
     }
 
+    const existingImages = await this.variantImageRepo.findByVariantId(variantId);
+    const nextPosition = sortOrder ?? existingImages.length + 1;
+
     return this.variantImageRepo.create({
       variantId,
       sku: variant.sku,
       storagePath: url,
       altText: altText ?? null,
-      position: sortOrder ?? 1,
+      position: nextPosition,
       isPrimary: false,
     });
   }
@@ -720,15 +727,73 @@ export class ProductService extends BaseService {
       throw new NotFoundException('Image not found');
     }
 
-    return this.variantImageRepo.update(imageId, data);
+    if (data.isPrimary === true) {
+      const currentPrimary = await this.variantImageRepo.findPrimaryByVariantId(image.variantId);
+      if (currentPrimary && currentPrimary.id !== imageId) {
+        await this.variantImageRepo.update(currentPrimary.id, { isPrimary: false });
+      }
+    }
+
+    const updateData: Partial<{
+      storagePath: string;
+      altText: string | null;
+      isPrimary: boolean;
+      position: number;
+    }> = {};
+
+    if (data.altText !== undefined) updateData.altText = data.altText;
+    if (data.sortOrder !== undefined) updateData.position = data.sortOrder;
+    if (data.isPrimary !== undefined) updateData.isPrimary = data.isPrimary;
+
+    return this.variantImageRepo.update(imageId, updateData);
   }
 
   async removeImage(imageId: string): Promise<void> {
+    const image = await this.variantImageRepo.findById(imageId);
+    if (image && image.storagePath) {
+      await this.deleteStorageFile(image.storagePath);
+    }
     await this.variantImageRepo.delete(imageId);
   }
 
   async getVariantImages(variantId: string): Promise<any[]> {
     return this.variantImageRepo.findByVariantId(variantId);
+  }
+
+  async reorderVariantImages(
+    productId: string,
+    variantId: string,
+    imageIds: string[],
+  ): Promise<void> {
+    if (!imageIds?.length) {
+      throw new BadRequestException('No images provided');
+    }
+
+    const product = await this.productRepo.findById(productId);
+    if (!product) {
+      throw new ProductNotFoundError(productId);
+    }
+
+    const variant = await this.variantRepo.findById(variantId);
+    if (!variant) {
+      throw new ProductVariantNotFoundError(variantId);
+    }
+
+    if (variant.productId !== productId) {
+      throw new InvalidProductOperationError(
+        'Variant does not belong to this product',
+        'VARIANT_PRODUCT_MISMATCH',
+      );
+    }
+
+    const existingImages = await this.variantImageRepo.findByVariantId(variantId);
+    if (imageIds.length !== existingImages.length) {
+      throw new BadRequestException(
+        'Image count mismatch. All images must be included in the reorder request.',
+      );
+    }
+
+    await this.variantImageRepo.reorderPositions(variantId, imageIds);
   }
 
   /**
@@ -905,5 +970,15 @@ export class ProductService extends BaseService {
     ].join('\n');
 
     return { productsCsv, variantsCsv };
+  }
+
+  private async deleteStorageFile(imageUrl: string): Promise<void> {
+    if (!this.storageService || !imageUrl) return;
+    const storageKey = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
+    try {
+      await this.storageService.deleteFile(storageKey);
+    } catch (error) {
+      this.logger.warn(`Failed to delete old file from SeaweedFS: ${storageKey}`, error);
+    }
   }
 }

@@ -67,6 +67,14 @@ const nextConfig: NextConfig = {
         source: '/api/auth/:path*',
         destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/:path*`,
       },
+      {
+        source: '/api/v1/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/:path*`,
+      },
+      {
+        source: '/api/v1/contact',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/contact`,
+      },
     ];
   },
   typescript: {

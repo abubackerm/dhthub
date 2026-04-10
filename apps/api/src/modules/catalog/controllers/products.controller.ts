@@ -42,7 +42,7 @@ export class ProductsController {
       dto.price ?? null,
       null,
       null,
-      'USD',
+      'SAR',
       dto.quantity ?? 0,
       dto.cellId ?? null,
       dto.isFeatured ?? false,
@@ -260,6 +260,16 @@ export class ProductsController {
       altText: img.altText,
       isPrimary: img.isPrimary,
     }));
+  }
+
+  @Patch(':productId/variants/:variantId/images/reorder')
+  async reorderVariantImages(
+    @Param('productId') productId: string,
+    @Param('variantId') variantId: string,
+    @Body() body: { imageIds: string[] },
+  ): Promise<{ success: boolean }> {
+    await this.productService.reorderVariantImages(productId, variantId, body.imageIds);
+    return { success: true };
   }
 
   @Post('export')

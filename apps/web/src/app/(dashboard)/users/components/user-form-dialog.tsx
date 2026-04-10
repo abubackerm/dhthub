@@ -33,18 +33,11 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { UserRole } from "../page"
 
-const userFormSchema = z
-  .object({
-    name: z.string().min(2, "Name must be at least 2 characters."),
-    email: z.string().email("Please enter a valid email address."),
-    password: z.string().min(6, "Password must be at least 6 characters."),
-    confirmPassword: z.string().min(6, "Please confirm the password."),
-    role: z.enum(["user", "dealer", "admin"]),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  })
+const userFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  email: z.string().email("Please enter a valid email address."),
+  role: z.enum(["user", "dealer", "admin"]),
+})
 
 type UserFormValues = z.infer<typeof userFormSchema>
 
@@ -52,7 +45,6 @@ interface UserFormDialogProps {
   onCreateUser: (data: {
     name: string
     email: string
-    password: string
     role: Exclude<UserRole, "super_admin">
   }) => Promise<void>
 }
@@ -67,8 +59,6 @@ export function UserFormDialog({ onCreateUser }: UserFormDialogProps) {
     defaultValues: {
       name: "",
       email: "",
-      password: "",
-      confirmPassword: "",
       role: "user",
     },
   })
@@ -80,7 +70,6 @@ export function UserFormDialog({ onCreateUser }: UserFormDialogProps) {
       await onCreateUser({
         name: data.name,
         email: data.email,
-        password: data.password,
         role: data.role,
       })
       form.reset()
@@ -104,7 +93,7 @@ export function UserFormDialog({ onCreateUser }: UserFormDialogProps) {
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            Create a new user or dealer account.
+            A password will be auto-generated and sent to the user's email.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -139,38 +128,6 @@ export function UserFormDialog({ onCreateUser }: UserFormDialogProps) {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Confirm password"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
               name="role"

@@ -11,6 +11,13 @@ import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import * as bcrypt from "bcrypt";
 import { ac, superAdmin, admin, dealer, user } from "./permissions";
+import { AUTH_EVENTS } from "@shared/events/event-constants";
+
+let nestjsEventEmitter: { emit: (event: string, payload: unknown) => boolean } | null = null;
+
+export function setAuthEventEmitter(emitter: { emit: (event: string, payload: unknown) => boolean }) {
+  nestjsEventEmitter = emitter;
+}
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -30,9 +37,21 @@ export const auth = betterAuth({
       verify: async ({ hash, password }) => bcrypt.compare(password, hash),
     },
     sendResetPassword: async ({ user: resetUser, url }) => {
-      // TODO: Wire up a real email provider (e.g. Resend, SendGrid)
       console.log(`[AUTH] Password reset requested for ${resetUser.email}`);
-      console.log(`[AUTH] Reset URL: ${url}`);
+
+      if (nestjsEventEmitter) {
+        nestjsEventEmitter.emit(AUTH_EVENTS.PASSWORD_RESET_REQUESTED, {
+          user: {
+            id: resetUser.id,
+            name: resetUser.name,
+            email: resetUser.email,
+          },
+          url,
+          occurredAt: new Date(),
+        });
+      } else {
+        console.warn('[AUTH] NestJS EventEmitter not yet initialized, skipping password reset email');
+      }
     },
   },
   user: {

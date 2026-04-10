@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { StorageModule } from '@modules/storage/storage.module';
 import { ProductService } from './services/product.service';
 import { CategoryService } from './services/category.service';
 import { ProductRepository } from './repositories/product.repository';
@@ -13,7 +14,7 @@ import { CategoriesController } from './controllers/categories.controller';
 import { ProductsController } from './controllers/products.controller';
 
 @Module({
-  imports: [EventEmitterModule],
+  imports: [EventEmitterModule, StorageModule],
   controllers: [CategoriesController, ProductsController],
   providers: [
     // Services

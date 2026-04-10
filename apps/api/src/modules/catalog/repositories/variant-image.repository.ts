@@ -121,4 +121,30 @@ export class VariantImageRepository {
       where: { id },
     });
   }
+
+  async reorderPositions(variantId: string, imageIds: string[]): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const existingImages = await tx.variantImage.findMany({
+        where: { variantId },
+        select: { id: true },
+      });
+
+      const existingIdSet = new Set(existingImages.map((img) => img.id));
+
+      for (const imageId of imageIds) {
+        if (!existingIdSet.has(imageId)) {
+          throw new Error(
+            `Image ${imageId} does not belong to variant ${variantId}`,
+          );
+        }
+      }
+
+      for (let i = 0; i < imageIds.length; i++) {
+        await tx.variantImage.update({
+          where: { id: imageIds[i] },
+          data: { position: i + 1 },
+        });
+      }
+    });
+  }
 }

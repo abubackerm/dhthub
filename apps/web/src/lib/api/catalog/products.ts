@@ -127,6 +127,17 @@ export async function removeImage(imageId: string): Promise<void> {
   return apiClient.delete(`/v1/catalog/products/images/${imageId}`);
 }
 
+export async function reorderVariantImages(
+  productId: string,
+  variantId: string,
+  imageIds: string[],
+): Promise<void> {
+  return apiClient.patch(
+    `/v1/catalog/products/${productId}/variants/${variantId}/images/reorder`,
+    { imageIds },
+  );
+}
+
 export async function getVariantImages(
   productId: string,
   variantId: string,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import {
   ChevronRight,
   Folder,
@@ -31,6 +31,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -211,7 +219,7 @@ function CategoryTreeItem({
         {category.imageUrl && (
           <div className="ml-2 w-8 h-8 rounded border bg-muted overflow-hidden shrink-0">
             <img
-              src={`/api/v1/storage${category.imageUrl}`}
+              src={category.imageUrl}
               alt={category.name}
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -356,7 +364,10 @@ export default function CategoriesPage() {
   const [isAddingChild, setIsAddingChild] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>("")
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const [copiedSku, setCopiedSku] = useState<string | null>(null)
+  const [uploadTimeoutError, setUploadTimeoutError] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Cell management state
   const [cellSheetOpen, setCellSheetOpen] = useState(false)
@@ -467,15 +478,23 @@ export default function CategoriesPage() {
 
     let imageUrl = formData.imageUrl
 
+    // Detect if image was explicitly removed (had image before, now cleared without new upload)
+    const imageRemoved = !imageFile && formData.imageUrl === undefined && editingCategory?.imageUrl;
+
     // Upload image if provided
     if (imageFile) {
+      setIsUploading(true)
       try {
-        const formData = new FormData()
-        formData.append('file', imageFile)
+        const uploadData = new FormData()
+        uploadData.append('file', imageFile)
+        uploadData.append('entityType', 'category')
+        uploadData.append('sku', formData.sku.trim() || editingCategory?.sku || '')
+        uploadData.append('position', '1')
 
-        const uploadResponse = await fetch('/api/v1/storage/upload', {
+        const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/v1/storage/upload`, {
           method: 'POST',
-          body: formData,
+          body: uploadData,
+          credentials: 'include',
         })
 
         if (!uploadResponse.ok) {
@@ -487,9 +506,17 @@ export default function CategoriesPage() {
 
         toast.success('Image uploaded successfully')
       } catch (error) {
-        toast.error('Failed to upload image')
-        console.error(error)
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          setImageFile(null)
+          setImagePreview("")
+          if (imageInputRef.current) imageInputRef.current.value = ''
+          setUploadTimeoutError(true)
+        } else {
+          toast.error('Failed to upload image')
+        }
         return
+      } finally {
+        setIsUploading(false)
       }
     }
 
@@ -499,7 +526,8 @@ export default function CategoriesPage() {
       sortOrder: formData.sortOrder,
       isActive: true,
       ...(formData.sku.trim() ? { sku: formData.sku.toUpperCase() } : {}),
-      ...(imageUrl ? { imageUrl } : {}),
+      ...(imageRemoved ? { imageUrl: null } : {}),
+      ...(imageUrl && !imageRemoved ? { imageUrl } : {}),
     }
 
     if (editingCategory) {
@@ -844,7 +872,7 @@ export default function CategoriesPage() {
                 {(imagePreview || formData.imageUrl) ? (
                   <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-border shrink-0 bg-muted">
                     <img
-                      src={imagePreview || `/api/v1/storage${formData.imageUrl}`}
+                      src={imagePreview || formData.imageUrl}
                       alt="Category image preview"
                       className="w-full h-full object-cover"
                     />
@@ -867,11 +895,12 @@ export default function CategoriesPage() {
                 <div className="flex-1 space-y-2">
                   <Input
                     id="image"
+                    ref={imageInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     className="cursor-pointer"
-                    disabled={createMutation.isPending || updateMutation.isPending}
+                    disabled={isUploading || createMutation.isPending || updateMutation.isPending}
                   />
                   <p className="text-xs text-muted-foreground">
                     Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
@@ -888,14 +917,14 @@ export default function CategoriesPage() {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isUploading || createMutation.isPending || updateMutation.isPending}
             >
-              {createMutation.isPending || updateMutation.isPending ? (
+              {isUploading || createMutation.isPending || updateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
-              {editingCategory ? "Update Category" : "Save Category"}
+              {isUploading ? "Uploading..." : editingCategory ? "Update Category" : "Save Category"}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -912,6 +941,25 @@ export default function CategoriesPage() {
           category={selectedCategoryForCells}
         />
       )}
+
+      <Dialog open={uploadTimeoutError} onOpenChange={setUploadTimeoutError}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Upload Timed Out
+            </DialogTitle>
+            <DialogDescription>
+              The file upload timed out. The file may be corrupted, too large, or in an unsupported format. Please try a different file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadTimeoutError(false)}>
+              Dismiss
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

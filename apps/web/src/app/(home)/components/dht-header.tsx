@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X, CircleUser, ShoppingCart, ChevronDown, LogOut } from "lucide-react";
-import { SignInDialog } from "@/components/sign-in-dialog";
+import { Menu, X, CircleUser, ShoppingCart, ChevronDown, LogOut, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useRequireAuth } from "@/providers/auth-provider";
 import { authClient } from "@/lib/auth-client";
 import { useCart } from "@/lib/api/cart";
 import {
@@ -25,15 +26,24 @@ const navLinks = [
 
 export function DHTHeader() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [signInOpen, setSignInOpen] = useState(false);
+    const { requireAuth, isAuthenticated } = useRequireAuth();
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const { data: session } = authClient.useSession();
     const { data: cart } = useCart();
 
-    const isAuthenticated = !!session?.user;
     const itemCount = cart?.itemCount || 0;
 
     const handleLogout = async () => {
-        await authClient.signOut();
+        setIsLoggingOut(true);
+        try {
+            await authClient.signOut();
+            toast.success("Signed out successfully");
+            window.location.reload();
+        } catch {
+            toast.error("Failed to sign out");
+        } finally {
+            setIsLoggingOut(false);
+        }
     };
 
     return (
@@ -102,16 +112,20 @@ export function DHTHeader() {
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                                        <LogOut className="h-4 w-4 mr-2" />
-                                        Logout
+                                    <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="cursor-pointer">
+                                        {isLoggingOut ? (
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        ) : (
+                                            <LogOut className="h-4 w-4 mr-2" />
+                                        )}
+                                        {isLoggingOut ? "Signing out..." : "Logout"}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : (
                             <button
                                 type="button"
-                                onClick={() => setSignInOpen(true)}
+                                onClick={() => requireAuth(() => {})}
                                 className="text-white hover:text-(--dht-red) font-medium transition-colors"
                             >
                                 Sign In
@@ -183,9 +197,15 @@ export function DHTHeader() {
                                             handleLogout();
                                             setMobileMenuOpen(false);
                                         }}
-                                        className="text-left text-white hover:text-(--dht-red) font-medium transition-colors"
+                                        disabled={isLoggingOut}
+                                        className="flex items-center gap-2 text-left text-white hover:text-(--dht-red) font-medium transition-colors"
                                     >
-                                        Logout
+                                        {isLoggingOut ? (
+                                            <Loader2 className="h-5 w-5 animate-spin" />
+                                        ) : (
+                                            <LogOut className="h-5 w-5" />
+                                        )}
+                                        {isLoggingOut ? "Signing out..." : "Logout"}
                                     </button>
                                 </>
                             ) : (
@@ -193,7 +213,7 @@ export function DHTHeader() {
                                     type="button"
                                     onClick={() => {
                                         setMobileMenuOpen(false);
-                                        setSignInOpen(true);
+                                        requireAuth(() => {});
                                     }}
                                     className="text-left text-white hover:text-(--dht-red) font-medium transition-colors"
                                 >
@@ -204,7 +224,6 @@ export function DHTHeader() {
                     </nav>
                 )}
             </div>
-            <SignInDialog open={signInOpen} onOpenChange={setSignInOpen} />
         </header>
     );
 }

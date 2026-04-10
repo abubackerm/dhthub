@@ -11,6 +11,7 @@ import { SearchModule } from './modules/search/search.module';
 import { ImportModule } from './modules/import/import.module';
 import { EnquiryModule } from './modules/enquiry/enquiry.module';
 import { CellModule } from './modules/cell/cell.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CellModule } from './modules/cell/cell.module';
     ImportModule,
     EnquiryModule,
     CellModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}

@@ -199,3 +199,14 @@
 - `category_attributes` table schema has only: id, category_id, attribute_id, created_at (no is_required, sort_order, or updated_at)
 - Filter sidebar queries filter on `attribute: { isFilterable: true }` joined through `category_attributes`
 - Categories missing `category_attributes` links will show empty filter sidebar even if attributes exist on variants
+
+- VPS production deployment for www.verdeum.in on OVH VPS (Ubuntu 22.04, 4 CPU, 7.6GB RAM, 73GB disk)
+- Infrastructure: Docker for Postgres 18.3, Redis 8.6.0, Meilisearch v1.8, SeaweedFS 4.16; PM2 for NestJS API, Next.js 16, BullMQ workers; Nginx reverse proxy with Certbot SSL
+- Deploy files live in `deploy/` directory: docker-compose.infra.yml, ecosystem.config.js, nginx configs, setup-vps.sh, deploy.sh, .env.production
+- Future deploys: `ssh ovh-dht && cd /opt/dynamic_hub && ./deploy/deploy.sh` (pulls code, installs deps, builds, migrates, restarts PM2)
+- PM2 ecosystem config must load .env from project root and inject into all process envs (workers need REDIS_PASSWORD etc.)
+- Shell script bin entries (node_modules/.bin/next, node_modules/.bin/tsx) cannot be used as PM2 script directly — use actual JS entry points (node_modules/next/dist/bin/next, node_modules/tsx/dist/cli.mjs) with `interpreter: 'node'`
+- Redis for BullMQ must use `--maxmemory-policy noeviction` (not allkeys-lru) to prevent job data loss
+- PowerShell on Windows mangles `$VARIABLE` and heredoc syntax when wrapping SSH commands — use single quotes to prevent local interpolation
+- Certbot requires HTTP-only nginx config first, then SSL config after certs are obtained
+- Prisma migrations may have gaps (tables created via db push but no migration files) — resolve by db push + migrate resolve --applied on fresh DB

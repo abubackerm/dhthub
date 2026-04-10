@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart } from "lucide-rea
 import { Attribute, Product } from "@/lib/mock-data";
 import { useMemo, useCallback } from "react";
 import { useAddToCart } from "@/lib/api/cart";
+import { useRequireAuth } from "@/providers/auth-provider";
 
 interface ProductTableProps {
   products: Product[];
@@ -35,6 +36,7 @@ export function ProductTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
+  const { requireAuth } = useRequireAuth();
 
   // Get visible attributes for table columns
   const visibleAttributes = useMemo(
@@ -189,7 +191,7 @@ export function ProductTable({
                   </TableCell>
                 ))}
                 <TableCell className="text-right font-semibold">
-                  ${product.basePrice.toFixed(2)}
+                  SAR {product.basePrice.toFixed(2)}
                 </TableCell>
                 <TableCell className="text-center">
                   {product.inStock ? (
@@ -209,7 +211,9 @@ export function ProductTable({
                     onClick={(e) => {
                       e.stopPropagation();
                       if (product.id) {
-                        addToCart.mutate({ variantId: product.id, qty: 1 });
+                        requireAuth(() => {
+                          addToCart.mutate({ variantId: product.id, qty: 1 });
+                        });
                       }
                     }}
                   >

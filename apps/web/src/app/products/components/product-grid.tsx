@@ -41,7 +41,7 @@ export function ProductGrid({ products }: ProductGridProps) {
             {/* Badges */}
             <div className="absolute left-3 top-3 flex flex-col gap-1">
               {product.badge && (
-                <Badge className="w-fit bg-[var(--dht-red)] hover:bg-[var(--dht-red)]">
+                <Badge className="w-fit bg-(--dht-red) hover:bg-(--dht-red)">
                   {product.badge}
                 </Badge>
               )}
@@ -64,7 +64,7 @@ export function ProductGrid({ products }: ProductGridProps) {
 
           {/* Content */}
           <CardHeader className="space-y-2 pb-3">
-            <Badge variant="outline" className="w-fit text-xs border-[var(--dht-red)] text-[var(--dht-red)]">
+            <Badge variant="outline" className="w-fit text-xs border-(--dht-red) text-(--dht-red)">
               {product.category}
             </Badge>
             <CardTitle className="line-clamp-1 text-lg text-gray-900">
@@ -84,7 +84,7 @@ export function ProductGrid({ products }: ProductGridProps) {
                     key={i}
                     className={`h-4 w-4 ${
                       i < Math.floor(product.rating)
-                        ? "fill-[var(--dht-red)] text-[var(--dht-red)]"
+                        ? "fill-(--dht-red) text-(--dht-red)"
                         : "fill-gray-300 text-gray-300"
                     }`}
                   />
@@ -98,11 +98,11 @@ export function ProductGrid({ products }: ProductGridProps) {
             {/* Price */}
             <div className="flex items-center gap-2">
               <span className="text-2xl font-bold text-gray-900">
-                ${product.price.toFixed(2)}
+                SAR {product.price.toFixed(2)}
               </span>
               {product.originalPrice && (
                 <span className="text-sm text-gray-500 line-through">
-                  ${product.originalPrice.toFixed(2)}
+                  SAR {product.originalPrice.toFixed(2)}
                 </span>
               )}
             </div>
@@ -122,7 +122,7 @@ export function ProductGrid({ products }: ProductGridProps) {
 
           <CardFooter>
             <Button
-              className="w-full bg-[var(--dht-red)] hover:bg-[var(--dht-red-hover)] text-white"
+              className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white"
               disabled={!product.inStock}
               variant={product.inStock ? "default" : "outline"}
               onClick={() => {

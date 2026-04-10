@@ -20,6 +20,7 @@ import {
   updateImage,
   removeImage,
   getVariantImages,
+  reorderVariantImages,
   bulkUpdateProducts,
   type ProductView,
   type CreateProductInput,
@@ -254,6 +255,29 @@ export function useRemoveImage(): UseMutationResult<void, Error, string> {
     },
     onError: (error: Error) => {
       console.error('Failed to remove image:', error);
+      const errorMessage =
+        error instanceof ApiError ? error.getErrorMessage() : error.message;
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useReorderVariantImages(): UseMutationResult<
+  void,
+  Error,
+  { productId: string; variantId: string; imageIds: string[] }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, variantId, imageIds }) =>
+      reorderVariantImages(productId, variantId, imageIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      toast.success('Image order updated');
+    },
+    onError: (error: Error) => {
+      console.error('Failed to reorder images:', error);
       const errorMessage =
         error instanceof ApiError ? error.getErrorMessage() : error.message;
       toast.error(errorMessage);

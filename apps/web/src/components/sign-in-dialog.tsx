@@ -12,9 +12,10 @@ import { LoginForm1 } from "@/app/(auth)/sign-in/components/login-form-1";
 interface SignInDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
+export function SignInDialog({ open, onOpenChange, onSuccess }: SignInDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden border-t-4 border-t-(--dht-red) bg-(--dht-gray-light) p-0 sm:max-w-sm **:data-[slot=dialog-close]:text-white **:data-[slot=dialog-close]:hover:text-(--dht-gray-light)">
@@ -31,7 +32,13 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
           />
         </div>
         <div className="px-6 pb-6 pt-2">
-          <LoginForm1 theme="dht" />
+          <LoginForm1
+            theme="dht"
+            onSuccess={() => {
+              onOpenChange(false);
+              onSuccess?.();
+            }}
+          />
         </div>
       </DialogContent>
     </Dialog>

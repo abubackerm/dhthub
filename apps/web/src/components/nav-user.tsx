@@ -1,12 +1,15 @@
 "use client"
 
+import { useState } from "react"
 import {
   CreditCard,
   EllipsisVertical,
   LogOut,
   BellDot,
   CircleUser,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
 import Link from "next/link"
 
 import { Logo } from "@/components/logo"
@@ -37,10 +40,19 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   async function handleSignOut() {
-    await authClient.signOut()
-    window.location.href = "/sign-in"
+    setIsLoggingOut(true)
+    try {
+      await authClient.signOut()
+      toast.success("Signed out successfully")
+      window.location.href = "/"
+    } catch {
+      toast.error("Failed to sign out")
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -108,9 +120,14 @@ export function NavUser({
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={handleSignOut}
+              disabled={isLoggingOut}
             >
-              <LogOut />
-              Log out
+              {isLoggingOut ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LogOut />
+              )}
+              {isLoggingOut ? "Signing out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

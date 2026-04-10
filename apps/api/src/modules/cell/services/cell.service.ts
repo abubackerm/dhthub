@@ -1,14 +1,20 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, Optional } from '@nestjs/common';
 import { CellRepository } from '../repositories/cell.repository';
 import { CreateCellDto } from '../dto/create-cell.dto';
 import { UpdateCellDto } from '../dto/update-cell.dto';
 import { AssignAttributeDto } from '../dto/assign-attribute.dto';
 import { Prisma } from '@prisma/client';
+import { StorageService } from '@modules/storage/storage.service';
 import { randomBytes } from 'crypto';
 
 @Injectable()
 export class CellService {
-  constructor(private readonly cellRepository: CellRepository) {}
+  private readonly logger = new Logger(CellService.name);
+
+  constructor(
+    private readonly cellRepository: CellRepository,
+    @Optional() private readonly storageService?: StorageService,
+  ) {}
 
   async create(userId: string, dto: CreateCellDto) {
     // Validate that categoryId is a leaf category
@@ -81,6 +87,11 @@ export class CellService {
       if (conflictSku) {
         throw new ConflictException('A cell with this SKU already exists');
       }
+    }
+
+    // Clean up old image from SeaweedFS if imageUrl is being changed or set to null
+    if (dto.imageUrl !== undefined && existingCell.imageUrl && dto.imageUrl !== existingCell.imageUrl) {
+      await this.deleteStorageFile(existingCell.imageUrl);
     }
 
     const updateData: Prisma.CellUpdateInput = {
@@ -191,5 +202,15 @@ export class CellService {
   private generateSku(): string {
     const randomPart = randomBytes(4).toString('hex').toUpperCase();
     return `C-${randomPart}`;
+  }
+
+  private async deleteStorageFile(imageUrl: string): Promise<void> {
+    if (!this.storageService || !imageUrl) return;
+    const storageKey = imageUrl.startsWith('/') ? imageUrl.slice(1) : imageUrl;
+    try {
+      await this.storageService.deleteFile(storageKey);
+    } catch (error) {
+      this.logger.warn(`Failed to delete old file from SeaweedFS: ${storageKey}`, error);
+    }
   }
 }

@@ -24,8 +24,9 @@ export class CategoryTreeView extends CategoryView {
     view.isActive = entity.isActive;
     
     // Normalize imageUrl if present
-    if (entity.imageUrl && entity.imageUrl.startsWith('http')) {
-      const parsed = new URL(entity.imageUrl);
+    view.imageUrl = entity.imageUrl || null;
+    if (view.imageUrl && view.imageUrl.startsWith('http')) {
+      const parsed = new URL(view.imageUrl);
       view.imageUrl = parsed.pathname;
     }
     if (view.imageUrl && view.imageUrl.startsWith('/catalog')) {

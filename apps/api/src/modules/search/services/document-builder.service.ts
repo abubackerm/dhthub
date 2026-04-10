@@ -87,7 +87,7 @@ export class VariantDocumentBuilder {
 
     return {
       price: price?.tiers[0]?.unitPrice?.toNumber() ?? null,
-      currency: price?.currency?.code ?? 'USD',
+      currency: price?.currency?.code ?? 'SAR',
     };
   }
 

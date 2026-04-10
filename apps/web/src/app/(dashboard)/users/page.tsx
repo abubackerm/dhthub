@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { StatCards } from "./components/stat-cards"
 import { DataTable } from "./components/data-table"
 import { authClient } from "@/lib/auth-client"
@@ -129,19 +130,23 @@ export default function UsersPage() {
   const handleCreateUser = async (data: {
     name: string
     email: string
-    password: string
     role: Exclude<UserRole, "super_admin">
   }) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
     try {
-      const { error: createError } = await authClient.admin.createUser({
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        role: data.role,
+      const res = await fetch(`${apiUrl}/v1/auth/users/create-with-password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       })
-      if (createError) {
-        throw new Error(createError.message ?? "Failed to create user")
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null)
+        throw new Error(errData?.message ?? `Failed to create user (${res.status})`)
       }
+
+      toast.success("User created successfully. A password has been sent to their email.")
       await fetchUsers()
     } catch (e) {
       throw e

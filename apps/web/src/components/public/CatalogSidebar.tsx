@@ -55,6 +55,9 @@ export function CatalogSidebar() {
 
     return (
         <aside className="catalog-sidebar">
+            <div className="bg-(--dht-red) py-2 px-1 mb-3 rounded">
+                <h2 className="text-xs font-semibold text-white uppercase tracking-wide text-center">All Categories</h2>
+            </div>
             <nav>
                 <ul className="catalog-sidebar__list">
                     {isLoading ? (

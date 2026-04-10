@@ -273,7 +273,7 @@ export class ProductRepository {
         price: data.price ?? null,
         compareAtPrice: data.compareAtPrice ?? null,
         costPrice: data.costPrice ?? null,
-        currency: data.currency ?? 'USD',
+        currency: data.currency ?? 'SAR',
         quantity: data.quantity ?? 0,
         cellId: data.cellId ?? null,
         isFeatured: data.isFeatured ?? false,

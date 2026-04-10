@@ -4,10 +4,11 @@ import { CellAdminController, CellPublicController } from './controllers/cell.co
 import { CellRepository } from './repositories/cell.repository';
 import { CellImageRepository } from './repositories/cell-image.repository';
 import { DatabaseModule } from '../../core/database/database.module';
+import { StorageModule } from '@modules/storage/storage.module';
 import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, StorageModule],
   controllers: [CellAdminController, CellPublicController],
   providers: [CellService, CellRepository, CellImageRepository, CategoryRepository],
   exports: [CellService, CellRepository, CellImageRepository],

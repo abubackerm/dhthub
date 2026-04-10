@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt, IsNotEmpty, ValidateIf } from 'class-validator';
 
 export class CreateCellDto {
   @IsString()
@@ -25,9 +25,10 @@ export class CreateCellDto {
   @IsOptional()
   isActive?: boolean;
 
-  @IsString()
   @IsOptional()
-  imageUrl?: string;
+  @ValidateIf((o) => o.imageUrl === null || o.imageUrl === undefined || typeof o.imageUrl === 'string')
+  @IsString()
+  imageUrl?: string | null;
 
   @IsString()
   @IsNotEmpty()
