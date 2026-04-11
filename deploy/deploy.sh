@@ -12,7 +12,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 log "Pulling latest code..."
-git pull origin main
+git pull origin master
 
 log "Installing dependencies..."
 pnpm install --frozen-lockfile 2>&1 | tail -3
@@ -23,8 +23,8 @@ pnpm build 2>&1 | tail -10
 log "Regenerating Prisma client..."
 pnpm --filter api db:generate 2>&1 | tail -3
 
-log "Running database migrations..."
-pnpm --filter api db:migrate:deploy 2>&1 | tail -3
+log "Pushing database schema (db push)..."
+pnpm --filter api db:push 2>&1 | tail -3
 
 log "Restarting PM2 apps..."
 pm2 restart all
