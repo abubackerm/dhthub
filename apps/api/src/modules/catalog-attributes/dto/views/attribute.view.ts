@@ -8,8 +8,6 @@ export class AttributeView {
   group: string | null;
   sortOrder: number;
   filterType: 'RANGE' | 'CHECKBOX' | 'SELECT' | null;
-  unitId: string | null;
-  unitSymbol: string | null;
   isFilterable: boolean;
   isRequired: boolean;
   createdAt: Date;
@@ -24,8 +22,6 @@ export class AttributeView {
     view.group = entity.group;
     view.sortOrder = entity.sortOrder;
     view.filterType = entity.filterType as 'RANGE' | 'CHECKBOX' | 'SELECT' | null;
-    view.unitId = entity.unitId;
-    view.unitSymbol = entity.unit?.symbol ?? null;
     view.isFilterable = entity.isFilterable;
     view.isRequired = entity.isRequired;
     view.createdAt = entity.createdAt;

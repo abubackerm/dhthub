@@ -3,7 +3,6 @@ import { CsvParserService } from '@modules/import/services/csv-parser.service';
 import { AttributeDefinitionService } from './attribute-definition.service';
 import { AttributeOptionService } from './attribute-option.service';
 import { AttributeDefinitionRepository } from '../repositories/attribute-definition.repository';
-import { UnitDefinitionRepository } from '../repositories/unit-definition.repository';
 import { AttributeOptionRepository } from '../repositories/attribute-option.repository';
 import { AttributeDataType, AttributeFilterType } from '../entities';
 import { ExtractedFiles } from '@modules/import/dto';
@@ -40,7 +39,6 @@ export class AttributeImportService {
     private readonly attributeDefinitionService: AttributeDefinitionService,
     private readonly attributeOptionService: AttributeOptionService,
     private readonly attributeRepo: AttributeDefinitionRepository,
-    private readonly unitRepo: UnitDefinitionRepository,
     private readonly optionRepo: AttributeOptionRepository,
     private readonly importJobService: ImportJobService,
   ) {}
@@ -265,7 +263,6 @@ export class AttributeImportService {
       sortOrder: number;
       isFilterable: boolean;
       filterType?: string;
-      unitSymbol?: string;
       rowNumber?: number;
     }>;
     invalid: Array<{
@@ -309,7 +306,6 @@ export class AttributeImportService {
           sortOrder: 0, // Will be auto-assigned alphabetically
           isFilterable: data.isFilterable?.toLowerCase() === 'true',
           filterType: data.filterType?.trim() || '',
-          unitSymbol: data.unitSymbol?.trim() || '',
         };
 
         // Validate
@@ -428,11 +424,6 @@ export class AttributeImportService {
       }
     }
 
-    // Validate unit symbol is only for number types
-    if (attr.unitSymbol && attr.dataType !== 'number') {
-      errors.push('unitSymbol can only be used with number dataType');
-    }
-
     return errors;
   }
 
@@ -485,15 +476,6 @@ export class AttributeImportService {
     options: ImportOptions,
   ): Promise<{ success: boolean; created: boolean; skipped: boolean; attributeId?: string; error?: string }> {
     try {
-      // Resolve unit symbol to unit ID
-      let unitId: string | undefined;
-      if (attr.unitSymbol) {
-        const unit = await this.unitRepo.findBySymbol(attr.unitSymbol);
-        if (unit) {
-          unitId = unit.id;
-        }
-      }
-
       // Check if attribute exists by name
       const { data: existingAttributes } = await this.attributeRepo.findAll();
       const existing = existingAttributes.find(a => a.name.toLowerCase() === attr.name.toLowerCase());
@@ -515,7 +497,6 @@ export class AttributeImportService {
               group: attr.group || null,
               sortOrder: attr.sortOrder ?? 0,
               filterType: attr.filterType as unknown as AttributeFilterType || null,
-              unitId: unitId || null,
               isFilterable: attr.isFilterable ?? false,
               updatedBy: options.createdBy,
             });
@@ -532,7 +513,6 @@ export class AttributeImportService {
               group: attr.group || null,
               sortOrder: attr.sortOrder ?? 0,
               filterType: attr.filterType as unknown as AttributeFilterType || null,
-              unitId: unitId || null,
               isFilterable: attr.isFilterable ?? false,
               createdBy: options.createdBy,
             });
@@ -552,7 +532,6 @@ export class AttributeImportService {
           group: attr.group || null,
           sortOrder: attr.sortOrder ?? 0,
           filterType: attr.filterType as unknown as AttributeFilterType || null,
-          unitId: unitId || null,
           isFilterable: attr.isFilterable ?? false,
           createdBy: options.createdBy,
         });
@@ -615,13 +594,13 @@ export class AttributeImportService {
     attributesCsv: string;
   }> {
     const attributesCsv = [
-      'name,dataType,group,isFilterable,filterType,unitSymbol',
-      'Thread Size,enum,Technical Specs,true,CHECKBOX,',
-      'Material,enum,Material,true,CHECKBOX,',
-      'Diameter,number,Dimensions,true,RANGE,mm',
-      'Length,number,Dimensions,true,RANGE,mm',
-      'Finish,enum,Material,true,CHECKBOX,',
-      'Color,text,Appearance,false,,',
+      'name,dataType,group,isFilterable,filterType',
+      'Thread Size,enum,Technical Specs,true,CHECKBOX',
+      'Material,enum,Material,true,CHECKBOX',
+      'Diameter,number,Dimensions,true,RANGE',
+      'Length,number,Dimensions,true,RANGE',
+      'Finish,enum,Material,true,CHECKBOX',
+      'Color,text,Appearance,false,',
     ].join('\n');
 
     return { attributesCsv };

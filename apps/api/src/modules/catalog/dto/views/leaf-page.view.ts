@@ -5,7 +5,7 @@ export interface LeafAttributeValueView {
   attributeName: string;
   attributeSlug: string;
   dataType: AttributeDataType;
-  unitSymbol: string | null;
+  unitName: string | null;
   rawValue: string | null;
   numberValue: number | null;
   textValue: string | null;
@@ -42,7 +42,7 @@ export interface LeafTableColumnView {
   attributeName: string;
   attributeSlug: string;
   dataType: string;
-  unitSymbol: string | null;
+  unitName: string | null;
 }
 
 export interface LeafCellView {
@@ -62,7 +62,7 @@ export interface LeafFilterableAttributeView {
   slug: string;
   dataType: AttributeDataType;
   filterType: AttributeFilterType | null;
-  unitSymbol: string | null;
+  unitName: string | null;
   options: { id: string; label: string; value: string }[];
 }
 
@@ -174,7 +174,7 @@ export class LeafPageView {
         attributeName: tc.attribute.name,
         attributeSlug: tc.attribute.slug,
         dataType: tc.attribute.dataType,
-        unitSymbol: tc.attribute.unit?.symbol || null,
+        unitName: tc.unit?.name || null,
       })),
     };
   }
@@ -216,7 +216,7 @@ export class LeafPageView {
       attributeName: av.attribute.name,
       attributeSlug: av.attribute.slug,
       dataType: av.attribute.dataType,
-      unitSymbol: av.attribute.unit?.symbol || null,
+      unitName: null,
       numberValue: av.numberValue,
       rawValue: av.rawValue,
       textValue: av.textValue,
@@ -233,7 +233,7 @@ export class LeafPageView {
       slug: attr.attribute.slug,
       dataType: attr.attribute.dataType,
       filterType: attr.attribute.filterType,
-      unitSymbol: attr.attribute.unit?.symbol || null,
+      unitName: null,
       options: (attr.attribute.options || []).map((opt: any) => ({
         id: opt.id,
         label: opt.label,

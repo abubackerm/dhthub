@@ -47,12 +47,11 @@ export class AttributesController {
   async create(@Body() dto: CreateAttributeDto): Promise<AttributeView> {
     const attribute = await this.attributeService.create({
       name: dto.name,
-      slug: dto.slug, // Can be undefined - service will auto-generate
+      slug: dto.slug,
       dataType: dto.dataType as any,
       group: dto.group ?? null,
       sortOrder: dto.sortOrder ?? 0,
       filterType: dto.filterType as any ?? null,
-      unitId: dto.unitId ?? null,
       isFilterable: dto.isFilterable ?? false,
       isRequired: dto.isRequired ?? false,
     });
@@ -102,7 +101,6 @@ export class AttributesController {
       group: dto.group,
       sortOrder: dto.sortOrder,
       filterType: dto.filterType as any,
-      unitId: dto.unitId,
       isFilterable: dto.isFilterable,
       isRequired: dto.isRequired,
     });
@@ -263,7 +261,7 @@ export class AttributesController {
     return {
       filename: 'attributes-template.csv',
       headers: {
-        attributes: ['name', 'dataType', 'group', 'isFilterable', 'filterType', 'unitSymbol'],
+        attributes: ['name', 'dataType', 'group', 'isFilterable', 'filterType'],
       },
       description: 'Download attribute template for bulk import. Only attributes.csv is needed - slug and sortOrder are auto-generated.',
       files: {

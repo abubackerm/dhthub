@@ -467,7 +467,7 @@ export default function UploadPage() {
                         <span className="font-medium">cell_sku</span> - Cell SKU (optional)
                       </div>
                       <div className="rounded-md bg-muted/70 px-3 py-1.5">
-                        <span className="font-medium">at_head1-15</span> - Attribute slugs
+                        <span className="font-medium">at_head1-15</span> - Attribute slugs, optionally with unit (e.g. <code className="text-xs">diameter</code> or <code className="text-xs">diameter;in</code>)
                       </div>
                     </div>
                   </div>

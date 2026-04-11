@@ -16,6 +16,14 @@ export async function getUnits(): Promise<UnitSummary[]> {
   return apiClient.get<UnitSummary[]>('/v1/catalog/units');
 }
 
+export async function createUnit(data: { name: string }): Promise<UnitSummary> {
+  return apiClient.post<UnitSummary>('/v1/catalog/units', data);
+}
+
+export async function deleteUnit(id: string): Promise<void> {
+  return apiClient.delete<void>(`/v1/catalog/units/${id}`);
+}
+
 export async function getCategoryAttributes(
   categoryId: string,
 ): Promise<CategoryAttributeView[]> {

@@ -54,10 +54,6 @@ export class CreateAttributeDto {
   filterType?: AttributeFilterTypeDto;
 
   @IsOptional()
-  @IsString()
-  unitId?: string;
-
-  @IsOptional()
   @IsBoolean()
   isFilterable?: boolean;
 

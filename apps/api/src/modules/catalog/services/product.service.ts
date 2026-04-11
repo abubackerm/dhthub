@@ -217,7 +217,6 @@ export class ProductService extends BaseService {
           name: string;
           slug: string;
           dataType: string;
-          attributeUnits: { unit: { symbol: string } }[];
         };
         option: { id: string; label: string; value: string } | null;
       }[];

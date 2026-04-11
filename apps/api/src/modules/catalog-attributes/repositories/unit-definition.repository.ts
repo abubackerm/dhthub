@@ -18,9 +18,9 @@ export class UnitDefinitionRepository {
     });
   }
 
-  async findBySymbol(symbol: string): Promise<UnitDefinitionEntity | null> {
+  async findByName(name: string): Promise<UnitDefinitionEntity | null> {
     return this.getClient().unitDefinition.findUnique({
-      where: { symbol },
+      where: { name },
     });
   }
 
@@ -30,7 +30,6 @@ export class UnitDefinitionRepository {
 
   async create(data: {
     name: string;
-    symbol: string;
   }): Promise<UnitDefinitionEntity> {
     return this.getClient().unitDefinition.create({
       data,
@@ -41,7 +40,6 @@ export class UnitDefinitionRepository {
     id: string,
     data: Partial<{
       name: string;
-      symbol: string;
     }>,
   ): Promise<UnitDefinitionEntity> {
     return this.getClient().unitDefinition.update({

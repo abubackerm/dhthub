@@ -296,11 +296,7 @@ export class CategoryRepository {
                 },
                 attributeValues: {
                   include: {
-                    attribute: {
-                      include: {
-                        unit: true,
-                      },
-                    },
+                    attribute: true,
                     option: true,
                   },
                 },
@@ -309,11 +305,8 @@ export class CategoryRepository {
             tableColumns: {
               orderBy: { position: 'asc' },
               include: {
-                attribute: {
-                  include: {
-                    unit: true,
-                  },
-                },
+                attribute: true,
+                unit: true,
               },
             },
           },
@@ -329,7 +322,6 @@ export class CategoryRepository {
       include: {
         attribute: {
           include: {
-            unit: true,
             options: {
               orderBy: { sortOrder: 'asc' },
             },
@@ -429,11 +421,7 @@ export class CategoryRepository {
                 },
                     attributeValues: {
                       include: {
-                        attribute: {
-                          include: {
-                            unit: true,
-                          },
-                        },
+                        attribute: true,
                         option: true,
                       },
                     },
@@ -442,11 +430,8 @@ export class CategoryRepository {
                 tableColumns: {
                   orderBy: { position: 'asc' },
                   include: {
-                    attribute: {
-                      include: {
-                        unit: true,
-                      },
-                    },
+                    attribute: true,
+                    unit: true,
                   },
                 },
               },
@@ -462,7 +447,6 @@ export class CategoryRepository {
           include: {
             attribute: {
               include: {
-                unit: true,
                 options: {
                   orderBy: { sortOrder: 'asc' },
                 },
@@ -493,7 +477,6 @@ export class CategoryRepository {
       include: {
         attribute: {
           include: {
-            unit: true,
             options: {
               orderBy: { sortOrder: 'asc' },
             },
@@ -557,7 +540,6 @@ export class CategoryRepository {
         include: {
           attribute: {
             include: {
-              unit: true,
               options: { orderBy: { sortOrder: 'asc' } },
             },
           },
@@ -578,7 +560,7 @@ export class CategoryRepository {
           quantity: true,
           attributeValues: {
             include: {
-              attribute: { include: { unit: true } },
+              attribute: true,
               option: true,
             },
           },

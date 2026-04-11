@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { CellRepository } from '@modules/cell/repositories/cell.repository';
 import { AttributeDefinitionRepository } from '@modules/catalog-attributes/repositories/attribute-definition.repository';
 import { AttributeOptionRepository } from '@modules/catalog-attributes/repositories/attribute-option.repository';
+import { UnitDefinitionRepository } from '@modules/catalog-attributes/repositories/unit-definition.repository';
 import { AttributeDataType } from '@modules/catalog-attributes/entities';
 import { CsvRow } from './csv-parser.service';
 
@@ -23,6 +24,7 @@ export interface ValidationContext {
   cellSlugMap: Map<string, string>; // cellSlug -> cellId
   attributeMap: Map<string, string>; // attributeSlug -> attributeId
   attributeOptionMap: Map<string, string>; // attributeSlug:optionValue -> optionId
+  unitMap: Map<string, string>; // unitName -> unitId
   requiredAttributesByCell: Map<string, Set<string>>; // cellId -> Set<attributeSlug>
 }
 
@@ -34,6 +36,7 @@ export class ImportValidationService {
     private readonly cellRepository: CellRepository,
     private readonly attributeDefinitionRepository: AttributeDefinitionRepository,
     private readonly attributeOptionRepository: AttributeOptionRepository,
+    private readonly unitDefinitionRepository: UnitDefinitionRepository,
   ) {}
 
   /**
@@ -77,6 +80,13 @@ export class ImportValidationService {
       }
     }
 
+    // Load all units
+    const units = await this.unitDefinitionRepository.findAll();
+    const unitMap = new Map<string, string>();
+    for (const unit of units) {
+      unitMap.set(unit.name, unit.id);
+    }
+
     // Load required attributes by cell
     const requiredAttributesByCell = new Map<string, Set<string>>();
     for (const cell of cells.cells) {
@@ -94,7 +104,7 @@ export class ImportValidationService {
 
     this.logger.debug(
       `Validation context built: ${cellSkuMap.size} cells by SKU, ` +
-      `${attributeMap.size} attributes, ${attributeOptionMap.size} options`,
+      `${attributeMap.size} attributes, ${attributeOptionMap.size} options, ${unitMap.size} units`,
     );
 
     return {
@@ -102,6 +112,7 @@ export class ImportValidationService {
       cellSlugMap,
       attributeMap,
       attributeOptionMap,
+      unitMap,
       requiredAttributesByCell,
     };
   }
@@ -153,7 +164,7 @@ export class ImportValidationService {
         if (requiredAttrs && requiredAttrs.size > 0) {
           for (const requiredAttr of requiredAttrs) {
             const found = Object.entries(row).some(([key, value]) =>
-              key.startsWith('at_head') && value === requiredAttr,
+              key.startsWith('at_head') && !!value && value.split(';')[0].trim() === requiredAttr,
             );
             if (!found) {
               errors.push({
@@ -169,18 +180,35 @@ export class ImportValidationService {
     }
 
     // Validate at_head columns reference valid attributes
+    // Format: "attribute-slug" or "attribute-slug;unit-name"
     const AT_HEAD_PATTERN = /^at_head(\d+)$/;
     for (const [key, value] of Object.entries(row)) {
       if (!AT_HEAD_PATTERN.test(key) || !value) continue;
 
-      const attributeId = context.attributeMap.get(value);
+      const [attributeSlug, unitName] = value.split(';');
+      const trimmedSlug = attributeSlug.trim();
+
+      const attributeId = context.attributeMap.get(trimmedSlug);
       if (!attributeId) {
         errors.push({
           rowNumber,
           field: key,
-          message: `Unknown attribute slug "${value}" in ${key}. Attribute must exist before importing.`,
+          message: `Unknown attribute slug "${trimmedSlug}" in ${key}. Attribute must exist before importing.`,
           severity: 'error',
         });
+        continue;
+      }
+
+      if (unitName) {
+        const trimmedUnit = unitName.trim();
+        if (!context.unitMap.has(trimmedUnit)) {
+          errors.push({
+            rowNumber,
+            field: key,
+            message: `Unknown unit "${trimmedUnit}" in ${key}. Unit must exist in admin before importing.`,
+            severity: 'warning',
+          });
+        }
       }
     }
 

@@ -8,12 +8,10 @@ import { CacheService } from '@core/cache';
 
 export interface CreateUnitData {
   name: string;
-  symbol: string;
 }
 
 export interface UpdateUnitData {
   name?: string;
-  symbol?: string;
 }
 
 @Injectable()
@@ -35,14 +33,14 @@ export class UnitService extends BaseService {
     return `unit:${id}`;
   }
 
-  private getCacheKeyBySymbol(symbol: string): string {
-    return `unit:symbol:${symbol}`;
+  private getCacheKeyByName(name: string): string {
+    return `unit:name:${name}`;
   }
 
   async create(data: CreateUnitData): Promise<UnitDefinitionEntity> {
-    const existing = await this.unitRepo.findBySymbol(data.symbol);
+    const existing = await this.unitRepo.findByName(data.name);
     if (existing) {
-      throw new ConflictException('Unit with this symbol already exists');
+      throw new ConflictException('Unit with this name already exists');
     }
 
     const unit = await this.unitRepo.create(data);
@@ -52,7 +50,6 @@ export class UnitService extends BaseService {
     this.emit('unit.created', {
       id: unit.id,
       name: unit.name,
-      symbol: unit.symbol,
     });
 
     return unit;
@@ -64,25 +61,24 @@ export class UnitService extends BaseService {
       throw new NotFoundException('Unit not found');
     }
 
-    if (data.symbol && data.symbol !== existing.symbol) {
-      const symbolExists = await this.unitRepo.findBySymbol(data.symbol);
-      if (symbolExists) {
-        throw new ConflictException('Unit with this symbol already exists');
+    if (data.name && data.name !== existing.name) {
+      const nameExists = await this.unitRepo.findByName(data.name);
+      if (nameExists) {
+        throw new ConflictException('Unit with this name already exists');
       }
     }
 
     const updated = await this.unitRepo.update(id, data);
 
     await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyBySymbol(existing.symbol));
-    if (data.symbol && data.symbol !== existing.symbol) {
-      await this.cacheService.del(this.getCacheKeyBySymbol(data.symbol));
+    await this.cacheService.del(this.getCacheKeyByName(existing.name));
+    if (data.name && data.name !== existing.name) {
+      await this.cacheService.del(this.getCacheKeyByName(data.name));
     }
 
     this.emit('unit.updated', {
       id: updated.id,
       name: updated.name,
-      symbol: updated.symbol,
     });
 
     return updated;
@@ -102,11 +98,11 @@ export class UnitService extends BaseService {
     );
   }
 
-  async findBySymbol(symbol: string): Promise<UnitDefinitionEntity> {
+  async findByName(name: string): Promise<UnitDefinitionEntity> {
     return this.cacheService.wrap(
-      this.getCacheKeyBySymbol(symbol),
+      this.getCacheKeyByName(name),
       async () => {
-        const unit = await this.unitRepo.findBySymbol(symbol);
+        const unit = await this.unitRepo.findByName(name);
         if (!unit) {
           throw new NotFoundException('Unit not found');
         }
@@ -135,12 +131,12 @@ export class UnitService extends BaseService {
     await this.unitRepo.delete(id);
 
     await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyBySymbol(existing.symbol));
+    await this.cacheService.del(this.getCacheKeyByName(existing.name));
     await this.cacheService.del('units:all');
 
     this.emit('unit.deleted', {
       id,
-      symbol: existing.symbol,
+      name: existing.name,
     });
   }
 }

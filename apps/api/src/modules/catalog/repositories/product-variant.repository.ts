@@ -24,11 +24,7 @@ export class ProductVariantRepository {
       include: {
         attributeValues: {
           include: {
-            attribute: {
-              include: {
-                unit: true,
-              },
-            },
+            attribute: true,
             option: true,
           },
         },
@@ -50,11 +46,7 @@ export class ProductVariantRepository {
       include: {
         attributeValues: {
           include: {
-            attribute: {
-              include: {
-                unit: true,
-              },
-            },
+            attribute: true,
             option: true,
           },
         },
@@ -80,11 +72,7 @@ export class ProductVariantRepository {
       include: {
         attributeValues: {
           include: {
-            attribute: {
-              include: {
-                unit: true,
-              },
-            },
+            attribute: true,
             option: true,
           },
         },

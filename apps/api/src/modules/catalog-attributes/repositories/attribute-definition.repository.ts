@@ -15,14 +15,6 @@ export class AttributeDefinitionRepository {
   async findById(id: string): Promise<AttributeDefinitionEntity | null> {
     return this.getClient().attributeDefinition.findUnique({
       where: { id },
-      include: {
-        attributeUnits: {
-          include: {
-            unit: { select: { id: true, name: true, symbol: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
     });
   }
 
@@ -124,14 +116,6 @@ export class AttributeDefinitionRepository {
         take,
         where,
         orderBy: { sortOrder: 'asc' },
-        include: {
-          attributeUnits: {
-            include: {
-              unit: { select: { id: true, name: true, symbol: true } },
-            },
-            orderBy: { createdAt: 'asc' },
-          },
-        },
       }),
       this.getClient().attributeDefinition.count({ where }),
     ]);

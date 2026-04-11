@@ -96,10 +96,10 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
   }, [data?.leafCategories, allVariants]);
 
   const filteredLeafCategories = useMemo(() => {
-    if (!data?.leafCategories || !data?.filterableAttributes) return data?.leafCategories ?? [];
+    if (!data?.leafCategories || !data?.filterableAttributes) return (data?.leafCategories ?? []).sort((a, b) => a.name.localeCompare(b.name));
 
     const hasActiveFilters = Array.from(searchParams.keys()).length > 0;
-    if (!hasActiveFilters) return data.leafCategories;
+    if (!hasActiveFilters) return [...data.leafCategories].sort((a, b) => a.name.localeCompare(b.name));
 
     return data.leafCategories
       .map((leafCat) => ({
@@ -136,7 +136,8 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
           }))
           .filter((cell) => cell.products.length > 0),
       }))
-      .filter((leafCat) => leafCat.cells.length > 0);
+      .filter((leafCat) => leafCat.cells.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [data?.leafCategories, data?.filterableAttributes, searchParams]);
 
   if (isLoading) {

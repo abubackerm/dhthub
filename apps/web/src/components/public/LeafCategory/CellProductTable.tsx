@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -12,7 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart, Package } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Minus, Plus, ShoppingCart, Package } from "lucide-react";
 import type {
   LeafProductView,
   LeafFilterableAttributeView,
@@ -70,7 +75,11 @@ export function CellProductTable({
       for (const attrId of orderedAttrIds) {
         const attr = attrMap.get(attrId);
         if (attr) {
-          result.push(attr);
+          const tc = tcMap.get(attrId);
+          result.push({
+            ...attr,
+            unitName: attr.unitName ?? tc?.unitName ?? null,
+          });
         } else {
           // Attribute is in tableColumns but not in filterableAttributes.
           // Synthesize a column definition from the tableColumn data.
@@ -82,7 +91,7 @@ export function CellProductTable({
               slug: tc.attributeSlug,
               dataType: tc.dataType as LeafFilterableAttributeView["dataType"],
               filterType: null,
-              unitSymbol: tc.unitSymbol,
+              unitName: tc.unitName,
               options: [],
             });
           }
@@ -179,16 +188,6 @@ export function CellProductTable({
   };
 
   // Get sort icon for column
-  const getSortIcon = (columnSlug: string) => {
-    if (sortColumn !== columnSlug) {
-      return <ChevronsUpDown className="w-3.5 h-3.5 text-white/50" />;
-    }
-    if (sortDirection === "asc") {
-      return <ChevronUp className="w-3.5 h-3.5 text-white" />;
-    }
-    return <ChevronDown className="w-3.5 h-3.5 text-white" />;
-  };
-
   if (sortedVariants.length === 0) {
     return (
       <div className="text-center py-8 border rounded-lg bg-muted/20">
@@ -210,10 +209,7 @@ export function CellProductTable({
                 className="font-semibold text-xs uppercase tracking-wide text-white w-[120px] p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                 onClick={() => handleSort("sku")}
               >
-                <div className="flex items-center gap-1">
-                  <span>SKU</span>
-                  {getSortIcon("sku")}
-                </div>
+                <span>SKU</span>
               </TableHead>
               {visibleAttributes.map((attr) => (
                 <TableHead
@@ -221,26 +217,22 @@ export function CellProductTable({
                   className="font-semibold text-xs uppercase tracking-wide text-white p-2 cursor-pointer select-none hover:bg-white/10 transition-colors leading-tight"
                   onClick={() => handleSort(attr.slug)}
                 >
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className="wrap-break-word">{attr.name}</span>
-                    <div className="flex items-center gap-1">
-                      {attr.unitSymbol && (
+                    <div className="flex flex-col items-start gap-0.5">
+                      <span className="wrap-break-word">{attr.name}</span>
+                      {attr.unitName && (
                         <span className="font-normal text-white/70">
-                          ({attr.unitSymbol})
+                          ({attr.unitName})
                         </span>
                       )}
-                      {getSortIcon(attr.slug)}
                     </div>
-                  </div>
                 </TableHead>
               ))}
               <TableHead
                 className="font-semibold text-xs uppercase tracking-wide text-white text-right w-[100px] p-2 cursor-pointer select-none hover:bg-white/10 transition-colors"
                 onClick={() => handleSort("price")}
               >
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end">
                   <span>Price</span>
-                  {getSortIcon("price")}
                 </div>
               </TableHead>
               <TableHead className="w-[80px] p-2"></TableHead>
@@ -248,7 +240,7 @@ export function CellProductTable({
           </TableHeader>
           <TableBody>
             {sortedVariants.map((variant, index) => {
-              const productPath = `${basePath}/${variant.productSlug}`;
+              const productPath = `${basePath}/${variant.productSlug}?variant=${encodeURIComponent(variant.sku)}`;
 
               return (
                 <TableRow
@@ -290,7 +282,7 @@ export function CellProductTable({
 
                   {/* Dynamic Attribute Columns */}
                   {visibleAttributes.map((attr) => {
-                    const value = getAttributeValueDisplay(variant.attributeValues, attr.id, attr.unitSymbol);
+                    const value = getAttributeValueDisplay(variant.attributeValues, attr.id, attr.unitName);
                     return (
                       <TableCell key={attr.id} className="p-2 text-sm">
                         {value}
@@ -307,23 +299,13 @@ export function CellProductTable({
                     )}
                   </TableCell>
 
-                  {/* Add Button */}
+                  {/* Add to Cart */}
                   <TableCell className="p-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 px-2 text-(--dht-red) hover:text-(--dht-red-hover) hover:bg-(--dht-red)/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (variant.id) {
-                          requireAuth(() => {
-                            addToCart.mutate({ variantId: variant.id, qty: 1 });
-                          });
-                        }
-                      }}
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                    </Button>
+                    <QuantityPopover
+                      variantId={variant.id}
+                      requireAuth={requireAuth}
+                      addToCart={addToCart}
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -340,11 +322,113 @@ export function CellProductTable({
   );
 }
 
+function QuantityPopover({
+  variantId,
+  requireAuth,
+  addToCart,
+}: {
+  variantId: string;
+  requireAuth: (fn: () => void) => void;
+  addToCart: { mutate: (data: { variantId: string; qty: number }) => void; isPending: boolean };
+}) {
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState(1);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleAdd = useCallback(() => {
+    requireAuth(() => {
+      addToCart.mutate({ variantId, qty });
+      setOpen(false);
+      setQty(1);
+    });
+  }, [variantId, qty, requireAuth, addToCart]);
+
+  const adjustQty = useCallback((delta: number) => {
+    setQty((prev) => Math.max(1, prev + delta));
+  }, []);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          ref={buttonRef}
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2 text-(--dht-red) hover:text-(--dht-red-hover) hover:bg-(--dht-red)/10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ShoppingCart className="w-4 h-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto p-2"
+        align="end"
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation();
+              adjustQty(-1);
+            }}
+            disabled={qty <= 1}
+          >
+            <Minus className="w-3 h-3" />
+          </Button>
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) => {
+              const val = parseInt(e.target.value, 10);
+              if (!isNaN(val) && val >= 1) setQty(val);
+            }}
+            className="h-7 w-12 text-center text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation();
+              adjustQty(1);
+            }}
+          >
+            <Plus className="w-3 h-3" />
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 px-2.5 ml-0.5 bg-(--dht-red) hover:bg-(--dht-red-hover) text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAdd();
+            }}
+            disabled={addToCart.isPending}
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Helper function to get attribute value for display
 function getAttributeValueDisplay(
   attributeValues: LeafAttributeValueView[],
   attributeId: string,
-  unitSymbol: string | null
+  unitName: string | null
 ): React.ReactNode {
   const av = attributeValues.find((v) => v.attributeId === attributeId);
   if (!av) return <span className="text-muted-foreground">—</span>;
@@ -378,7 +462,7 @@ function getAttributeValueDisplay(
   return (
     <>
       {value}
-      {unitSymbol && <span className="text-muted-foreground ml-0.5">{unitSymbol}</span>}
+      {unitName && <span className="text-muted-foreground ml-0.5">{unitName}</span>}
     </>
   );
 }

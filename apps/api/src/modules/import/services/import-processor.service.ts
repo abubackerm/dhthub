@@ -260,18 +260,37 @@ export class ImportProcessorService {
   }
 
   private async processTableColumns(productId: string, row: CsvRow): Promise<void> {
-    const tableColumns: Array<{ attributeId: string; position: number }> = [];
+    const tableColumns: Array<{ attributeId: string; position: number; unitId?: string }> = [];
 
     for (let i = 1; i <= 15; i++) {
-      const attrSlug = row[`at_head${i}`]?.trim();
-      if (attrSlug) {
+      const rawHead = row[`at_head${i}`]?.trim();
+      if (rawHead) {
+        const [slug, unitName] = rawHead.split(';');
+        const trimmedSlug = slug.trim();
+
         const attribute = await this.db.attributeDefinition.findUnique({
-          where: { slug: attrSlug },
+          where: { slug: trimmedSlug },
         });
         if (attribute) {
-          tableColumns.push({ attributeId: attribute.id, position: i });
+          let unitId: string | undefined;
+          if (unitName) {
+            const trimmedUnit = unitName.trim();
+            const unit = await this.db.unitDefinition.findUnique({
+              where: { name: trimmedUnit },
+            });
+            if (unit) {
+              unitId = unit.id;
+            } else {
+              this.logger.warn(`Unit not found for column at_head${i}: ${trimmedUnit}`);
+            }
+          }
+          tableColumns.push({
+            attributeId: attribute.id,
+            position: i,
+            ...(unitId ? { unitId } : {}),
+          });
         } else {
-          this.logger.warn(`Attribute not found for column at_head${i}: ${attrSlug}`);
+          this.logger.warn(`Attribute not found for column at_head${i}: ${trimmedSlug}`);
         }
       }
     }

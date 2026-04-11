@@ -93,7 +93,7 @@ export class ProductRepository {
           name: string;
           slug: string;
           dataType: string;
-          unit: { symbol: string } | null;
+          unit: { name: string } | null;
         };
         option: { id: string; label: string; value: string } | null;
       }[];
@@ -130,6 +130,14 @@ export class ProductRepository {
             },
           },
         },
+        tableColumns: {
+          select: {
+            attributeId: true,
+            unit: {
+              select: { name: true },
+            },
+          },
+        },
         variants: {
           orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
           select: {
@@ -160,9 +168,6 @@ export class ProductRepository {
                     name: true,
                     slug: true,
                     dataType: true,
-                    unit: {
-                      select: { symbol: true },
-                    },
                   },
                 },
                 option: {
@@ -186,6 +191,12 @@ export class ProductRepository {
 
     if (!product) return null;
 
+    // Build unit lookup from product's tableColumns (unit is now per-product, not per-attribute)
+    const unitMap = new Map<string, { name: string } | null>();
+    for (const tc of product.tableColumns) {
+      unitMap.set(tc.attributeId, tc.unit);
+    }
+
     // Transform variantImages to images format with relative URLs for proxy
     return {
       ...product,
@@ -195,6 +206,13 @@ export class ProductRepository {
           url: img.storagePath,
           altText: img.altText,
           isPrimary: img.isPrimary,
+        })),
+        attributeValues: (variant.attributeValues || []).map((av: any) => ({
+          ...av,
+          attribute: {
+            ...av.attribute,
+            unit: unitMap.get(av.attribute.id) ?? null,
+          },
         })),
       })),
     };

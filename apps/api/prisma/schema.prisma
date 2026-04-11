@@ -323,12 +323,14 @@ model ProductTableColumn {
   id          String   @id @default(cuid())
   productId   String   @map("product_id")
   attributeId String   @map("attribute_id")
+  unitId      String?  @map("unit_id")
   position    Int      @map("position")      // Order 1-15
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   attribute AttributeDefinition @relation(fields: [attributeId], references: [id])
+  unit      UnitDefinition?     @relation(fields: [unitId], references: [id])
 
   @@unique([productId, position])
   @@unique([productId, attributeId])
@@ -360,7 +362,6 @@ model AttributeDefinition {
   group        String?              @map("group_name")
   sortOrder    Int                  @default(0) @map("sort_order")
   filterType   AttributeFilterType? @map("filter_type")
-  unitId       String?              @map("unit_id")
   isFilterable Boolean              @default(false) @map("is_filterable")
   isRequired   Boolean              @default(false) @map("is_required")
   createdAt    DateTime             @default(now()) @map("created_at")
@@ -368,7 +369,6 @@ model AttributeDefinition {
   createdBy    String?              @map("created_by")
   updatedBy    String?              @map("updated_by")
 
-  unit               UnitDefinition?         @relation(fields: [unitId], references: [id])
   options            AttributeOption[]
   values             VariantAttributeValue[]
   categoryAttributes CategoryAttribute[]
@@ -424,11 +424,10 @@ model VariantAttributeValue {
 
 model UnitDefinition {
   id        String   @id @default(cuid())
-  name      String
-  symbol    String   @unique
+  name      String   @unique
   createdAt DateTime @default(now()) @map("created_at")
 
-  attributes AttributeDefinition[]
+  productTableColumns ProductTableColumn[]
 
   @@map("unit_definitions")
 }

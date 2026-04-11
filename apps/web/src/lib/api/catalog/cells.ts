@@ -91,7 +91,6 @@ export async function getCellAttributes(cellId: string) {
     slug: item.attribute.slug,
     dataType: item.attribute.dataType,
     isRequired: item.attribute.isRequired,
-    unit: item.attribute.unit,
     options: item.attribute.options,
   }));
 }

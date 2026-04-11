@@ -54,7 +54,7 @@ export class AttributeImportDto {
 
   @IsOptional()
   @IsString()
-  unitSymbol?: string;
+  unitName?: string;
 
   @IsOptional()
   @IsBoolean()

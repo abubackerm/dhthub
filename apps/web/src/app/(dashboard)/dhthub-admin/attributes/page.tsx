@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Search, Trash2, Upload } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Ruler, Search, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -54,12 +54,16 @@ import {
   uploadAttributesCsv,
   uploadAttributesZip,
   downloadAttributeTemplate,
+  getUnits,
+  createUnit,
+  deleteUnit,
   type AttributeDataType,
   type AttributeFilterType,
   type CategoryAttributeView,
   type CategoryTreeNode,
   type AttributeView,
   type ImportJobView,
+  type UnitSummary,
 } from "@/lib/api/catalog"
 import { useConfirmDialog } from "@/providers/confirm-dialog-provider"
 import {
@@ -259,7 +263,7 @@ function AttributeDetails({
         </div>
         <div className="grid gap-1">
           <span className="text-muted-foreground">Unit</span>
-          <span>{record.attribute.unitSymbol || "-"}</span>
+          <span>{record.attribute.unitName || "-"}</span>
         </div>
         <div className="grid gap-1">
           <span className="text-muted-foreground">Required</span>
@@ -314,6 +318,8 @@ export default function AttributesPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [unitsDialogOpen, setUnitsDialogOpen] = useState(false)
+  const [newUnitName, setNewUnitName] = useState("")
   const [importFile, setImportFile] = useState<File | null>(null)
   const [validateOnly, setValidateOnly] = useState(false)
   const [importJob, setImportJob] = useState<any>(null)
@@ -607,6 +613,38 @@ export default function AttributesPage() {
     },
   })
 
+  const {
+    data: units = [],
+    isLoading: unitsLoading,
+  } = useQuery({
+    queryKey: ["units"],
+    queryFn: () => getUnits(),
+    enabled: unitsDialogOpen,
+  })
+
+  const createUnitMutation = useMutation({
+    mutationFn: (data: { name: string }) => createUnit(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["units"] })
+      toast.success("Unit created successfully")
+      setNewUnitName("")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to create unit"))
+    },
+  })
+
+  const deleteUnitMutation = useMutation({
+    mutationFn: (id: string) => deleteUnit(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["units"] })
+      toast.success("Unit deleted successfully")
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to delete unit"))
+    },
+  })
+
   function handleCloseSheet() {
     setSheetOpen(false)
     setSheetMode("create")
@@ -846,10 +884,16 @@ export default function AttributesPage() {
               : "Assign attributes to specific leaf categories."}
           </p>
         </div>
-        <Button variant="outline" onClick={() => router.push("/dhthub-admin/attributes/import")}>
-          <Upload className="mr-2 h-4 w-4" />
-          Import CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setUnitsDialogOpen(true)}>
+            <Ruler className="mr-2 h-4 w-4" />
+            Manage Units
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/dhthub-admin/attributes/import")}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "global" | "assignment")}>
@@ -933,7 +977,7 @@ export default function AttributesPage() {
                           </TableCell>
                           <TableCell>{attribute.group || "-"}</TableCell>
                           <TableCell>{getFilterLabel(attribute.filterType)}</TableCell>
-                          <TableCell>{attribute.unitSymbol || "-"}</TableCell>
+                          <TableCell>{attribute.unitName || "-"}</TableCell>
                           <TableCell>
                             {attribute.isRequired ? (
                               <Check className="h-4 w-4 text-(--dht-green)" />
@@ -1104,7 +1148,7 @@ export default function AttributesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{getFilterLabel(record.attribute.filterType)}</TableCell>
-                      <TableCell>{record.attribute.unitSymbol || "-"}</TableCell>
+                      <TableCell>{record.attribute.unitName || "-"}</TableCell>
                       <TableCell>
                         {record.attribute.isRequired ? (
                           <Check className="h-4 w-4 text-(--dht-green)" />
@@ -1602,6 +1646,115 @@ export default function AttributesPage() {
             >
               {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {validateOnly ? "Validate" : "Import"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={unitsDialogOpen} onOpenChange={(open) => {
+        setUnitsDialogOpen(open)
+        if (!open) {
+          setNewUnitName("")
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Manage Units</DialogTitle>
+            <DialogDescription>
+              Add and manage units used for numeric attributes (e.g., mm, kg, cm).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto grid gap-4 py-4">
+            <div className="grid gap-3 rounded-md border p-4">
+              <div className="text-sm font-medium">Add New Unit</div>
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="unit-name">Name</Label>
+                  <Input
+                    id="unit-name"
+                    placeholder="e.g., mm, kg, cm"
+                    value={newUnitName}
+                    onChange={(e) => setNewUnitName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  if (!newUnitName.trim()) {
+                    toast.error("Unit name is required")
+                    return
+                  }
+                  createUnitMutation.mutate({
+                    name: newUnitName.trim(),
+                  })
+                }}
+                disabled={!newUnitName.trim() || createUnitMutation.isPending}
+                className="self-start"
+              >
+                {createUnitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Plus className="mr-2 h-4 w-4" />
+                Add Unit
+              </Button>
+            </div>
+
+            <div className="grid gap-3">
+              <div className="text-sm font-medium">
+                Existing Units ({units.length})
+              </div>
+              {unitsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : units.length === 0 ? (
+                <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  No units defined yet. Add your first unit above.
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="w-[100px] text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {units.map((unit) => (
+                        <TableRow key={unit.id}>
+                          <TableCell className="font-medium">{unit.name}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                confirm({
+                                  title: "Delete unit?",
+                                  description: `Delete "${unit.name}"? This may affect attributes using this unit.`,
+                                  confirmLabel: "Delete",
+                                  cancelLabel: "Cancel",
+                                  variant: "destructive",
+                                }).then((ok) => {
+                                  if (ok) deleteUnitMutation.mutate(unit.id)
+                                })
+                              }}
+                              disabled={deleteUnitMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnitsDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

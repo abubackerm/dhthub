@@ -39,27 +39,27 @@ async function main() {
   // 1. Unit Definitions (upsert)
   // ──────────────────────────────────────────
   const unitMm = await prisma.unitDefinition.upsert({
-    where: { symbol: 'mm' },
+    where: { name: 'mm' },
     update: {},
-    create: { name: 'Millimeters', symbol: 'mm' },
+    create: { name: 'mm' },
   });
 
   const unitIn = await prisma.unitDefinition.upsert({
-    where: { symbol: 'in' },
+    where: { name: 'in' },
     update: {},
-    create: { name: 'Inches', symbol: 'in' },
+    create: { name: 'in' },
   });
 
   const unitNm = await prisma.unitDefinition.upsert({
-    where: { symbol: 'N·m' },
+    where: { name: 'N·m' },
     update: {},
-    create: { name: 'Newton-meters', symbol: 'N·m' },
+    create: { name: 'N·m' },
   });
 
   const unitRpm = await prisma.unitDefinition.upsert({
-    where: { symbol: 'rpm' },
+    where: { name: 'rpm' },
     update: {},
-    create: { name: 'Revolutions per minute', symbol: 'rpm' },
+    create: { name: 'rpm' },
   });
 
   console.log('  Units ready');

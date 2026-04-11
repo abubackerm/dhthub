@@ -414,6 +414,10 @@ html {
   border-radius: 4px;
 }
 
+.catalog-grid--has-descriptions {
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+}
+
 .catalog-grid__cell {
   display: flex;
   flex-direction: row;
@@ -470,10 +474,6 @@ html {
   font-size: 0.75rem;
   line-height: 1.4;
   color: #666;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* Responsive: hide sidebar on mobile */
@@ -523,6 +523,10 @@ html {
 @media (min-width: 768px) and (max-width: 1023px) {
   .catalog-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+
+  .catalog-grid--has-descriptions {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 
   .catalog-grid__cell {

@@ -19,7 +19,7 @@ export class VariantAttributeView {
     view.name = entity.attribute?.name ?? '';
     view.slug = entity.attribute?.slug ?? '';
     view.dataType = entity.attribute?.dataType as 'number' | 'text' | 'enum' | 'boolean';
-    view.unit = entity.attribute?.unit?.symbol ?? null;
+    view.unit = null;
     view.createdAt = entity.createdAt;
 
     switch (view.dataType) {

@@ -119,9 +119,9 @@ export function MobileFilterToggle({ attributes, variants, basePath }: MobileFil
                 <AccordionTrigger className="text-sm font-medium py-3 hover:no-underline">
                   <span>
                     {attr.name}
-                    {attr.unitSymbol && (
+                    {attr.unitName && (
                       <span className="text-muted-foreground font-normal ml-1">
-                        ({attr.unitSymbol})
+                        ({attr.unitName})
                       </span>
                     )}
                   </span>
@@ -230,7 +230,7 @@ function RangeFilter({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Range: {bounds.min.toFixed(2)} - {bounds.max.toFixed(2)} {attr.unitSymbol}
+        Range: {bounds.min.toFixed(2)} - {bounds.max.toFixed(2)} {attr.unitName}
       </p>
     </div>
   );

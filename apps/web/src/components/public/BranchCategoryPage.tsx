@@ -25,7 +25,10 @@ export function BranchCategoryPage({
   const { data, isLoading } = useAggregatedFilterData(lastSlug);
   const { setFilterData } = useFilterContext();
 
-  const activeChildren = category.children.filter((c) => c.isActive);
+  const activeChildren = category.children
+    .filter((c) => c.isActive)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const hasDescriptions = activeChildren.some((c) => c.description);
 
   useEffect(() => {
     if (data && data.filterableAttributes && data.filterableAttributes.length > 0) {
@@ -64,7 +67,7 @@ export function BranchCategoryPage({
       <h1 className="catalog-page__title">{category.name}</h1>
 
       {/* Grid of child categories */}
-      <div className="catalog-grid">
+      <div className={`catalog-grid${hasDescriptions ? " catalog-grid--has-descriptions" : ""}`}>
         {activeChildren.map((child) => (
           <Link
             key={child.id}

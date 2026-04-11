@@ -64,7 +64,7 @@ export interface AttributeView {
   sortOrder: number;
   filterType: AttributeFilterType;
   unitId: string | null;
-  unitSymbol: string | null;
+  unitName: string | null;
   isFilterable: boolean;
   isRequired: boolean;
   createdAt: string;
@@ -116,6 +116,12 @@ export interface UpdateAttributeOptionInput {
   label?: string;
   value?: string;
   sortOrder?: number;
+}
+
+export interface UnitSummary {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 export interface ListResponseMeta {
@@ -293,7 +299,7 @@ export interface LeafAttributeValueView {
   attributeName: string;
   attributeSlug: string;
   dataType: AttributeDataType;
-  unitSymbol: string | null;
+  unitName: string | null;
   rawValue: string | null;
   numberValue: number | null;
   textValue: string | null;
@@ -330,7 +336,7 @@ export interface LeafTableColumnView {
   attributeName: string;
   attributeSlug: string;
   dataType: string;
-  unitSymbol: string | null;
+  unitName: string | null;
 }
 
 export interface LeafCellView {
@@ -355,7 +361,7 @@ export interface LeafFilterableAttributeView {
   slug: string;
   dataType: AttributeDataType;
   filterType: AttributeFilterType;
-  unitSymbol: string | null;
+  unitName: string | null;
   options: { id: string; label: string; value: string }[];
 }
 
@@ -436,7 +442,7 @@ export interface ProductDetailVariantView {
       name: string;
       slug: string;
       dataType: string;
-      unit: { symbol: string } | null;
+      unit: { name: string } | null;
     };
     option: { id: string; label: string; value: string } | null;
   }[];

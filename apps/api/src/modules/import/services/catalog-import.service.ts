@@ -415,22 +415,39 @@ export class CatalogImportService {
           const slug = productSlug || generateSlug(productName);
 
           // Collect table column headers (at_head1-15)
-          const tableColumns: Array<{ attributeId: string; position: number }> = [];
+          const tableColumns: Array<{ attributeId: string; position: number; unitId?: string }> = [];
           let hasInvalidAttrSlug = false;
           for (let i = 1; i <= 15; i++) {
-            const attrSlug = data[`at_head${i}`]?.trim();
-            if (attrSlug) {
+            const rawHead = data[`at_head${i}`]?.trim();
+            if (rawHead) {
+              const [slug, unitName] = rawHead.split(';');
               const attribute = await this.db.attributeDefinition.findUnique({
-                where: { slug: attrSlug },
+                where: { slug },
               });
               if (attribute) {
-                tableColumns.push({
-                  attributeId: attribute.id,
-                  position: i,
-                });
+                let unitId: string | undefined;
+                if (unitName) {
+                  const unit = await this.db.unitDefinition.findUnique({
+                    where: { name: unitName.trim() },
+                  });
+                  if (unit) {
+                    unitId = unit.id;
+                  } else {
+                    this.logger.warn(`Unit not found for column at_head${i}: ${unitName}`);
+                    await this.recordError(jobId, rowNumber, productSku, `Unknown unit "${unitName}" in at_head${i}. Unit must exist in admin before importing.`, data, 'products.csv');
+                    hasInvalidAttrSlug = true;
+                  }
+                }
+                if (!hasInvalidAttrSlug) {
+                  tableColumns.push({
+                    attributeId: attribute.id,
+                    position: i,
+                    ...(unitId ? { unitId } : {}),
+                  });
+                }
               } else {
-                this.logger.warn(`Attribute not found for column at_head${i}: ${attrSlug}`);
-                await this.recordError(jobId, rowNumber, productSku, `Unknown attribute slug "${attrSlug}" in at_head${i}. Attribute must exist before importing.`, data, 'products.csv');
+                this.logger.warn(`Attribute not found for column at_head${i}: ${slug}`);
+                await this.recordError(jobId, rowNumber, productSku, `Unknown attribute slug "${slug}" in at_head${i}. Attribute must exist before importing.`, data, 'products.csv');
                 hasInvalidAttrSlug = true;
               }
             }

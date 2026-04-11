@@ -22,7 +22,6 @@ export class UnitsController {
   async create(@Body() dto: CreateUnitDto): Promise<UnitView> {
     const unit = await this.unitService.create({
       name: dto.name,
-      symbol: dto.symbol,
     });
 
     return UnitView.fromEntity(unit);
@@ -47,7 +46,6 @@ export class UnitsController {
   ): Promise<UnitView> {
     const unit = await this.unitService.update(id, {
       name: dto.name,
-      symbol: dto.symbol,
     });
 
     return UnitView.fromEntity(unit);

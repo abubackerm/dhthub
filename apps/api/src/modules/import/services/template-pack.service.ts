@@ -71,7 +71,7 @@ export class TemplatePackService {
    * Generate attributes.csv template
    */
   private generateAttributesTemplate(): string {
-    const headers = ['name', 'slug', 'dataType', 'group', 'sortOrder', 'isFilterable', 'filterType', 'unitSymbol'];
+    const headers = ['name', 'slug', 'dataType', 'group', 'sortOrder', 'isFilterable', 'filterType', 'unitName'];
     const exampleRows = [
       'Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,',
       'Material,material,enum,Material,2,true,CHECKBOX,',
@@ -226,7 +226,7 @@ Required columns:
 - sortOrder: Sort order (integer, 0-indexed)
 - isFilterable: Whether attribute can be used for filtering (true/false)
 - filterType: Filter type (RANGE for numbers, CHECKBOX/SELECT for enums)
-- unitSymbol: Unit symbol (only for number types, e.g., mm, in)
+- unitName: Unit name (only for number types, e.g., mm, kg, cm)
 
 Data type restrictions:
 - number: Only RANGE filter type allowed
@@ -235,7 +235,7 @@ Data type restrictions:
 - text: No filter type allowed
 
 Example:
-name,slug,dataType,group,sortOrder,isFilterable,filterType,unitSymbol
+name,slug,dataType,group,sortOrder,isFilterable,filterType,unitName
 Thread Size,thread-size,enum,Technical Specs,1,true,CHECKBOX,
 Material,material,enum,Material,2,true,CHECKBOX,
 Diameter,diameter,number,Dimensions,3,true,RANGE,mm
@@ -283,7 +283,7 @@ VALIDATION RULES
    - enum type: CHECKBOX or SELECT filter allowed
    - boolean type: no filter allowed
    - text type: no filter allowed
-   - unitSymbol only for number types
+   - unitName only for number types
 
 5. attribute-options.csv:
    - attributeSlug must exist in attributes.csv (matches slug column)

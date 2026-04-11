@@ -3,14 +3,12 @@ import { UnitDefinitionEntity } from '../../entities';
 export class UnitView {
   id: string;
   name: string;
-  symbol: string;
   createdAt: Date;
 
   static fromEntity(entity: UnitDefinitionEntity): UnitView {
     const view = new UnitView();
     view.id = entity.id;
     view.name = entity.name;
-    view.symbol = entity.symbol;
     view.createdAt = entity.createdAt;
     return view;
   }

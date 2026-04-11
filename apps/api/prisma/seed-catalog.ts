@@ -127,15 +127,15 @@ async function main() {
   // ──────────────────────────────────────────
 
   const unitMm = await prisma.unitDefinition.upsert({
-    where: { symbol: 'mm' },
+    where: { name: 'mm' },
     update: {},
-    create: { name: 'Millimeters', symbol: 'mm' },
+    create: { name: 'mm' },
   });
 
   const unitIn = await prisma.unitDefinition.upsert({
-    where: { symbol: 'in' },
+    where: { name: 'in' },
     update: {},
-    create: { name: 'Inches', symbol: 'in' },
+    create: { name: 'in' },
   });
 
   console.log('  Units created');

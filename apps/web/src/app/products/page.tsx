@@ -96,7 +96,9 @@ export default function ProductsPage() {
 
       {/* Each top-level category rendered as a section */}
       {displayCategories.map((category) => {
-        const activeChildren = category.children.filter((c) => c.isActive);
+        const activeChildren = category.children
+          .filter((c) => c.isActive)
+          .sort((a, b) => a.name.localeCompare(b.name));
 
         return (
           <div key={category.id} className="catalog-section">

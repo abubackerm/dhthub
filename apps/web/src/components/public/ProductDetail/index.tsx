@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SpecTable } from "./SpecTable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,13 +44,29 @@ export function ProductDetailPage({
   pathSlugs,
 }: ProductDetailProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const addToCart = useAddToCart();
   const { requireAuth } = useRequireAuth();
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    (product.variants || []).find((v) => v.isDefault)?.id || (product.variants || [])[0]?.id || null
-  );
+
+  const variantSku = searchParams.get("variant");
+
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Resolve initial variant from URL param, default, or first variant
+  useEffect(() => {
+    const variants = product.variants || [];
+    if (variants.length === 0) return;
+
+    const match = variantSku
+      ? variants.find((v) => v.sku === variantSku)
+      : null;
+
+    setSelectedVariantId(
+      match?.id || variants.find((v) => v.isDefault)?.id || variants[0]?.id || null,
+    );
+  }, [product.variants, variantSku]);
 
   // Get selected variant
   const selectedVariant = useMemo(() => {
@@ -86,7 +102,7 @@ export function ProductDetailPage({
         return {
           name: av.attribute.name,
           value: value || "—",
-          unit: av.attribute.unit?.symbol || null,
+          unit: av.attribute.unit?.name || null,
         };
       });
   }, [selectedVariant]);

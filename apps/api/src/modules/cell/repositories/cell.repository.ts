@@ -140,7 +140,6 @@ export class CellRepository {
         attribute: {
           include: {
             options: true,
-            unit: true,
           },
         },
       },
