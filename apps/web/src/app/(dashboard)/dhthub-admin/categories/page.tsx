@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Search,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -66,6 +67,7 @@ import {
   useCreateCategory,
   useUpdateCategory,
   useDeleteCategory,
+  useCells,
   type CategoryTreeNode,
   type CreateCategoryInput,
   type UpdateCategoryInput,
@@ -163,6 +165,51 @@ function countDescendants(category: CategoryTreeNode): {
   return { totalCategories, totalCells, totalProducts }
 }
 
+/** Sort tree alphabetically at every level by name */
+function sortTree(categories: CategoryTreeNode[]): CategoryTreeNode[] {
+  return categories
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((cat) => ({
+      ...cat,
+      children: sortTree(cat.children),
+    }))
+}
+
+/** Collect ancestor IDs from root down to a given node ID */
+function collectAncestorIds(categories: CategoryTreeNode[], targetId: string): Set<string> {
+  const ancestors = new Set<string>()
+  function walk(items: CategoryTreeNode[], trail: string[]): boolean {
+    for (const item of items) {
+      if (item.id === targetId) {
+        trail.forEach(id => ancestors.add(id))
+        ancestors.add(targetId)
+        return true
+      }
+      if (item.children.length > 0 && walk(item.children, [...trail, item.id])) {
+        return true
+      }
+    }
+    return false
+  }
+  walk(categories, [])
+  return ancestors
+}
+
+/** Filter tree keeping only nodes that match or have a descendant that matches */
+function filterTree(
+  categories: CategoryTreeNode[],
+  predicate: (cat: CategoryTreeNode) => boolean,
+): CategoryTreeNode[] {
+  return categories.reduce<CategoryTreeNode[]>((acc, cat) => {
+    const childMatches = filterTree(cat.children, predicate)
+    if (predicate(cat) || childMatches.length > 0) {
+      acc.push({ ...cat, children: childMatches })
+    }
+    return acc
+  }, [])
+}
+
 interface CategoryTreeItemProps {
   category: CategoryTreeNode
   depth: number
@@ -257,19 +304,20 @@ function CategoryTreeItem({
         {/* SKU */}
         {category.sku && (
           <div className="flex items-center gap-1">
-            <span 
+            <span
               className="text-xs font-mono ml-2 px-2 py-0.5 rounded bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
-              onClick={() => handleCopySku(category.sku!)}
+              onClick={(e) => { e.stopPropagation(); onCopySku(category.sku!) }}
               title="Click to copy SKU"
             >
               {category.sku}
             </span>
             {copiedSku === category.sku ? (
-              <Check className="h-3 w-3 text-green-500" />
+              <Check className="h-3 w-3 text-green-500 shrink-0" />
             ) : (
-              <Copy 
-                className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer"
+              <Copy
+                className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
                 title="Copy SKU"
+                onClick={(e) => { e.stopPropagation(); onCopySku(category.sku!) }}
               />
             )}
           </div>
@@ -372,12 +420,14 @@ export default function CategoriesPage() {
   const createMutation = useCreateCategory()
   const updateMutation = useUpdateCategory()
   const deleteMutation = useDeleteCategory()
+  const { data: allCells = [] } = useCells({ pageSize: 1000 })
 
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     return new Set<string>()
   })
 
+  const [searchQuery, setSearchQuery] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<CategoryTreeNode | null>(null)
   const [formData, setFormData] = useState<CategoryFormData>(initialFormData)
@@ -396,8 +446,66 @@ export default function CategoriesPage() {
   const [cellSheetOpen, setCellSheetOpen] = useState(false)
   const [selectedCategoryForCells, setSelectedCategoryForCells] = useState<CategoryTreeNode | null>(null)
 
-  const allCategoriesFlat = useMemo(() => getAllCategoriesFlat(categories), [categories])
-  const mixedBranchCount = useMemo(() => countMixedBranches(categories), [categories])
+  // Build a map of categoryId -> cell names for cell search
+  const categoryIdToCellNames = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const cell of allCells) {
+      const names = map.get(cell.categoryId) || []
+      names.push(cell.name.toLowerCase())
+      map.set(cell.categoryId, names)
+    }
+    return map
+  }, [allCells])
+
+  // Determine which leaf category IDs match by cell name
+  const leafIdsMatchingCellSearch = useMemo(() => {
+    if (!searchQuery.trim()) return new Set<string>()
+    const q = searchQuery.toLowerCase()
+    const ids = new Set<string>()
+    categoryIdToCellNames.forEach((cellNames, catId) => {
+      if (cellNames.some(name => name.includes(q))) {
+        ids.add(catId)
+      }
+    })
+    return ids
+  }, [searchQuery, categoryIdToCellNames])
+
+  // Sort tree alphabetically at every level
+  const sortedCategories = useMemo(() => sortTree(categories), [categories])
+
+  // Apply search filter on top of sorted tree
+  const displayCategories = useMemo(() => {
+    if (!searchQuery.trim()) return sortedCategories
+    const q = searchQuery.toLowerCase()
+    return filterTree(sortedCategories, (cat) => {
+      if (cat.name.toLowerCase().includes(q)) return true
+      if (cat.slug.toLowerCase().includes(q)) return true
+      if (cat.sku?.toLowerCase().includes(q)) return true
+      if (leafIdsMatchingCellSearch.has(cat.id)) return true
+      return false
+    })
+  }, [sortedCategories, searchQuery, leafIdsMatchingCellSearch])
+
+  // Rebuild searchExpandedIds from displayCategories
+  const searchExpandedIds = useMemo(() => {
+    if (!searchQuery.trim()) return null
+    const ids = new Set<string>()
+    function collectIds(items: CategoryTreeNode[]) {
+      for (const item of items) {
+        if (item.children.length > 0) {
+          ids.add(item.id)
+          collectIds(item.children)
+        }
+      }
+    }
+    collectIds(displayCategories)
+    return ids
+  }, [searchQuery, displayCategories])
+
+  const effectiveExpandedIds = searchExpandedIds ?? expandedIds
+
+  const allCategoriesFlat = useMemo(() => getAllCategoriesFlat(sortedCategories), [sortedCategories])
+  const mixedBranchCount = useMemo(() => countMixedBranches(sortedCategories), [sortedCategories])
 
   const handleToggle = (id: string) => {
     setExpandedIds((prev) => {
@@ -608,13 +716,24 @@ export default function CategoriesPage() {
   const handleCopySku = async (sku: string) => {
     try {
       await navigator.clipboard.writeText(sku)
-      setCopiedSku(sku)
-      toast.success(`SKU ${sku} copied to clipboard`)
-      setTimeout(() => setCopiedSku(null), 2000)
-    } catch (error) {
-      toast.error('Failed to copy SKU')
-      console.error(error)
+    } catch {
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = sku
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      } catch {
+        toast.error('Failed to copy SKU')
+        return
+      }
     }
+    setCopiedSku(sku)
+    toast.success(`SKU ${sku} copied to clipboard`)
+    setTimeout(() => setCopiedSku(null), 2000)
   }
 
   if (isLoading) {
@@ -709,32 +828,50 @@ export default function CategoriesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            Category Tree
-            {mixedBranchCount > 0 && (
-              <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50 text-xs font-normal">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                {mixedBranchCount} mixed {mixedBranchCount === 1 ? "branch" : "branches"}
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Manage your product categorization hierarchy
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <CardTitle className="text-lg flex items-center gap-2">
+                Category Tree
+                {mixedBranchCount > 0 && (
+                  <Badge variant="outline" className="border-red-500 text-red-600 bg-red-50 text-xs font-normal">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    {mixedBranchCount} mixed {mixedBranchCount === 1 ? "branch" : "branches"}
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Manage your product categorization hierarchy
+              </CardDescription>
+            </div>
+            <div className="relative w-64 shrink-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search categories or cells..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
-            {categories.length === 0 ? (
+            {displayCategories.length === 0 && searchQuery.trim() ? (
+              <div className="p-12 text-center">
+                <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">No categories or cells match "{searchQuery}"</p>
+              </div>
+            ) : displayCategories.length === 0 ? (
               <div className="p-12 text-center">
                 <p className="text-muted-foreground">No categories yet. Create your first category to get started.</p>
               </div>
             ) : (
-              categories.map((category) => (
+              displayCategories.map((category) => (
                 <CategoryTreeItem
                   key={category.id}
                   category={category}
                   depth={0}
-                  expandedIds={expandedIds}
+                  expandedIds={effectiveExpandedIds}
                   onToggle={handleToggle}
                   onEdit={handleEditCategory}
                   onAddChild={handleAddChild}

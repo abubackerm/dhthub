@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   ChevronRight,
   Grid3x3,
@@ -12,6 +12,8 @@ import {
   X,
   Image as ImageIcon,
   AlertTriangle,
+  Copy,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -123,10 +125,46 @@ function generateSku(): string {
   return `C-${randomPart}`
 }
 
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+  toast.success(`${text} copied to clipboard`)
+}
+
 function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: Cell) => void; onDelete: (cell: Cell) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: cell.id,
   })
+
+  const [copiedSku, setCopiedSku] = useState<string | null>(null)
+
+  const handleCopy = useCallback(async (sku: string) => {
+    try {
+      await navigator.clipboard.writeText(sku)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = sku
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    setCopiedSku(sku)
+    toast.success(`${sku} copied to clipboard`)
+    setTimeout(() => setCopiedSku(null), 2000)
+  }, [])
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -180,7 +218,26 @@ function SortableCell({ cell, onEdit, onDelete }: { cell: Cell; onEdit: (cell: C
             </p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
               <span>Slug: {cell.slug}</span>
-              {cell.sku && <span>SKU: {cell.sku}</span>}
+              {cell.sku && (
+                <span className="flex items-center gap-1">
+                  <span className="font-mono">{cell.sku}</span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                    title={copiedSku === cell.sku ? "Copied!" : "Copy SKU"}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCopy(cell.sku!)
+                    }}
+                  >
+                    {copiedSku === cell.sku ? (
+                      <Check className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
+                </span>
+              )}
             </div>
           </div>
         </div>

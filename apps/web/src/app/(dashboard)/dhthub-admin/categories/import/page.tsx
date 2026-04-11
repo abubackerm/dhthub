@@ -126,8 +126,9 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
             }
           }
 
-          // Auto-refresh categories list on completion
+          // Auto-refresh categories list and tree on completion
           await queryClient.invalidateQueries({ queryKey: ["categories"] })
+          await queryClient.invalidateQueries({ queryKey: ["category-tree"] })
         }
       } catch (error) {
         console.error("Failed to poll import job", error)
@@ -184,10 +185,10 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
         template = `main_branch,branch1,branch2,branch3,branch4,branch5,branch6\nElectronics,Phones,Smartphones,\nElectronics,Phones,Feature Phones,\nElectronics,Computers,Laptops,Gaming`
         filename = 'categories-create-template.csv'
       } else if (mode === 'UPDATE') {
-        template = `sku,name,cell\nCG-A1B2C3D4,iPhone 15,x\nCG-A1B2C3D4,Samsung Galaxy,x\nCG-E5F6G7H8,Accessories,`
+        template = `sku,name,cell,description\nCG-A1B2C3D4,iPhone 15,x,Apple smartphone\nCG-A1B2C3D4,Samsung Galaxy,x,Samsung smartphone\nCG-E5F6G7H8,Accessories,,Mobile accessories`
         filename = 'categories-update-template.csv'
       } else if (mode === 'EDIT') {
-        template = `sku,new_name\nCG-A1B2C3D4,Smartphones\nCG-E5F6G7H8,Laptops & PCs`
+        template = `sku,new_name,description\nCG-A1B2C3D4,Smartphones,Mobile phones\nCG-E5F6G7H8,,Computing devices\nCG-12345678,Tablets,`
         filename = 'categories-edit-template.csv'
       }
 
@@ -294,7 +295,9 @@ function CategoryImportForm({ mode }: CategoryImportFormProps) {
           <p className="text-xs text-muted-foreground">
             {mode === 'CREATE'
               ? 'CSV columns: main_branch, branch1, branch2, branch3, branch4, branch5, branch6'
-              : 'CSV columns: sku, name, cell (optional, use "x" for cell)'}
+              : mode === 'UPDATE'
+              ? 'CSV columns: sku, name, cell (optional, use "x" for cell), description (optional)'
+              : 'CSV columns: sku, new_name (optional), description (optional) — at least one of new_name or description is required'}
           </p>
         </div>
 

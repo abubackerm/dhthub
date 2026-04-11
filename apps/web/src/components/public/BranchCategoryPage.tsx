@@ -76,8 +76,8 @@ export function BranchCategoryPage({
                 <Image
                   src={child.imageUrl}
                   alt={child.name}
-                  width={128}
-                  height={128}
+                  width={80}
+                  height={80}
                   className="w-full h-full"
                 />
               ) : (
@@ -88,7 +88,12 @@ export function BranchCategoryPage({
                 />
               )}
             </div>
-            <span className="catalog-grid__label">{child.name}</span>
+            <div className="catalog-grid__text">
+              <span className="catalog-grid__label">{child.name}</span>
+              {child.description && (
+                <p className="catalog-grid__desc">{child.description}</p>
+              )}
+            </div>
           </Link>
         ))}
       </div>

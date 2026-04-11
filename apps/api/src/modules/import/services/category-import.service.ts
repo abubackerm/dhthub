@@ -66,6 +66,30 @@ export class CategoryImportService {
   }
 
   /**
+   * Generate a unique slug by appending incrementing suffix if needed.
+   * e.g. "test-category" -> "test-category-2" -> "test-category-3"
+   */
+  private async findUniqueSlug(
+    baseSlug: string,
+    findBySlug: (slug: string) => Promise<any>,
+  ): Promise<string> {
+    const existing = await findBySlug(baseSlug);
+    if (!existing) {
+      return baseSlug;
+    }
+
+    for (let i = 2; i <= 100; i++) {
+      const candidate = `${baseSlug}-${i}`;
+      const collision = await findBySlug(candidate);
+      if (!collision) {
+        return candidate;
+      }
+    }
+
+    throw new Error(`Could not find unique slug for "${baseSlug}" after 100 attempts`);
+  }
+
+  /**
    * Validate branch/leaf constraint: under any parent, all children must be of the same type
    */
   private async validateBranchLeafConstraint(
@@ -326,6 +350,7 @@ export class CategoryImportService {
           const parentSku = rowData.sku?.trim();
           const name = rowData.name?.trim();
           const cellMarker = rowData.cell?.trim();
+          const description = rowData.description?.trim() || null;
 
           if (!parentSku) {
             throw new Error('Parent SKU is required');
@@ -353,30 +378,28 @@ export class CategoryImportService {
           }
 
           if (createType === 'CELL') {
-            // Create cell
+            // Check if a cell with this slug already exists under the same parent (true duplicate)
             const existingCell = await this.cellRepo.findBySlug(slug);
-            if (existingCell) {
-              // Track skipped item
+            if (existingCell && existingCell.categoryId === parentCategory.id) {
               result.skippedRows++;
               result.skippedItems.push({
                 rowNumber: row.rowNumber,
-                name: name,
+                name,
                 type: 'CELL',
-                reason: 'Cell already exists',
+                reason: 'Cell already exists under this parent',
                 sku: existingCell.sku || undefined,
               });
-              
-              // Store skipped item in database for persistence
+
               await this.importErrorRepository.create({
                 jobId,
                 rowNumber: row.rowNumber,
-                message: `Skipped: Cell already exists (${existingCell.sku})`,
+                message: `Skipped: Cell "${name}" already exists under ${parentSku} (${existingCell.sku})`,
                 rawData: rowData,
                 sourceFile: filePath,
               });
-              
-              this.logger.debug(`Skipped existing cell: ${name} (${existingCell.sku})`);
-              
+
+              this.logger.debug(`Skipped existing cell: ${name} (${existingCell.sku}) under ${parentSku}`);
+
               await this.progressService.updateProgress({
                 jobId,
                 processedRows: result.processedRows,
@@ -387,12 +410,17 @@ export class CategoryImportService {
               continue;
             }
 
-            const sku = this.generateSKU('C');
+            // Slug collision with a different parent — deduplicate the slug
+            const uniqueSlug = existingCell
+              ? await this.findUniqueSlug(slug, (s) => this.cellRepo.findBySlug(s))
+              : slug;
+
+            const cellSku = this.generateSKU('C');
             const cell = await this.cellRepo.create({
               name,
-              slug,
-              sku,
-              description: null,
+              slug: uniqueSlug,
+              sku: cellSku,
+              description,
               sortOrder: 0,
               isActive: true,
               category: { connect: { id: parentCategory.id } },
@@ -402,33 +430,34 @@ export class CategoryImportService {
             result.cellsCreated++;
             result.successRows++;
 
+            if (uniqueSlug !== slug) {
+              this.logger.debug(`Slug collision resolved: ${slug} -> ${uniqueSlug}`);
+            }
             this.logger.debug(`Created cell: ${name} (${cell.sku}) under ${parentSku}`);
 
           } else {
-            // Create child category
+            // Check if a category with this slug already exists under the same parent (true duplicate)
             const existingCategory = await this.categoryRepo.findBySlug(slug);
-            if (existingCategory) {
-              // Track skipped item
+            if (existingCategory && existingCategory.parentId === parentCategory.id) {
               result.skippedRows++;
               result.skippedItems.push({
                 rowNumber: row.rowNumber,
-                name: name,
+                name,
                 type: 'CATEGORY',
-                reason: 'Category already exists',
+                reason: 'Category already exists under this parent',
                 sku: existingCategory.sku || undefined,
               });
-              
-              // Store skipped item in database for persistence
+
               await this.importErrorRepository.create({
                 jobId,
                 rowNumber: row.rowNumber,
-                message: `Skipped: Category already exists (${existingCategory.sku})`,
+                message: `Skipped: Category "${name}" already exists under ${parentSku} (${existingCategory.sku})`,
                 rawData: rowData,
                 sourceFile: filePath,
               });
-              
-              this.logger.debug(`Skipped existing category: ${name} (${existingCategory.sku})`);
-              
+
+              this.logger.debug(`Skipped existing category: ${name} (${existingCategory.sku}) under ${parentSku}`);
+
               await this.progressService.updateProgress({
                 jobId,
                 processedRows: result.processedRows,
@@ -439,19 +468,24 @@ export class CategoryImportService {
               continue;
             }
 
-            const sku = this.generateSKU();
-            const path = `${parentCategory.path}.${slug}`;
+            // Slug collision with a different parent — deduplicate the slug
+            const uniqueSlug = existingCategory
+              ? await this.findUniqueSlug(slug, (s) => this.categoryRepo.findBySlug(s))
+              : slug;
+
+            const catSku = this.generateSKU();
+            const path = `${parentCategory.path}.${uniqueSlug}`;
 
             const category = await this.categoryRepo.create({
               name,
-              slug,
-              description: null,
+              slug: uniqueSlug,
+              description,
               parentId: parentCategory.id,
               path,
               imageUrl: null,
               sortOrder: 0,
               isActive: true,
-              sku,
+              sku: catSku,
             });
 
             result.categoriesCreated++;
@@ -546,39 +580,47 @@ export class CategoryImportService {
         try {
           const sku = rowData.sku?.trim();
           const newName = rowData.new_name?.trim();
+          const description = rowData.description?.trim() || null;
 
           if (!sku) {
             throw new Error('SKU is required');
           }
-          if (!newName) {
-            throw new Error('new_name is required');
+          if (!newName && description === null) {
+            throw new Error('At least one of new_name or description is required');
           }
 
-          // Generate new slug from new_name
-          const newSlug = this.generateSlug(newName);
+          // Generate new slug from new_name only if provided
+          const newSlug = newName ? this.generateSlug(newName) : null;
 
           // Try to find category by SKU first
           const category = await this.categoryRepo.findBySku(sku);
 
           if (category) {
-            // Check for slug conflicts (skip if same slug as current)
-            if (newSlug !== category.slug) {
-              const existingBySlug = await this.categoryRepo.findBySlug(newSlug);
-              if (existingBySlug && existingBySlug.id !== category.id) {
-                throw new Error(`Slug "${newSlug}" is already in use by another category`);
+            if (newSlug) {
+              // Check for slug conflicts (skip if same slug as current)
+              if (newSlug !== category.slug) {
+                const existingBySlug = await this.categoryRepo.findBySlug(newSlug);
+                if (existingBySlug && existingBySlug.id !== category.id) {
+                  throw new Error(`Slug "${newSlug}" is already in use by another category`);
+                }
               }
             }
 
             // Update category
-            await this.categoryRepo.update(category.id, {
-              name: newName,
-              slug: newSlug,
-            });
+            const updateData: { name?: string; slug?: string; description?: string | null } = {};
+            if (newName) {
+              updateData.name = newName;
+              updateData.slug = newSlug!;
+            }
+            if (description !== null) {
+              updateData.description = description;
+            }
+            await this.categoryRepo.update(category.id, updateData);
 
             result.categoriesUpdated++;
             result.successRows++;
 
-            this.logger.debug(`Updated category: ${sku} -> ${newName} (${newSlug})`);
+            this.logger.debug(`Updated category: ${sku}${newName ? ` -> ${newName} (${newSlug})` : ''}`);
           } else {
             // Try to find cell by SKU
             const cell = await this.cellRepo.findBySku(sku);
@@ -586,24 +628,31 @@ export class CategoryImportService {
               throw new Error(`Category or Cell with SKU ${sku} not found`);
             }
 
-            // Check for slug conflicts (skip if same slug as current)
-            if (newSlug !== cell.slug) {
-              const existingBySlug = await this.cellRepo.findBySlug(newSlug);
-              if (existingBySlug && existingBySlug.id !== cell.id) {
-                throw new Error(`Slug "${newSlug}" is already in use by another cell`);
+            if (newSlug) {
+              // Check for slug conflicts (skip if same slug as current)
+              if (newSlug !== cell.slug) {
+                const existingBySlug = await this.cellRepo.findBySlug(newSlug);
+                if (existingBySlug && existingBySlug.id !== cell.id) {
+                  throw new Error(`Slug "${newSlug}" is already in use by another cell`);
+                }
               }
             }
 
             // Update cell
-            await this.cellRepo.update(cell.id, {
-              name: newName,
-              slug: newSlug,
-            });
+            const cellUpdateData: { name?: string; slug?: string; description?: string | null } = {};
+            if (newName) {
+              cellUpdateData.name = newName;
+              cellUpdateData.slug = newSlug!;
+            }
+            if (description !== null) {
+              cellUpdateData.description = description;
+            }
+            await this.cellRepo.update(cell.id, cellUpdateData);
 
             result.categoriesUpdated++;
             result.successRows++;
 
-            this.logger.debug(`Updated cell: ${sku} -> ${newName} (${newSlug})`);
+            this.logger.debug(`Updated cell: ${sku}${newName ? ` -> ${newName} (${newSlug})` : ''}`);
           }
 
           // Update progress

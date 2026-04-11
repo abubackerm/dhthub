@@ -80,7 +80,10 @@ async function bootstrap() {
   app.useGlobalFilters(new DomainExceptionFilter());
 
   app.enableCors({
-    origin: process.env.WEB_URL || 'http://localhost:3005',
+    origin: [
+      process.env.WEB_URL || 'http://localhost:3005',
+      'http://localhost:3005',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
