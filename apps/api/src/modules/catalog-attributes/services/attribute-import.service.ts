@@ -471,7 +471,7 @@ export class AttributeImportService {
       case 'boolean':
         return [];
       case 'text':
-        return [];
+        return ['CHECKBOX', 'SELECT'];
       default:
         return [];
     }
