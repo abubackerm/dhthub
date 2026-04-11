@@ -401,6 +401,7 @@ model VariantAttributeValue {
   id          String   @id @default(cuid())
   variantId   String   @map("variant_id")
   attributeId String   @map("attribute_id")
+  rawValue    String?  @map("raw_value")
   numberValue Float?   @map("number_value")
   textValue   String?  @map("text_value")
   optionId    String?  @map("option_id")

@@ -9,7 +9,12 @@ import type {
   CreateAttributeOptionInput,
   UpdateAttributeInput,
   UpdateAttributeOptionInput,
+  UnitSummary,
 } from './types';
+
+export async function getUnits(): Promise<UnitSummary[]> {
+  return apiClient.get<UnitSummary[]>('/v1/catalog/units');
+}
 
 export async function getCategoryAttributes(
   categoryId: string,

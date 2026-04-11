@@ -16,7 +16,12 @@ export class AttributeDefinitionRepository {
     return this.getClient().attributeDefinition.findUnique({
       where: { id },
       include: {
-        unit: { select: { id: true, name: true, symbol: true } },
+        attributeUnits: {
+          include: {
+            unit: { select: { id: true, name: true, symbol: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
   }
@@ -48,7 +53,6 @@ export class AttributeDefinitionRepository {
     group?: string | null;
     sortOrder?: number;
     filterType?: AttributeFilterType | null;
-    unitId?: string | null;
     isFilterable?: boolean;
     isRequired?: boolean;
     createdBy?: string;
@@ -61,7 +65,6 @@ export class AttributeDefinitionRepository {
         group: data.group ?? null,
         sortOrder: data.sortOrder ?? 0,
         filterType: data.filterType ?? null,
-        unitId: data.unitId ?? null,
         isFilterable: data.isFilterable ?? false,
         isRequired: data.isRequired ?? false,
         createdBy: data.createdBy,
@@ -78,7 +81,6 @@ export class AttributeDefinitionRepository {
       group: string | null;
       sortOrder: number;
       filterType: AttributeFilterType | null;
-      unitId: string | null;
       isFilterable: boolean;
       isRequired: boolean;
       updatedBy: string;
@@ -123,7 +125,12 @@ export class AttributeDefinitionRepository {
         where,
         orderBy: { sortOrder: 'asc' },
         include: {
-          unit: { select: { id: true, name: true, symbol: true } },
+          attributeUnits: {
+            include: {
+              unit: { select: { id: true, name: true, symbol: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       }),
       this.getClient().attributeDefinition.count({ where }),

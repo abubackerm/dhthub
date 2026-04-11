@@ -853,23 +853,58 @@ export class CatalogImportService {
     value: string,
     dataType?: string,
   ): Promise<void> {
+    const rawValue = value.trim();
     const data: any = {
       variantId,
       attributeId,
+      rawValue,
     };
 
     if (dataType === 'number') {
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue)) {
-        data.numberValue = numValue;
+      const numericValue = this.parseMeasurement(rawValue);
+      if (numericValue !== null) {
+        data.numberValue = numericValue;
       }
     } else if (dataType === 'boolean') {
-      data.booleanValue = value.toLowerCase() === 'true';
+      data.booleanValue = rawValue.toLowerCase() === 'true';
     } else {
-      data.textValue = value;
+      data.textValue = rawValue;
     }
 
     await prisma.variantAttributeValue.create({ data });
+  }
+
+  /**
+   * Parse measurement strings like "3/4", "1-1/2", "2.5" into numeric values
+   */
+  private parseMeasurement(value: string): number | null {
+    if (!value || value.trim() === '') return null;
+
+    // Strip trailing unit symbols to expose the numeric portion
+    const cleanValue = value.trim()
+      .replace(/["""''`\u00b0]+$/, '')
+      .replace(/\s*(mm|cm|m|in|ft|yd|kg|g|lb|oz|°F|°C)$/i, '');
+
+    // Match mixed number: "1-1/2" or "1 1/2" → whole + fraction
+    const mixedMatch = cleanValue.match(/^(\d+)\s*[-\s]\s*(\d+)\/(\d+)$/);
+    if (mixedMatch) {
+      const whole = parseInt(mixedMatch[1], 10);
+      const num = parseInt(mixedMatch[2], 10);
+      const den = parseInt(mixedMatch[3], 10);
+      if (den !== 0) return whole + num / den;
+    }
+
+    // Match fraction: "3/4" → fraction
+    const fracMatch = cleanValue.match(/^(\d+)\/(\d+)$/);
+    if (fracMatch) {
+      const num = parseInt(fracMatch[1], 10);
+      const den = parseInt(fracMatch[2], 10);
+      if (den !== 0) return num / den;
+    }
+
+    // Fallback to plain decimal/integer
+    const numValue = parseFloat(cleanValue.replace(/[^\d.\-]/g, ''));
+    return !isNaN(numValue) ? numValue : null;
   }
 
   /**

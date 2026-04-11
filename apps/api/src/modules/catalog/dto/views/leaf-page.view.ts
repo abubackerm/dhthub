@@ -6,6 +6,7 @@ export interface LeafAttributeValueView {
   attributeSlug: string;
   dataType: AttributeDataType;
   unitSymbol: string | null;
+  rawValue: string | null;
   numberValue: number | null;
   textValue: string | null;
   optionValue: string | null;
@@ -217,6 +218,7 @@ export class LeafPageView {
       dataType: av.attribute.dataType,
       unitSymbol: av.attribute.unit?.symbol || null,
       numberValue: av.numberValue,
+      rawValue: av.rawValue,
       textValue: av.textValue,
       optionValue: av.option?.value || null,
       optionLabel: av.option?.label || null,

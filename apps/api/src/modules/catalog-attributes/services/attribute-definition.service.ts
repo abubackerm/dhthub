@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
 import { BaseService } from '@shared/domain';
-import { AttributeDefinitionRepository } from '../repositories';
+import { AttributeDefinitionRepository, AttributeUnitRepository, UnitDefinitionRepository } from '../repositories';
 import { AttributeDefinitionEntity, AttributeDataType, AttributeFilterType } from '../entities';
 import { CacheService } from '@core/cache';
 
@@ -13,7 +13,7 @@ export interface CreateAttributeDefinitionData {
   group?: string | null;
   sortOrder?: number;
   filterType?: AttributeFilterType | null;
-  unitId?: string | null;
+  unitIds?: string[];
   isFilterable?: boolean;
   isRequired?: boolean;
   createdBy?: string;
@@ -26,7 +26,7 @@ export interface UpdateAttributeDefinitionData {
   group?: string | null;
   sortOrder?: number;
   filterType?: AttributeFilterType | null;
-  unitId?: string | null;
+  unitIds?: string[];
   isFilterable?: boolean;
   isRequired?: boolean;
   updatedBy?: string;
@@ -37,6 +37,7 @@ export class AttributeDefinitionService extends BaseService {
   constructor(
     eventEmitter: EventEmitter2,
     private readonly attributeRepo: AttributeDefinitionRepository,
+    private readonly attributeUnitRepo: AttributeUnitRepository,
     private readonly cacheService: CacheService,
     private readonly configService: ConfigService,
   ) {
@@ -86,6 +87,18 @@ export class AttributeDefinitionService extends BaseService {
     }
   }
 
+  /**
+   * Sync attribute-unit join rows: delete existing and create new ones
+   */
+  private async syncAttributeUnits(attributeId: string, unitIds: string[]): Promise<void> {
+    await this.attributeUnitRepo.deleteByAttributeId(attributeId);
+    if (unitIds.length > 0) {
+      await this.attributeUnitRepo.createMany(
+        unitIds.map((unitId) => ({ attributeId, unitId })),
+      );
+    }
+  }
+
   async create(data: CreateAttributeDefinitionData): Promise<AttributeDefinitionEntity> {
     // Auto-generate slug if not provided
     const slug = data.slug || await this.generateUniqueSlug(data.name);
@@ -99,13 +112,18 @@ export class AttributeDefinitionService extends BaseService {
         slug: uniqueSlug,
       });
 
+      // Sync units
+      if (data.unitIds && data.unitIds.length > 0) {
+        await this.syncAttributeUnits(attribute.id, data.unitIds);
+      }
+
       this.emit('attribute.created', {
         id: attribute.id,
         name: attribute.name,
         slug: attribute.slug,
       });
 
-      return attribute;
+      return this.attributeRepo.findById(attribute.id) as Promise<AttributeDefinitionEntity>;
     }
 
     const attribute = await this.attributeRepo.create({
@@ -113,13 +131,18 @@ export class AttributeDefinitionService extends BaseService {
       slug,
     });
 
+    // Sync units
+    if (data.unitIds && data.unitIds.length > 0) {
+      await this.syncAttributeUnits(attribute.id, data.unitIds);
+    }
+
     this.emit('attribute.created', {
       id: attribute.id,
       name: attribute.name,
       slug: attribute.slug,
     });
 
-    return attribute;
+    return this.attributeRepo.findById(attribute.id) as Promise<AttributeDefinitionEntity>;
   }
 
   async update(
@@ -138,7 +161,13 @@ export class AttributeDefinitionService extends BaseService {
       }
     }
 
-    const updated = await this.attributeRepo.update(id, data);
+    const { unitIds, ...updateData } = data;
+    const updated = await this.attributeRepo.update(id, updateData);
+
+    // Sync units if provided
+    if (unitIds !== undefined) {
+      await this.syncAttributeUnits(id, unitIds);
+    }
 
     await this.cacheService.del(this.getCacheKey(id));
     await this.cacheService.del(this.getCacheKeyBySlug(existing.slug));
@@ -152,7 +181,7 @@ export class AttributeDefinitionService extends BaseService {
       slug: updated.slug,
     });
 
-    return updated;
+    return this.attributeRepo.findById(id) as Promise<AttributeDefinitionEntity>;
   }
 
   async findById(id: string): Promise<AttributeDefinitionEntity> {

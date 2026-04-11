@@ -349,6 +349,11 @@ function getAttributeValueDisplay(
   const av = attributeValues.find((v) => v.attributeId === attributeId);
   if (!av) return <span className="text-muted-foreground">—</span>;
 
+  // Use rawValue when available (exact CSV input like "3/4\""), fall back to typed values
+  if (av.rawValue != null && av.rawValue !== '') {
+    return <>{av.rawValue}</>;
+  }
+
   let value: string | number | null = null;
 
   switch (av.dataType) {

@@ -294,6 +294,7 @@ export interface LeafAttributeValueView {
   attributeSlug: string;
   dataType: AttributeDataType;
   unitSymbol: string | null;
+  rawValue: string | null;
   numberValue: number | null;
   textValue: string | null;
   optionValue: string | null;
