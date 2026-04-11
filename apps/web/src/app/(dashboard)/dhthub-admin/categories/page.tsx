@@ -647,8 +647,8 @@ export default function CategoriesPage() {
     if (editingCategory) {
       const updateData: UpdateCategoryInput = {
         ...baseCategoryData,
-        ...(formData.description.trim()
-          ? { description: formData.description }
+        ...(formData.description !== editingCategory.description
+          ? { description: formData.description || null }
           : {}),
       }
 

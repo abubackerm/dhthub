@@ -24,7 +24,7 @@ log "Regenerating Prisma client..."
 pnpm --filter api db:generate 2>&1 | tail -3
 
 log "Pushing database schema (db push)..."
-pnpm --filter api db:push 2>&1 | tail -3
+pnpm --filter api db:push 2>&1 | tail -5
 
 log "Restarting PM2 apps..."
 pm2 restart all
