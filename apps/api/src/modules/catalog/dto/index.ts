@@ -8,6 +8,7 @@ export * from './bulk-update-product.dto';
 export * from './product-query.dto';
 export * from './views/category.view';
 export * from './views/category-tree.view';
+export * from './views/category-slug-lookup.view';
 export * from './views/product.view';
 export * from './views/variant.view';
 export * from './views/leaf-page.view';

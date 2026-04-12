@@ -7,6 +7,18 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError } from '../client';
+
+export const CATEGORY_TOO_MANY_LEAVES_CODE = 'CATEGORY_TOO_MANY_LEAVES';
+
+export function isCategoryTooManyLeavesError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  return error.status === 413;
+}
+
+export function getCategoryTooManyLeavesMessage(error: ApiError): string | undefined {
+  if (error.status !== 413) return undefined;
+  return error.getErrorMessage();
+}
 import {
   getCategories,
   getCategoryTree,
@@ -37,10 +49,10 @@ export function useCategories(): UseQueryResult<Category[], Error> {
   });
 }
 
-export function useCategoryTree(): UseQueryResult<CategoryTreeNode[], Error> {
+export function useCategoryTree(options?: { maxDepth?: number }): UseQueryResult<CategoryTreeNode[], Error> {
   return useQuery({
     queryKey: CATEGORY_TREE_QUERY_KEY,
-    queryFn: getCategoryTree,
+    queryFn: () => getCategoryTree(options),
     staleTime: 5 * 60 * 1000, // 5 minutes - category tree changes infrequently
     gcTime: 10 * 60 * 1000, // 10 minutes - keep cached data longer
     refetchOnWindowFocus: false, // Don't refetch when tab regains focus

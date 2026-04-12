@@ -169,6 +169,8 @@ log "PM2 apps started: api, web, workers"
 log "Phase 10: Configuring Nginx..."
 
 sudo mkdir -p /var/www/html
+sudo mkdir -p /var/cache/nginx/catalog
+sudo chown -R www-data:www-data /var/cache/nginx
 sudo cp "$SCRIPT_DIR/nginx/default.conf" /etc/nginx/sites-available/default
 sudo nginx -t && sudo systemctl reload nginx
 

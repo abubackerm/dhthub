@@ -2,6 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseProvider, TransactionClient } from '@core/database/database.provider';
 import { transactionContext } from '@core/database/transaction-context.store';
 import { CategoryEntity } from '../entities/category.entity';
+import { CategoryTooManyLeafCategoriesError } from '@shared/domain/errors';
+import { Prisma } from '@prisma/client';
+import pLimit from 'p-limit';
 
 export interface CategoryWithCells extends CategoryEntity {
   cells: any[];
@@ -30,6 +33,35 @@ export class CategoryRepository {
     return this.getClient().category.findUnique({
       where: { slug },
     });
+  }
+
+  async findBySlugWithAncestors(slug: string): Promise<{
+    category: CategoryEntity & { _count: { children: number } };
+    ancestors: CategoryEntity[];
+  } | null> {
+    const client = this.getClient();
+    const category = await client.category.findUnique({
+      where: { slug },
+      include: {
+        _count: { select: { children: true } },
+      },
+    });
+
+    if (!category) return null;
+
+    const ancestors: CategoryEntity[] = [];
+    if (category.path) {
+      const pathSegments = category.path.split('.');
+      pathSegments.pop(); // remove the category itself
+      for (const segment of pathSegments) {
+        const ancestor = await client.category.findUnique({
+          where: { path: segment },
+        });
+        if (ancestor) ancestors.push(ancestor);
+      }
+    }
+
+    return { category: category as CategoryEntity & { _count: { children: number } }, ancestors };
   }
 
   async findByPath(path: string): Promise<CategoryEntity | null> {
@@ -337,6 +369,24 @@ export class CategoryRepository {
     };
   }
 
+  /**
+   * Maximum number of leaf categories processed in a single consolidated request.
+   * Beyond this limit a `CategoryTooManyLeafCategoriesError` (HTTP 413) is thrown
+   * so the frontend can guide the user to a narrower category.
+   */
+  static readonly MAX_CONSOLIDATED_LEAVES = 50;
+
+  /**
+   * Batch size for chunked cell queries. Postgres handles IN clauses well
+   * up to a few hundred values; 20 keeps each query fast and predictable.
+   */
+  private static readonly CELL_BATCH_SIZE = 20;
+
+  /**
+   * Concurrency limit for parallel cell-fetch chunks.
+   */
+  private static readonly CELL_QUERY_CONCURRENCY = 3;
+
   async findConsolidatedLeafData(categoryId: string): Promise<{
     category: {
       id: string;
@@ -355,6 +405,8 @@ export class CategoryRepository {
       filterableAttributes: any[];
     }>;
     filterableAttributes: any[];
+    totalLeafCount: number;
+    isTruncated: boolean;
   }> {
     const client = this.getClient();
 
@@ -391,87 +443,97 @@ export class CategoryRepository {
       },
     });
 
-    // For each leaf category, get its cells and filterable attributes
-    const leafCategoriesWithCells = await Promise.all(
-      leafCategories.map(async (leafCat) => {
-        const cells = await client.cell.findMany({
-          where: {
-            categoryId: leafCat.id,
-            isActive: true,
+    const totalLeafCount = leafCategories.length;
+
+    // Reject requests for categories with too many leaf descendants.
+    // The frontend should guide users to a narrower sub-category.
+    if (totalLeafCount > CategoryRepository.MAX_CONSOLIDATED_LEAVES) {
+      throw new CategoryTooManyLeafCategoriesError(
+        totalLeafCount,
+        CategoryRepository.MAX_CONSOLIDATED_LEAVES,
+        category.name,
+      );
+    }
+
+    const activeLeafIds = leafCategories.map(lc => lc.id);
+
+    // --- Batch 1: Fetch all cells for active leaf categories in concurrent chunks ---
+    const cellInclude = {
+      images: {
+        orderBy: [{ isPrimary: 'desc' as const }, { position: 'asc' as const }],
+      },
+      products: {
+        where: { status: 'active' },
+        orderBy: { name: 'asc' as const },
+        include: {
+          images: {
+            orderBy: [{ isPrimary: 'desc' as const }, { sortOrder: 'asc' as const }],
+            take: 1,
           },
-          orderBy: { sortOrder: 'asc' },
-          include: {
-            images: {
-              orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
-            },
-            products: {
-              where: { status: 'active' },
-              orderBy: { name: 'asc' },
-              include: {
-                images: {
-                  orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
-                  take: 1,
-                },
-                variants: {
-                  orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
-              include: {
-                variantImages: {
-                  orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }],
-                  take: 1,
-                },
-                    attributeValues: {
-                      include: {
-                        attribute: true,
-                        option: true,
-                      },
-                    },
-                  },
-                },
-                tableColumns: {
-                  orderBy: { position: 'asc' },
-                  include: {
-                    attribute: true,
-                    unit: true,
-                  },
+          variants: {
+            orderBy: [{ isDefault: 'desc' as const }, { sortOrder: 'asc' as const }],
+            include: {
+              variantImages: {
+                orderBy: [{ isPrimary: 'desc' as const }, { position: 'asc' as const }],
+                take: 1,
+              },
+              attributeValues: {
+                include: {
+                  attribute: true,
+                  option: true,
                 },
               },
             },
           },
-        });
-
-        const filterableAttributes = await client.categoryAttribute.findMany({
-          where: {
-            categoryId: leafCat.id,
-            attribute: { isFilterable: true },
-          },
-          include: {
-            attribute: {
-              include: {
-                options: {
-                  orderBy: { sortOrder: 'asc' },
-                },
-              },
+          tableColumns: {
+            orderBy: { position: 'asc' as const },
+            include: {
+              attribute: true,
+              unit: true,
             },
           },
-        });
+        },
+      },
+    } as const;
 
-        return {
-          id: leafCat.id,
-          name: leafCat.name,
-          slug: leafCat.slug,
-          description: leafCat.description,
-          cells,
-          filterableAttributes,
-        };
-      })
+    // Chunk leaf IDs and fetch cells concurrently with bounded parallelism
+    const chunks: string[][] = [];
+    for (let i = 0; i < activeLeafIds.length; i += CategoryRepository.CELL_BATCH_SIZE) {
+      chunks.push(activeLeafIds.slice(i, i + CategoryRepository.CELL_BATCH_SIZE));
+    }
+
+    const limit = pLimit(CategoryRepository.CELL_QUERY_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunks.map(chunk =>
+        limit(() =>
+          client.cell.findMany({
+            where: {
+              categoryId: { in: chunk },
+              isActive: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+            include: cellInclude,
+          }),
+        ),
+      ),
     );
 
-    // Get all unique filterable attributes across all leaf categories
+    const allCells = chunkResults.flat();
+
+    // Group cells by categoryId
+    const cellsByCategory = new Map<string, any[]>();
+    for (const cell of allCells) {
+      const catId = (cell as any).categoryId;
+      if (!catId) continue;
+      const existing = cellsByCategory.get(catId) || [];
+      existing.push(cell);
+      cellsByCategory.set(catId, existing);
+    }
+
+    // --- Batch 2: Fetch all filterable attributes across all active leaves in one query ---
     const allFilterableAttributes = await client.categoryAttribute.findMany({
       where: {
-        categoryId: {
-          in: leafCategories.map(lc => lc.id),
-        },
+        categoryId: { in: activeLeafIds },
         attribute: { isFilterable: true },
       },
       include: {
@@ -490,7 +552,17 @@ export class CategoryRepository {
       },
     });
 
-    // Deduplicate attributes by attribute ID
+    // Group filterable attributes by categoryId
+    const attrsByCategory = new Map<string, any[]>();
+    for (const attr of allFilterableAttributes) {
+      const catId = (attr as any).categoryId;
+      if (!catId) continue;
+      const existing = attrsByCategory.get(catId) || [];
+      existing.push(attr);
+      attrsByCategory.set(catId, existing);
+    }
+
+    // Deduplicate attributes by attribute ID (for the top-level list)
     const uniqueFilterableAttributes = allFilterableAttributes.reduce((acc: any[], attr: any) => {
       if (!acc.find((a: any) => a.attribute.id === attr.attribute.id)) {
         acc.push(attr);
@@ -498,16 +570,36 @@ export class CategoryRepository {
       return acc;
     }, [] as any[]);
 
+    // Assemble leaf categories with their batched data
+    const leafCategoriesWithCells = leafCategories.map((leafCat) => ({
+      id: leafCat.id,
+      name: leafCat.name,
+      slug: leafCat.slug,
+      description: leafCat.description,
+      cells: cellsByCategory.get(leafCat.id) || [],
+      filterableAttributes: attrsByCategory.get(leafCat.id) || [],
+    }));
+
     return {
       category,
       leafCategories: leafCategoriesWithCells,
       filterableAttributes: uniqueFilterableAttributes,
+      totalLeafCount,
+      isTruncated: false,
     };
   }
 
   async findAggregatedFilterData(categoryId: string): Promise<{
     filterableAttributes: any[];
-    variants: any[];
+    facets: Array<{
+      attributeId: string;
+      optionId?: string;
+      optionLabel?: string;
+      optionValue?: string;
+      variantCount: number;
+      min?: number | null;
+      max?: number | null;
+    }>;
   }> {
     const client = this.getClient();
 
@@ -531,53 +623,20 @@ export class CategoryRepository {
 
     const leafCategoryIds = leafCategories.map((lc) => lc.id);
 
-    const [filterableAttributes, variants] = await Promise.all([
-      client.categoryAttribute.findMany({
-        where: {
-          categoryId: { in: leafCategoryIds },
-          attribute: { isFilterable: true },
-        },
-        include: {
-          attribute: {
-            include: {
-              options: { orderBy: { sortOrder: 'asc' } },
-            },
+    const filterableAttributes = await client.categoryAttribute.findMany({
+      where: {
+        categoryId: { in: leafCategoryIds },
+        attribute: { isFilterable: true },
+      },
+      include: {
+        attribute: {
+          include: {
+            options: { orderBy: { sortOrder: 'asc' } },
           },
         },
-        orderBy: { attribute: { sortOrder: 'asc' } },
-      }),
-      client.productVariant.findMany({
-        where: {
-          product: {
-            status: 'active',
-            cell: { categoryId: { in: leafCategoryIds } },
-          },
-        },
-        select: {
-          id: true,
-          sku: true,
-          price: true,
-          quantity: true,
-          attributeValues: {
-            include: {
-              attribute: true,
-              option: true,
-            },
-          },
-          product: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              cell: {
-                select: { id: true, name: true },
-              },
-            },
-          },
-        },
-        orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
-      }),
-    ]);
+      },
+      orderBy: { attribute: { sortOrder: 'asc' } },
+    });
 
     const uniqueFilterableAttributes = filterableAttributes.reduce(
       (acc: any[], attr: any) => {
@@ -589,9 +648,127 @@ export class CategoryRepository {
       [] as any[],
     );
 
+    const filterableAttributeIds = uniqueFilterableAttributes.map((a: any) => a.attribute.id);
+
+    if (filterableAttributeIds.length === 0) {
+      return { filterableAttributes: uniqueFilterableAttributes, facets: [] };
+    }
+
+    // Option/enum facet counts: COUNT(DISTINCT variant_id) per attribute+option
+    const optionFacets = await this.db.$queryRaw<Array<{
+      attributeId: string;
+      optionId: string;
+      optionLabel: string;
+      optionValue: string;
+      variantCount: number;
+    }>>(Prisma.sql`
+      SELECT
+        av.attribute_id as "attributeId",
+        ao.id as "optionId",
+        ao.label as "optionLabel",
+        ao.value as "optionValue",
+        COUNT(DISTINCT pv.id)::int as "variantCount"
+      FROM product_variants pv
+      JOIN products p ON p.id = pv.product_id
+      JOIN cells c ON c.id = p.cell_id AND c.is_active = true
+      JOIN variant_attribute_values av ON av.variant_id = pv.id
+      JOIN attribute_options ao ON ao.id = av.option_id
+      WHERE p.status = 'active'
+        AND c.category_id = ANY(${leafCategoryIds}::text[])
+        AND av.attribute_id = ANY(${filterableAttributeIds}::text[])
+      GROUP BY av.attribute_id, ao.id, ao.label, ao.value
+      LIMIT 50
+    `);
+
+    // Number range facets: MIN/MAX per attribute
+    const numberFacets = await this.db.$queryRaw<Array<{
+      attributeId: string;
+      min: number | null;
+      max: number | null;
+    }>>(Prisma.sql`
+      SELECT
+        av.attribute_id as "attributeId",
+        MIN(av.number_value) as min,
+        MAX(av.number_value) as max
+      FROM product_variants pv
+      JOIN products p ON p.id = pv.product_id
+      JOIN cells c ON c.id = p.cell_id AND c.is_active = true
+      JOIN variant_attribute_values av ON av.variant_id = pv.id
+      WHERE p.status = 'active'
+        AND c.category_id = ANY(${leafCategoryIds}::text[])
+        AND av.attribute_id = ANY(${filterableAttributeIds}::text[])
+        AND av.number_value IS NOT NULL
+      GROUP BY av.attribute_id
+    `);
+
+    // Boolean facet counts: true/false per boolean attribute
+    const booleanFacets = await this.db.$queryRaw<Array<{
+      attributeId: string;
+      optionId: string;
+      optionLabel: string;
+      optionValue: string;
+      variantCount: number;
+    }>>(Prisma.sql`
+      SELECT
+        av.attribute_id as "attributeId",
+        av.boolean_value::text as "optionId",
+        CASE WHEN av.boolean_value = true THEN 'Yes' ELSE 'No' END as "optionLabel",
+        av.boolean_value::text as "optionValue",
+        COUNT(DISTINCT pv.id)::int as "variantCount"
+      FROM product_variants pv
+      JOIN products p ON p.id = pv.product_id
+      JOIN cells c ON c.id = p.cell_id AND c.is_active = true
+      JOIN variant_attribute_values av ON av.variant_id = pv.id
+      JOIN attribute_definitions a ON a.id = av.attribute_id AND a.data_type = 'boolean'
+      WHERE p.status = 'active'
+        AND c.category_id = ANY(${leafCategoryIds}::text[])
+        AND av.attribute_id = ANY(${filterableAttributeIds}::text[])
+        AND av.boolean_value IS NOT NULL
+      GROUP BY av.attribute_id, av.boolean_value
+    `);
+
+    const facets: Array<{
+      attributeId: string;
+      optionId?: string;
+      optionLabel?: string;
+      optionValue?: string;
+      variantCount: number;
+      min?: number | null;
+      max?: number | null;
+    }> = [];
+
+    for (const row of optionFacets) {
+      facets.push({
+        attributeId: row.attributeId,
+        optionId: row.optionId,
+        optionLabel: row.optionLabel,
+        optionValue: row.optionValue,
+        variantCount: row.variantCount,
+      });
+    }
+
+    for (const row of numberFacets) {
+      facets.push({
+        attributeId: row.attributeId,
+        variantCount: 0,
+        min: row.min,
+        max: row.max,
+      });
+    }
+
+    for (const row of booleanFacets) {
+      facets.push({
+        attributeId: row.attributeId,
+        optionId: row.optionId,
+        optionLabel: row.optionLabel,
+        optionValue: row.optionValue,
+        variantCount: row.variantCount,
+      });
+    }
+
     return {
       filterableAttributes: uniqueFilterableAttributes,
-      variants,
+      facets,
     };
   }
 

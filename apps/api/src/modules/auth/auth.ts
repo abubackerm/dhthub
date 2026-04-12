@@ -19,7 +19,13 @@ export function setAuthEventEmitter(emitter: { emit: (event: string, payload: un
   nestjsEventEmitter = emitter;
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const authPoolMax = parseInt(process.env.DB_AUTH_POOL_MAX || '3', 10);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: authPoolMax,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 

@@ -1,20 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import type {
   LeafFilterableAttributeView,
-  LeafVariantView,
+  FacetStats,
 } from "@/lib/api/catalog/types";
 
 interface FilterData {
   attributes: LeafFilterableAttributeView[];
-  variants: Array<LeafVariantView & {
-    productId: string;
-    productName: string;
-    productSlug: string;
-    cellId: string;
-    cellName: string;
-  }>;
+  facets: Record<string, FacetStats>;
   basePath: string;
 }
 

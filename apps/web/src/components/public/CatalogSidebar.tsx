@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCategoryTree } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
@@ -20,7 +19,7 @@ import { useCallback, useMemo } from "react";
 import type { CategoryTreeNode } from "@/lib/api/catalog/types";
 import type {
   LeafFilterableAttributeView,
-  LeafVariantView,
+  FacetStats,
 } from "@/lib/api/catalog/types";
 
 export function CatalogSidebar() {
@@ -28,7 +27,7 @@ export function CatalogSidebar() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { filterData } = useFilterContext();
-    const { data: categoryTree, isLoading, error } = useCategoryTree();
+    const { data: categoryTree, isLoading, error } = useCategoryTree({ maxDepth: 1 });
 
     const selectedCategory = searchParams.get("category");
 
@@ -44,7 +43,7 @@ export function CatalogSidebar() {
             <aside className="catalog-sidebar">
                 <FilterPanelContent
                     attributes={filterData.attributes}
-                    variants={filterData.variants}
+                    facets={filterData.facets}
                     basePath={filterData.basePath}
                 />
             </aside>
@@ -102,19 +101,11 @@ export function CatalogSidebar() {
 // Simplified FilterPanel component for sidebar use
 function FilterPanelContent({
   attributes,
-  variants,
+  facets,
   basePath,
 }: {
   attributes: LeafFilterableAttributeView[];
-  variants: Array<
-    LeafVariantView & {
-      productId: string;
-      productName: string;
-      productSlug: string;
-      cellId: string;
-      cellName: string;
-    }
-  >;
+  facets: Record<string, FacetStats>;
   basePath: string;
 }) {
   const router = useRouter();
@@ -151,51 +142,28 @@ function FilterPanelContent({
     router.push(basePath);
   }, [router, basePath]);
 
-  // Get value counts for checkbox filters
+  // Get value counts for checkbox filters from facet buckets
   const getValueCounts = useCallback(
-    (attr: LeafFilterableAttributeView) => {
+    (attr: LeafFilterableAttributeView): Record<string, number> => {
+      const stats = facets[attr.id];
+      if (!stats?.buckets) return {};
       const counts: Record<string, number> = {};
-      variants.forEach((variant) => {
-        const av = variant.attributeValues.find((v) => v.attributeId === attr.id);
-        if (av) {
-          let value: string | null = null;
-          if (av.dataType === "enum" && av.optionValue) {
-            value = av.optionValue;
-          } else if (av.dataType === "text" && av.textValue) {
-            value = av.textValue;
-          } else if (av.dataType === "boolean") {
-            value = av.booleanValue ? "true" : "false";
-          } else if (av.dataType === "number" && av.numberValue !== null) {
-            value = String(av.numberValue);
-          }
-          if (value) {
-            counts[value] = (counts[value] || 0) + 1;
-          }
-        }
-      });
+      for (const bucket of stats.buckets) {
+        counts[bucket.value] = bucket.count;
+      }
       return counts;
     },
-    [variants]
+    [facets]
   );
 
-  // Get min/max for range filters
+  // Get min/max for range filters from facet stats
   const getRangeBounds = useCallback(
     (attr: LeafFilterableAttributeView) => {
-      const values = variants
-        .map((v) => {
-          const av = v.attributeValues.find((av) => av.attributeId === attr.id);
-          return av?.numberValue;
-        })
-        .filter((v): v is number => v !== null && !isNaN(v));
-
-      if (values.length === 0) return { min: 0, max: 100 };
-
-      return {
-        min: Math.min(...values),
-        max: Math.max(...values),
-      };
+      const stats = facets[attr.id];
+      if (!stats || stats.min == null || stats.max == null) return { min: 0, max: 100 };
+      return { min: stats.min, max: stats.max };
     },
-    [variants]
+    [facets]
   );
 
   const filterableAttributes = attributes.filter(

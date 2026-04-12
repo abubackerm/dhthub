@@ -18,6 +18,7 @@ export interface CategoryTreeNode extends Category {
   depth: number;
   productCount: number;
   cellCount?: number;
+  hasChildren: boolean;
 }
 
 export interface CreateCategoryInput {
@@ -398,24 +399,26 @@ export interface ConsolidatedLeafPageView {
   };
   leafCategories: LeafCategoryView[];
   filterableAttributes: LeafFilterableAttributeView[];
+  totalLeafCount: number;
+  isTruncated: boolean;
 }
 
-export interface AggregatedFilterVariantView {
-  id: string;
-  sku: string;
-  price: number | null;
-  quantity: number;
-  attributeValues: LeafAttributeValueView[];
-  productId: string;
-  productName: string;
-  productSlug: string;
-  cellId: string;
-  cellName: string;
+export interface FacetBucket {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface FacetStats {
+  attributeId: string;
+  buckets?: FacetBucket[];
+  min?: number | null;
+  max?: number | null;
 }
 
 export interface AggregatedFilterDataView {
   filterableAttributes: LeafFilterableAttributeView[];
-  variants: AggregatedFilterVariantView[];
+  facets: Record<string, FacetStats>;
 }
 
 // ============================================

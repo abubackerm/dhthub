@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BaseService } from '@shared/domain';
 import { CATALOG_EVENTS } from '@shared/events';
@@ -11,6 +12,7 @@ import { CategoryRepository, CategoryWithCells } from '../repositories/category.
 import { CategoryEntity } from '../entities/category.entity';
 import { CategoryCreatedEvent, CategoryUpdatedEvent } from '../events';
 import { StorageService } from '@modules/storage/storage.service';
+import { CacheService, CacheKeyService, CacheInvalidationService, NextJsRevalidationService } from '@core/cache';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -20,6 +22,11 @@ export class CategoryService extends BaseService {
   constructor(
     eventEmitter: EventEmitter2,
     private readonly categoryRepo: CategoryRepository,
+    private readonly configService: ConfigService,
+    private readonly cacheService: CacheService,
+    private readonly cacheKeyService: CacheKeyService,
+    private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly nextJsRevalidation: NextJsRevalidationService,
     @Optional() private readonly storageService?: StorageService,
   ) {
     super(eventEmitter);
@@ -78,6 +85,9 @@ export class CategoryService extends BaseService {
       ),
     );
 
+    await this.invalidateCatalogCache('create');
+    await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-create');
+
     return category;
   }
 
@@ -91,6 +101,13 @@ export class CategoryService extends BaseService {
 
   async findBySlug(slug: string): Promise<CategoryEntity | null> {
     return this.categoryRepo.findBySlug(slug);
+  }
+
+  async findBySlugWithAncestors(slug: string): Promise<{
+    category: CategoryEntity & { _count: { children: number } };
+    ancestors: CategoryEntity[];
+  } | null> {
+    return this.categoryRepo.findBySlugWithAncestors(slug);
   }
 
   async findByPath(path: string): Promise<CategoryEntity | null> {
@@ -129,6 +146,26 @@ export class CategoryService extends BaseService {
     cells: any[];
     filterableAttributes: any[];
   } | null> {
+    const ttl = this.configService.get<number>('cache.ttl.categoryLeaf', 120);
+    return this.cacheService.wrap(
+      this.cacheKeyService.catalogLeaf(slug),
+      () => this._getLeafPageData(slug),
+      ttl,
+    );
+  }
+
+  private async _getLeafPageData(slug: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    cells: any[];
+    filterableAttributes: any[];
+  } | null> {
     const category = await this.categoryRepo.findBySlug(slug);
     if (!category || !category.isActive) {
       return null;
@@ -154,6 +191,37 @@ export class CategoryService extends BaseService {
       filterableAttributes: any[];
     }>;
     filterableAttributes: any[];
+    totalLeafCount: number;
+    isTruncated: boolean;
+  } | null> {
+    const ttl = this.configService.get<number>('cache.ttl.categoryConsolidated', 120);
+    return this.cacheService.wrap(
+      this.cacheKeyService.catalogConsolidated(slug),
+      () => this._getConsolidatedLeafData(slug),
+      ttl,
+    );
+  }
+
+  private async _getConsolidatedLeafData(slug: string): Promise<{
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      path: string;
+      imageUrl: string | null;
+    };
+    leafCategories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      cells: any[];
+      filterableAttributes: any[];
+    }>;
+    filterableAttributes: any[];
+    totalLeafCount: number;
+    isTruncated: boolean;
   } | null> {
     const category = await this.categoryRepo.findBySlug(slug);
     if (!category || !category.isActive) {
@@ -164,7 +232,35 @@ export class CategoryService extends BaseService {
 
   async getAggregatedFilterData(slug: string): Promise<{
     filterableAttributes: any[];
-    variants: any[];
+    facets: Array<{
+      attributeId: string;
+      optionId?: string;
+      optionLabel?: string;
+      optionValue?: string;
+      variantCount: number;
+      min?: number | null;
+      max?: number | null;
+    }>;
+  } | null> {
+    const ttl = this.configService.get<number>('cache.ttl.categoryFilter', 300);
+    return this.cacheService.wrap(
+      this.cacheKeyService.catalogFilter(slug),
+      () => this._getAggregatedFilterData(slug),
+      ttl,
+    );
+  }
+
+  private async _getAggregatedFilterData(slug: string): Promise<{
+    filterableAttributes: any[];
+    facets: Array<{
+      attributeId: string;
+      optionId?: string;
+      optionLabel?: string;
+      optionValue?: string;
+      variantCount: number;
+      min?: number | null;
+      max?: number | null;
+    }>;
   } | null> {
     const category = await this.categoryRepo.findBySlug(slug);
     if (!category || !category.isActive) {
@@ -229,6 +325,9 @@ export class CategoryService extends BaseService {
       new CategoryUpdatedEvent(category.id, changes),
     );
 
+    await this.invalidateCategoryOnUpdate(category, data);
+    await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-update');
+
     return updatedCategory;
   }
 
@@ -278,6 +377,9 @@ export class CategoryService extends BaseService {
       new CategoryUpdatedEvent(category.id, changes),
     );
 
+    await this.invalidateCatalogCache('move');
+    await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-move');
+
     return updatedCategory;
   }
 
@@ -288,9 +390,21 @@ export class CategoryService extends BaseService {
     }
 
     await this.categoryRepo.deleteCascade(id);
+
+    await this.invalidateCatalogCache('delete');
+    await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-delete');
   }
 
   async getTree(): Promise<CategoryEntity[]> {
+    const ttl = this.configService.get<number>('cache.ttl.categoryTree', 300);
+    return this.cacheService.wrap(
+      this.cacheKeyService.catalogTree(),
+      () => this._getTree(),
+      ttl,
+    );
+  }
+
+  private async _getTree(): Promise<CategoryEntity[]> {
     // Fetch all categories with product counts in a single query
     const allCategories = await this.categoryRepo.findAllWithProductCount();
     
@@ -326,6 +440,72 @@ export class CategoryService extends BaseService {
       await this.storageService.deleteFile(storageKey);
     } catch (error) {
       this.logger.warn(`Failed to delete old file from SeaweedFS: ${storageKey}`, error);
+    }
+  }
+
+  /**
+   * Invalidate all catalog cache keys (tree + all slug-scoped endpoints).
+   * Uses distributed lock so only one cluster instance performs the SCAN.
+   * Suitable for create, move, and delete where the impact is broad.
+   */
+  private async invalidateCatalogCache(operation: string): Promise<void> {
+    try {
+      await this.cacheInvalidation.invalidateCatalog(operation);
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate catalog cache after ${operation}`, error);
+    }
+  }
+
+  /**
+   * Targeted invalidation for category updates.
+   * - Always invalidates the tree (structure may change).
+   * - If slug changed, deletes keys for the old slug and the new slug.
+   * - Otherwise, deletes keys scoped to the category's slug.
+   *
+   * Uses direct delMany (no lock) because the key set is small and known.
+   */
+  private async invalidateCategoryOnUpdate(
+    category: CategoryEntity,
+    data: Partial<{
+      name: string;
+      slug: string;
+      description: string | null;
+      imageUrl: string | null;
+      sortOrder: number;
+      isActive: boolean;
+      updatedBy: string;
+      sku: string;
+    }>,
+  ): Promise<void> {
+    try {
+      const keysToDelete: string[] = [this.cacheKeyService.catalogTree()];
+
+      const oldSlug = category.slug;
+      const newSlug = data.slug;
+
+      if (newSlug && newSlug !== oldSlug) {
+        keysToDelete.push(
+          this.cacheKeyService.catalogLeaf(oldSlug),
+          this.cacheKeyService.catalogConsolidated(oldSlug),
+          this.cacheKeyService.catalogFilter(oldSlug),
+          this.cacheKeyService.catalogLeaf(newSlug),
+          this.cacheKeyService.catalogConsolidated(newSlug),
+          this.cacheKeyService.catalogFilter(newSlug),
+        );
+      } else {
+        keysToDelete.push(
+          this.cacheKeyService.catalogLeaf(oldSlug),
+          this.cacheKeyService.catalogConsolidated(oldSlug),
+          this.cacheKeyService.catalogFilter(oldSlug),
+        );
+      }
+
+      await this.cacheInvalidation.invalidateCatalogKeys(
+        keysToDelete,
+        `category-update:${category.id}`,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate catalog cache for category ${category.id}`, error);
     }
   }
 }

@@ -265,45 +265,69 @@ export interface LeafCategoryView {
   filterableAttributes: LeafFilterableAttributeView[];
 }
 
-export interface AggregatedFilterVariantView {
-  id: string;
-  sku: string;
-  price: number | null;
-  quantity: number;
-  attributeValues: LeafAttributeValueView[];
-  productId: string;
-  productName: string;
-  productSlug: string;
-  cellId: string;
-  cellName: string;
+export interface FacetBucket {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface FacetStats {
+  attributeId: string;
+  buckets?: FacetBucket[];
+  min?: number | null;
+  max?: number | null;
 }
 
 export class AggregatedFilterDataView {
   filterableAttributes: LeafFilterableAttributeView[];
-  variants: AggregatedFilterVariantView[];
+  facets: Record<string, FacetStats>;
 
   static fromPrisma(data: {
     filterableAttributes: any[];
-    variants: any[];
+    facets: Array<{
+      attributeId: string;
+      optionId?: string;
+      optionLabel?: string;
+      optionValue?: string;
+      variantCount: number;
+      min?: number | null;
+      max?: number | null;
+    }>;
   }): AggregatedFilterDataView {
     const view = new AggregatedFilterDataView();
     view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
       LeafPageView.mapFilterableAttribute(attr),
     );
-    view.variants = data.variants.map((variant: any) => ({
-      id: variant.id,
-      sku: variant.sku,
-      price: variant.price,
-      quantity: variant.quantity,
-      attributeValues: (variant.attributeValues || []).map((av: any) =>
-        LeafPageView.mapAttributeValue(av),
-      ),
-      productId: variant.product.id,
-      productName: variant.product.name,
-      productSlug: variant.product.slug,
-      cellId: variant.product.cell.id,
-      cellName: variant.product.cell.name,
-    }));
+
+    view.facets = {};
+    for (const row of data.facets) {
+      if (view.facets[row.attributeId] === undefined) {
+        view.facets[row.attributeId] = {
+          attributeId: row.attributeId,
+          min: row.min ?? null,
+          max: row.max ?? null,
+        };
+      }
+      if (row.min !== undefined || row.max !== undefined) {
+        const existing = view.facets[row.attributeId];
+        if (row.min !== undefined && row.min !== null) {
+          existing.min = existing.min == null ? row.min : Math.min(existing.min, row.min);
+        }
+        if (row.max !== undefined && row.max !== null) {
+          existing.max = existing.max == null ? row.max : Math.max(existing.max, row.max);
+        }
+      }
+      if (row.optionId) {
+        const stats = view.facets[row.attributeId];
+        if (!stats.buckets) stats.buckets = [];
+        stats.buckets.push({
+          value: row.optionValue ?? '',
+          label: row.optionLabel ?? '',
+          count: row.variantCount,
+        });
+      }
+    }
+
     return view;
   }
 }
@@ -320,6 +344,8 @@ export class ConsolidatedLeafPageView {
   };
   leafCategories: LeafCategoryView[];
   filterableAttributes: LeafFilterableAttributeView[];
+  totalLeafCount: number;
+  isTruncated: boolean;
 
   static fromPrisma(data: {
     category: {
@@ -333,6 +359,8 @@ export class ConsolidatedLeafPageView {
     };
     leafCategories: any[];
     filterableAttributes: any[];
+    totalLeafCount?: number;
+    isTruncated?: boolean;
   }): ConsolidatedLeafPageView {
     const view = new ConsolidatedLeafPageView();
     view.category = {
@@ -357,6 +385,8 @@ export class ConsolidatedLeafPageView {
     view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
       LeafPageView.mapFilterableAttribute(attr)
     );
+    view.totalLeafCount = data.totalLeafCount ?? data.leafCategories.length;
+    view.isTruncated = data.isTruncated ?? false;
     return view;
   }
 }

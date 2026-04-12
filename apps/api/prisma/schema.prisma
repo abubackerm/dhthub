@@ -256,6 +256,7 @@ model Category {
   @@index([slug])
   @@index([parentId])
   @@index([path])
+  @@index([path, isActive])
   @@index([sku])
   @@map("categories")
 }
@@ -473,6 +474,7 @@ model Cell {
   @@index([slug])
   @@index([sku])
   @@index([categoryId])
+  @@index([categoryId, isActive, sortOrder])
   @@map("cells")
 }
 

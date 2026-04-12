@@ -22,7 +22,7 @@ export function BranchCategoryPage({
 }: BranchCategoryPageProps) {
   const lastSlug = pathSlugs[pathSlugs.length - 1];
   const basePath = `/products/${pathSlugs.join("/")}`;
-  const { data, isLoading } = useAggregatedFilterData(lastSlug);
+  const { data } = useAggregatedFilterData(lastSlug);
   const { setFilterData } = useFilterContext();
 
   const activeChildren = category.children
@@ -34,7 +34,7 @@ export function BranchCategoryPage({
     if (data && data.filterableAttributes && data.filterableAttributes.length > 0) {
       setFilterData({
         attributes: data.filterableAttributes,
-        variants: data.variants,
+        facets: data.facets,
         basePath,
       });
     } else {

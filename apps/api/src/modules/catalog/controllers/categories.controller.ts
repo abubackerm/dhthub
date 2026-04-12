@@ -20,6 +20,7 @@ import {
   CategoryQueryDto,
   CategoryView,
   CategoryTreeView,
+  CategorySlugLookupView,
   LeafPageView,
   ConsolidatedLeafPageView,
   AggregatedFilterDataView,
@@ -63,6 +64,10 @@ export class CategoriesController {
 
     let treeViews = convertToTreeView(entities);
 
+    if (query.maxDepth !== undefined) {
+      treeViews = CategoryTreeView.trimToDepth(treeViews, query.maxDepth);
+    }
+
     if (query.isActive !== undefined && !query.includeInactive) {
       treeViews = filterActiveCategories(treeViews);
     }
@@ -85,6 +90,15 @@ export class CategoriesController {
       leafOnly: leafOnly === 'true',
     });
     return CategoryView.fromEntities(categories);
+  }
+
+  @Get(':slug/lookup')
+  async getLookup(@Param('slug') slug: string): Promise<CategorySlugLookupView> {
+    const data = await this.categoryService.findBySlugWithAncestors(slug);
+    if (!data) {
+      throw new NotFoundException(`Category with slug "${slug}" not found`);
+    }
+    return CategorySlugLookupView.fromData(data.category, data.ancestors);
   }
 
   @Get(':slug/leaf-data')

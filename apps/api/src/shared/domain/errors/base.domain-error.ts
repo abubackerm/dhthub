@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ConflictException, PayloadTooLargeException } from '@nestjs/common';
 
 export abstract class DomainError extends Error {
   constructor(
@@ -42,5 +42,18 @@ export abstract class InvalidOperationError extends DomainError {
 
   toHttpException(): BadRequestException {
     return new BadRequestException(this.message);
+  }
+}
+
+export class PayloadTooLargeError extends DomainError {
+  constructor(message: string, code: string) {
+    super(message, code);
+  }
+
+  toHttpException(): PayloadTooLargeException {
+    return new PayloadTooLargeException({
+      message: this.message,
+      code: this.code,
+    });
   }
 }

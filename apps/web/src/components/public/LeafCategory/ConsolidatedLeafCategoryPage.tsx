@@ -3,20 +3,19 @@
 import React, { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useConsolidatedLeafData } from "@/lib/api/catalog/use-categories";
+import { useConsolidatedLeafData, useAggregatedFilterData, isCategoryTooManyLeavesError, getCategoryTooManyLeavesMessage } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
+import { ApiError } from "@/lib/api/client";
 import type {
-  LeafCellView,
   LeafProductView,
   LeafFilterableAttributeView,
-  LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
 import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MobileFilterToggle } from "./MobileFilterToggle";
 
-import { ChevronRight, Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 
 interface ConsolidatedLeafCategoryPageProps {
@@ -27,76 +26,47 @@ interface ConsolidatedLeafCategoryPageProps {
 
 export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlugs }: ConsolidatedLeafCategoryPageProps) {
   const { data, isLoading, error } = useConsolidatedLeafData(categorySlug);
+  const { data: filterData } = useAggregatedFilterData(categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
-  const { setFilterData } = useFilterContext();
+  const { setFilterData: setFilterContext } = useFilterContext();
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
     path: `/products/${pathSlugs.slice(0, index + 1).join("/")}`,
   }));
 
-  const allVariants = useMemo(() => {
-    if (!data?.leafCategories) return [];
-    const variants: Array<LeafVariantView & {
-      productId: string;
-      productName: string;
-      productSlug: string;
-      productImages: LeafProductView["images"];
-      cellId: string;
-      cellName: string;
-      categoryId: string;
-      categoryName: string;
-    }> = [];
-    data.leafCategories.forEach((leafCat) => {
-      leafCat.cells.forEach((cell) => {
-        cell.products.forEach((product) => {
-          product.variants.forEach((variant) => {
-            variants.push({
-              ...variant,
-              productId: product.id,
-              productName: product.name,
-              productSlug: product.slug,
-              productImages: product.images,
-              cellId: cell.id,
-              cellName: cell.name,
-              categoryId: leafCat.id,
-              categoryName: leafCat.name,
-            });
-          });
-        });
-      });
-    });
-    return variants;
-  }, [data?.leafCategories]);
+  const facets = filterData?.facets ?? {};
+  const filterableAttributes = filterData?.filterableAttributes ?? data?.filterableAttributes ?? [];
 
   // Set filter data in context when data is loaded
   useEffect(() => {
-    if (data && data.filterableAttributes && data.filterableAttributes.length > 0) {
-      setFilterData({
-        attributes: data.filterableAttributes,
-        variants: allVariants,
+    if (filterData && filterData.filterableAttributes.length > 0) {
+      setFilterContext({
+        attributes: filterData.filterableAttributes,
+        facets: filterData.facets,
         basePath,
       });
     } else {
-      setFilterData(null);
+      setFilterContext(null);
     }
 
     // Cleanup when unmounting
-    return () => setFilterData(null);
-  }, [data, allVariants, basePath, setFilterData]);
+    return () => setFilterContext(null);
+  }, [filterData, basePath, setFilterContext]);
 
   const totalVariantCount = useMemo(() => {
     if (!data?.leafCategories) return 0;
-    const variantCount = allVariants.length;
+    let variantCount = 0;
+    data.leafCategories.forEach(lc => lc.cells.forEach(c => c.products.forEach(p => { variantCount += p.variants.length; })));
     if (variantCount > 0) return variantCount;
     let productCount = 0;
     data.leafCategories.forEach(lc => lc.cells.forEach(c => { productCount += c.products.length; }));
     return productCount;
-  }, [data?.leafCategories, allVariants]);
+  }, [data?.leafCategories]);
 
   const filteredLeafCategories = useMemo(() => {
-    if (!data?.leafCategories || !data?.filterableAttributes) return (data?.leafCategories ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    if (!data?.leafCategories || !filterableAttributes) return (data?.leafCategories ?? []).sort((a, b) => a.name.localeCompare(b.name));
 
     const hasActiveFilters = Array.from(searchParams.keys()).length > 0;
     if (!hasActiveFilters) return [...data.leafCategories].sort((a, b) => a.name.localeCompare(b.name));
@@ -112,7 +82,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
                 ...product,
                 _hadVariants: product.variants.length > 0,
                 variants: product.variants.filter((variant) => {
-                  return data.filterableAttributes.every((attr) => {
+                  return filterableAttributes.every((attr) => {
                     const attrValue = getAttributeValue(variant.attributeValues, attr.id);
                     if (attrValue === null) return true;
                     if (attr.filterType === "RANGE") {
@@ -138,18 +108,32 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
       }))
       .filter((leafCat) => leafCat.cells.length > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [data?.leafCategories, data?.filterableAttributes, searchParams]);
+  }, [data?.leafCategories, filterableAttributes, searchParams]);
 
   if (isLoading) {
     return <ConsolidatedLeafCategoryPageSkeleton />;
   }
   if (error || !data) {
+    const tooManyLeaves = isCategoryTooManyLeavesError(error);
+    const tooManyMessage = error instanceof ApiError ? getCategoryTooManyLeavesMessage(error) : undefined;
     return (
       <div className="catalog-page">
         <div className="text-center py-16">
-          <p className="text-muted-foreground text-lg">
-            Unable to load category data. Please try again later.
-          </p>
+          {tooManyLeaves ? (
+            <div className="mx-auto max-w-lg rounded-lg border border-amber-300 bg-amber-50 px-6 py-8">
+              <p className="text-amber-800 text-lg font-medium mb-2">Category too broad</p>
+              <p className="text-amber-700 text-sm">{tooManyMessage || 'This category has too many sub-categories to display together. Navigate to a specific sub-category from the sidebar or breadcrumb.'}</p>
+              <Link href="/products" className="text-(--dht-red) hover:underline mt-4 inline-block text-sm">
+                Browse all categories
+              </Link>
+            </div>
+          ) : (
+            <>
+              <p className="text-muted-foreground text-lg">
+                Unable to load category data. Please try again later.
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -158,11 +142,11 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
   return (
     <div className="catalog-page">
       {/* Mobile Filter */}
-      {data.filterableAttributes.length > 0 && (
+      {filterableAttributes.length > 0 && (
         <div className="lg:hidden mb-4">
           <MobileFilterToggle
-            attributes={data.filterableAttributes}
-            variants={allVariants}
+            attributes={filterableAttributes}
+            facets={facets}
             basePath={basePath}
           />
         </div>
@@ -278,7 +262,7 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
                   <ProductSection
                     key={product.id}
                     product={product}
-                    filterableAttributes={data.filterableAttributes}
+                    filterableAttributes={filterableAttributes}
                     basePath={basePath}
                     leafSlug={leafCat.slug}
                   />

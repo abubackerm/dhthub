@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { CatalogModule } from '@modules/catalog';
@@ -21,10 +20,6 @@ import { MeiliClient } from './meilisearch/meili.client';
   imports: [
     ConfigModule,
     EventEmitterModule.forRoot(),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 60,
-    }]),
     DatabaseModule,
     CoreCacheModule,
     CatalogModule,

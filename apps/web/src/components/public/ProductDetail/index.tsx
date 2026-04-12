@@ -26,13 +26,13 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import type { ProductDetailView, CategoryTreeNode } from "@/lib/api/catalog/types";
+import type { ProductDetailView, Category } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
 import { useRequireAuth } from "@/providers/auth-provider";
 
 interface ProductDetailProps {
   product: ProductDetailView;
-  category: CategoryTreeNode | null;
+  category: Category | null;
   pathNames: string[];
   pathSlugs: string[];
 }

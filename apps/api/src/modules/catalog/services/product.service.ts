@@ -30,6 +30,7 @@ import {
 import { VariantAttributeService } from '@modules/catalog-attributes/services/variant-attribute.service';
 import { CellRepository } from '@modules/cell';
 import { StorageService } from '@modules/storage/storage.service';
+import { CacheService, CacheKeyService, NextJsRevalidationService } from '@core/cache';
 
 interface AttributeValue {
   attributeId: string;
@@ -74,6 +75,9 @@ export class ProductService extends BaseService {
     private readonly imageRepo: ProductImageRepository,
     private readonly variantImageRepo: VariantImageRepository,
     private readonly configService: ConfigService,
+    private readonly cacheService: CacheService,
+    private readonly cacheKeyService: CacheKeyService,
+    private readonly nextJsRevalidation: NextJsRevalidationService,
     @Optional() private readonly variantAttributeService?: VariantAttributeService,
     @Optional() private readonly cellRepo?: CellRepository,
     @Optional() private readonly storageService?: StorageService,
@@ -155,6 +159,8 @@ export class ProductService extends BaseService {
       ),
     );
 
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-create:${product.id}`);
+
     return product;
   }
 
@@ -175,6 +181,63 @@ export class ProductService extends BaseService {
   }
 
   async findBySlugWithDetails(slug: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    type: string;
+    status: string;
+    price: number | null;
+    compareAtPrice: number | null;
+    currency: string;
+    quantity: number;
+    isFeatured: boolean;
+    cell: {
+      id: string;
+      name: string;
+      slug: string;
+      category: {
+        id: string;
+        name: string;
+        slug: string;
+        path: string;
+      };
+    } | null;
+    variants: {
+      id: string;
+      sku: string;
+      name: string;
+      price: number | null;
+      compareAtPrice: number | null;
+      quantity: number;
+      isDefault: boolean;
+      sortOrder: number;
+      images: { url: string; altText: string | null; isPrimary: boolean }[];
+      attributeValues: {
+        id: string;
+        numberValue: number | null;
+        textValue: string | null;
+        booleanValue: boolean | null;
+        attribute: {
+          id: string;
+          name: string;
+          slug: string;
+          dataType: string;
+        };
+        option: { id: string; label: string; value: string } | null;
+      }[];
+    }[];
+    images: { url: string; altText: string | null; isPrimary: boolean }[];
+  } | null> {
+    const ttl = this.configService.get<number>('cache.ttl.productSlug', 120);
+    return this.cacheService.wrap(
+      this.cacheKeyService.productSlug(slug),
+      () => this._findBySlugWithDetails(slug),
+      ttl,
+    );
+  }
+
+  private async _findBySlugWithDetails(slug: string): Promise<{
     id: string;
     name: string;
     slug: string;
@@ -282,6 +345,10 @@ export class ProductService extends BaseService {
       new ProductUpdatedEvent(product.id, changes),
     );
 
+    await this.invalidateProductOnUpdate(product, data);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-update:${product.id}`);
+
     return updatedProduct;
   }
 
@@ -334,6 +401,10 @@ export class ProductService extends BaseService {
       new ProductUpdatedEvent(product.id, changes),
     );
 
+    await this.invalidateProductOnUpdate(product, data);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-update:${product.id}`);
+
     return updatedProduct;
   }
 
@@ -368,6 +439,10 @@ export class ProductService extends BaseService {
       );
     }
 
+    await this.invalidateProductSlugs(products.map(p => p.slug));
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-bulk-update:${products.length}`);
+
     return { updatedCount };
   }
 
@@ -400,6 +475,10 @@ export class ProductService extends BaseService {
       CATALOG_EVENTS.PRODUCT_STATUS_CHANGED,
       new ProductStatusChangedEvent(product.id, oldStatus, newStatus),
     );
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-status:${product.id}`);
 
     return updatedProduct;
   }
@@ -481,6 +560,10 @@ export class ProductService extends BaseService {
         variant.name,
       ),
     );
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-add:${variant.id}`);
 
     return variant;
   }
@@ -587,6 +670,10 @@ export class ProductService extends BaseService {
       );
     }
 
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-update:${variant.id}`);
+
     return updatedVariant;
   }
 
@@ -614,6 +701,10 @@ export class ProductService extends BaseService {
       CATALOG_EVENTS.PRODUCT_VARIANT_DELETED,
       new ProductVariantDeletedEvent(variant.id, variant.productId),
     );
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-delete:${variant.id}`);
   }
 
   async delete(id: string): Promise<void> {
@@ -630,6 +721,10 @@ export class ProductService extends BaseService {
     }
 
     await this.productRepo.delete(id);
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `product-delete:${product.id}`);
   }
 
   async findAllPaginated(options: {
@@ -707,7 +802,7 @@ export class ProductService extends BaseService {
     const existingImages = await this.variantImageRepo.findByVariantId(variantId);
     const nextPosition = sortOrder ?? existingImages.length + 1;
 
-    return this.variantImageRepo.create({
+    const image = await this.variantImageRepo.create({
       variantId,
       sku: variant.sku,
       storagePath: url,
@@ -715,6 +810,12 @@ export class ProductService extends BaseService {
       position: nextPosition,
       isPrimary: false,
     });
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-image-add:${image.id}`);
+
+    return image;
   }
 
   async updateImage(
@@ -744,7 +845,17 @@ export class ProductService extends BaseService {
     if (data.sortOrder !== undefined) updateData.position = data.sortOrder;
     if (data.isPrimary !== undefined) updateData.isPrimary = data.isPrimary;
 
-    return this.variantImageRepo.update(imageId, updateData);
+    const updatedImage = await this.variantImageRepo.update(imageId, updateData);
+
+    // Invalidate product slug cache since image data is part of PDP
+    const variant = await this.variantRepo.findById(image.variantId);
+    if (variant) {
+      await this.invalidateProductSlugByProductId(variant.productId);
+    }
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-image-update:${imageId}`);
+
+    return updatedImage;
   }
 
   async removeImage(imageId: string): Promise<void> {
@@ -753,6 +864,12 @@ export class ProductService extends BaseService {
       await this.deleteStorageFile(image.storagePath);
     }
     await this.variantImageRepo.delete(imageId);
+
+    if (image) {
+      await this.invalidateProductSlugByProductId(image.variantId);
+    }
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-image-remove:${imageId}`);
   }
 
   async getVariantImages(variantId: string): Promise<any[]> {
@@ -793,6 +910,10 @@ export class ProductService extends BaseService {
     }
 
     await this.variantImageRepo.reorderPositions(variantId, imageIds);
+
+    await this.invalidateProductSlug(product.slug);
+
+    await this.nextJsRevalidation.revalidateTags(['product'], `variant-images-reorder:${variantId}`);
   }
 
   /**
@@ -978,6 +1099,91 @@ export class ProductService extends BaseService {
       await this.storageService.deleteFile(storageKey);
     } catch (error) {
       this.logger.warn(`Failed to delete old file from SeaweedFS: ${storageKey}`, error);
+    }
+  }
+
+  /**
+   * Invalidate product cache on update, handling slug rename.
+   * When slug changes, the old slug's cached key must be deleted before
+   * the new slug gets cached on next read — otherwise stale PDP JSON
+   * is served at the old URL until TTL expires.
+   */
+  private async invalidateProductOnUpdate(
+    product: ProductEntity,
+    data: Partial<{
+      sku: string | null;
+      name: string;
+      slug: string;
+      description: string | null;
+      type: ProductType;
+      status: ProductStatus;
+      price: number | null;
+      compareAtPrice: number | null;
+      costPrice: number | null;
+      currency: string;
+      quantity: number;
+      cellId: string | null;
+      isFeatured: boolean;
+      thumbnailUrl: string | null;
+      metadata: Record<string, unknown> | null;
+      updatedBy: string;
+    }>,
+  ): Promise<void> {
+    try {
+      const keysToDelete: string[] = [];
+
+      keysToDelete.push(this.cacheKeyService.productSlug(product.slug));
+
+      if (data.slug && data.slug !== product.slug) {
+        // Slug renamed: also delete the new slug key in case it was pre-cached
+        keysToDelete.push(this.cacheKeyService.productSlug(data.slug));
+      }
+
+      await this.cacheService.delMany(keysToDelete);
+      this.logger.debug(`Product cache invalidated for product ${product.id} (slug: ${product.slug})`);
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate product cache for product ${product.id}`, error);
+    }
+  }
+
+  /**
+   * Invalidate cached product detail by slug.
+   */
+  private async invalidateProductSlug(slug: string): Promise<void> {
+    try {
+      await this.cacheService.del(this.cacheKeyService.productSlug(slug));
+      this.logger.debug(`Product cache invalidated for slug: ${slug}`);
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate product cache for slug: ${slug}`, error);
+    }
+  }
+
+  /**
+   * Invalidate cached product detail for multiple slugs in one pipeline.
+   */
+  private async invalidateProductSlugs(slugs: string[]): Promise<void> {
+    if (slugs.length === 0) return;
+    try {
+      const keys = slugs.map(slug => this.cacheKeyService.productSlug(slug));
+      await this.cacheService.delMany(keys);
+      this.logger.debug(`Product cache invalidated for ${slugs.length} slug(s)`);
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate product cache for bulk slugs`, error);
+    }
+  }
+
+  /**
+   * Invalidate product cache by looking up the product slug from productId.
+   * Used by image methods that have variantId but not the product slug directly.
+   */
+  private async invalidateProductSlugByProductId(productId: string): Promise<void> {
+    try {
+      const product = await this.productRepo.findById(productId);
+      if (product) {
+        await this.invalidateProductSlug(product.slug);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to invalidate product cache for productId: ${productId}`, error);
     }
   }
 }

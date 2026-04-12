@@ -3,14 +3,12 @@
 import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useLeafPageData } from "@/lib/api/catalog/use-categories";
+import { useLeafPageData, useAggregatedFilterData } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
 import type {
-  LeafPageView,
   LeafCellView,
   LeafProductView,
   LeafFilterableAttributeView,
-  LeafVariantView,
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
 import { CellProductTable } from "./CellProductTable";
@@ -29,58 +27,42 @@ interface LeafCategoryPageProps {
 
 export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCategoryPageProps) {
   const { data, isLoading, error } = useLeafPageData(categorySlug);
+  const { data: filterData } = useAggregatedFilterData(categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
-  const { setFilterData } = useFilterContext();
+  const { setFilterData: setFilterContext } = useFilterContext();
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
     path: `/products/${pathSlugs.slice(0, index + 1).join("/")}`,
   }));
 
-  const allVariants = useMemo(() => {
-    if (!data) return [];
-    const variants: Array<LeafVariantView & { productId: string; productName: string; productSlug: string; cellId: string; cellName: string }> = [];
-    data.cells.forEach((cell) => {
-      cell.products.forEach((product) => {
-        product.variants.forEach((variant) => {
-          variants.push({
-            ...variant,
-            productId: product.id,
-            productName: product.name,
-            productSlug: product.slug,
-            cellId: cell.id,
-            cellName: cell.name,
-          });
-        });
-      });
-    });
-    return variants;
-  }, [data]);
+  const facets = filterData?.facets ?? {};
+  const filterableAttributes = filterData?.filterableAttributes ?? data?.filterableAttributes ?? [];
 
   // Set filter data in context when data is loaded
   useEffect(() => {
-    if (data && data.filterableAttributes.length > 0) {
-      setFilterData({
-        attributes: data.filterableAttributes,
-        variants: allVariants,
+    if (filterData && filterData.filterableAttributes.length > 0) {
+      setFilterContext({
+        attributes: filterData.filterableAttributes,
+        facets: filterData.facets,
         basePath,
       });
     } else {
-      setFilterData(null);
+      setFilterContext(null);
     }
 
     // Cleanup when unmounting
-    return () => setFilterData(null);
-  }, [data, allVariants, basePath, setFilterData]);
+    return () => setFilterContext(null);
+  }, [filterData, basePath, setFilterContext]);
 
   const totalVariantCount = useMemo(() => {
     if (!data) return 0;
-    const variantCount = allVariants.length;
+    let variantCount = 0;
+    data.cells.forEach((c) => c.products.forEach((p) => { variantCount += p.variants.length; }));
     if (variantCount > 0) return variantCount;
-    const productCount = data.cells.reduce((sum, c) => sum + c.products.length, 0);
-    return productCount;
-  }, [data, allVariants]);
+    return data.cells.reduce((sum, c) => sum + c.products.length, 0);
+  }, [data]);
 
   const filteredCells = useMemo(() => {
     if (!data) return [];
@@ -93,7 +75,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
         ...product,
         _hadVariants: product.variants.length > 0,
         variants: product.variants.filter((variant) => {
-          return data.filterableAttributes.every((attr) => {
+          return filterableAttributes.every((attr) => {
             const attrValue = getAttributeValue(variant.attributeValues, attr.id);
             if (attrValue === null) return true;
             if (attr.filterType === "RANGE") {
@@ -114,7 +96,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
         }),
       })).filter((product) => product.variants.length > 0 || !product._hadVariants),
     })).filter((cell) => cell.products.length > 0);
-  }, [data, searchParams]);
+  }, [data, filterableAttributes, searchParams]);
 
   if (isLoading) {
     return <LeafCategoryPageSkeleton />;
@@ -164,11 +146,11 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
       </p>
 
       {/* Mobile Filter */}
-      {data.filterableAttributes.length > 0 && (
+      {filterableAttributes.length > 0 && (
         <div className="lg:hidden mb-4">
           <MobileFilterToggle
-            attributes={data.filterableAttributes}
-            variants={allVariants}
+            attributes={filterableAttributes}
+            facets={facets}
             basePath={basePath}
           />
         </div>
@@ -190,7 +172,7 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
             key={cell.id}
             cell={cell}
             basePath={basePath}
-            filterableAttributes={data.filterableAttributes}
+            filterableAttributes={filterableAttributes}
           />
         ))}
       </div>

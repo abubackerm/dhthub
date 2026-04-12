@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsInt, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CategoryQueryDto {
@@ -15,4 +15,10 @@ export class CategoryQueryDto {
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   includeInactive?: boolean;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  @Transform(({ value }) => value !== undefined && value !== null ? parseInt(value, 10) : undefined)
+  maxDepth?: number;
 }

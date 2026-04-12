@@ -25,6 +25,7 @@
     "@aws-sdk/client-s3": "^3.1026.0",
     "@aws-sdk/lib-storage": "^3.1026.0",
     "@azure/msal-node": "^5.1.2",
+    "@fastify/compress": "^8.3.1",
     "@fastify/multipart": "^9.0.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.0",

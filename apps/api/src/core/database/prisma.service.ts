@@ -12,14 +12,20 @@ export class PrismaService
 
   constructor() {
     const connectionString = process.env.DATABASE_URL;
-    const pool = new Pool({ connectionString });
+    const poolMax = parseInt(process.env.DB_POOL_MAX || '5', 10);
+    const pool = new Pool({
+      connectionString,
+      max: poolMax,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
     const adapter = new PrismaPg(pool);
 
     super({
       adapter,
       log:
         process.env.NODE_ENV === 'development'
-          ? ['error', 'warn'] // Only show errors and warnings in development
+          ? ['error', 'warn']
           : ['error'],
     });
 

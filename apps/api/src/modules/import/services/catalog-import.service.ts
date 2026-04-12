@@ -10,6 +10,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImageImportService } from './image-import.service';
 import { createHash } from 'crypto';
 import { StorageService } from '../../storage/storage.service';
+import { CacheInvalidationService } from '@core/cache';
+import { NextJsRevalidationService } from '@core/cache';
 
 const SYSTEM_FIELDS = ['product_sku', 'sku', 'price', 'stock'];
 
@@ -92,6 +94,8 @@ export class CatalogImportService {
     private readonly eventEmitter: EventEmitter2,
     private readonly imageImportService: ImageImportService,
     private readonly storageService: StorageService,
+    private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly nextJsRevalidation: NextJsRevalidationService,
   ) {}
 
   private async updateJobProgress(
@@ -178,6 +182,10 @@ export class CatalogImportService {
 
       await this.importJobService.markAsCompleted(jobId);
       this.logger.log(`Catalog import job ${jobId} completed: ${variantResult.success} success, ${variantResult.failed} failed out of ${variantResult.processed} variants processed`);
+
+      // Invalidate Redis caches and trigger Next.js ISR revalidation
+      await this.cacheInvalidation.invalidateAll('catalog-import-complete');
+      await this.nextJsRevalidation.revalidateTags(['catalog', 'product'], 'catalog-import');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Catalog import job ${jobId} failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);

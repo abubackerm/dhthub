@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { serverFetch } from '../server-fetch';
 import type {
   Category,
   CategoryTreeNode,
@@ -9,12 +10,48 @@ import type {
   AggregatedFilterDataView,
 } from './types';
 
+export const CACHE_TAG_CATALOG = 'catalog';
+
 export async function getCategories(): Promise<Category[]> {
   return apiClient.get<Category[]>('/v1/catalog/categories');
 }
 
-export async function getCategoryTree(): Promise<CategoryTreeNode[]> {
-  return apiClient.get<CategoryTreeNode[]>('/v1/catalog/categories/tree');
+export async function getCategoryTree(options?: { maxDepth?: number }): Promise<CategoryTreeNode[]> {
+  const params = new URLSearchParams();
+  if (options?.maxDepth !== undefined) {
+    params.set('maxDepth', String(options.maxDepth));
+  }
+  const qs = params.toString();
+  const url = `/v1/catalog/categories/tree${qs ? `?${qs}` : ''}`;
+  return apiClient.get<CategoryTreeNode[]>(url);
+}
+
+export interface CategorySlugLookupResult {
+  category: Category;
+  ancestors: Category[];
+  hasChildren: boolean;
+}
+
+export async function getCategoryBySlugLookup(slug: string): Promise<CategorySlugLookupResult> {
+  return apiClient.get<CategorySlugLookupResult>(`/v1/catalog/categories/${slug}/lookup`);
+}
+
+export async function getServerCategoryBySlugLookup(slug: string): Promise<CategorySlugLookupResult> {
+  return serverFetch<CategorySlugLookupResult>(`/v1/catalog/categories/${slug}/lookup`, {
+    tags: [CACHE_TAG_CATALOG],
+  });
+}
+
+export async function getServerCategoryTree(options?: { maxDepth?: number }): Promise<CategoryTreeNode[]> {
+  const params = new URLSearchParams();
+  if (options?.maxDepth !== undefined) {
+    params.set('maxDepth', String(options.maxDepth));
+  }
+  const qs = params.toString();
+  const url = `/v1/catalog/categories/tree${qs ? `?${qs}` : ''}`;
+  return serverFetch<CategoryTreeNode[]>(url, {
+    tags: [CACHE_TAG_CATALOG],
+  });
 }
 
 export async function getCategoryById(id: string): Promise<Category> {

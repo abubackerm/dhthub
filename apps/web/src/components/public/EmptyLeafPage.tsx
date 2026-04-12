@@ -4,10 +4,10 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useAggregatedFilterData } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
-import type { CategoryTreeNode } from "@/lib/api/catalog/types";
+import type { Category } from "@/lib/api/catalog/types";
 
 interface EmptyLeafPageProps {
-  category: CategoryTreeNode;
+  category: Category;
   pathNames: string[];
   pathSlugs: string[];
 }
@@ -26,7 +26,7 @@ export function EmptyLeafPage({
     if (data && data.filterableAttributes && data.filterableAttributes.length > 0) {
       setFilterData({
         attributes: data.filterableAttributes,
-        variants: data.variants,
+        facets: data.facets,
         basePath,
       });
     } else {

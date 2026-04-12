@@ -6,6 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import multipart from '@fastify/multipart';
+import fastifyCompress from '@fastify/compress';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter, LoggingInterceptor } from '@shared/infrastructure';
 import { auth, setAuthEventEmitter } from './modules/auth/auth';
@@ -25,6 +26,11 @@ async function bootstrap() {
     limits: {
       fileSize: 200 * 1024 * 1024, // 200MB
     },
+  });
+
+  await fastify.register(fastifyCompress, {
+    global: true,
+    threshold: 1024,
   });
 
   fastify.route({

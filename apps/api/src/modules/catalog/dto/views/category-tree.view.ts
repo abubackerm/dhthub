@@ -6,6 +6,7 @@ export class CategoryTreeView extends CategoryView {
   depth: number;
   productCount: number;
   cellCount: number;
+  hasChildren: boolean;
 
   static fromEntity(
     entity: CategoryEntity & { _count?: { products?: number; cells?: number } },
@@ -22,7 +23,7 @@ export class CategoryTreeView extends CategoryView {
     view.path = entity.path;
     view.sortOrder = entity.sortOrder;
     view.isActive = entity.isActive;
-    
+
     // Normalize imageUrl if present
     view.imageUrl = entity.imageUrl || null;
     if (view.imageUrl && view.imageUrl.startsWith('http')) {
@@ -38,6 +39,26 @@ export class CategoryTreeView extends CategoryView {
     view.depth = depth;
     view.productCount = entity._count?.products ?? 0;
     view.cellCount = entity._count?.cells ?? 0;
+    view.hasChildren = children.length > 0;
     return view;
+  }
+
+  static trimToDepth(nodes: CategoryTreeView[], maxDepth: number): CategoryTreeView[] {
+    if (maxDepth < 0) return [];
+
+    return nodes.map((node) => {
+      if (node.depth >= maxDepth) {
+        const trimmed = new CategoryTreeView();
+        Object.assign(trimmed, node);
+        trimmed.children = [];
+        trimmed.hasChildren = node.children.length > 0;
+        return trimmed;
+      }
+      return {
+        ...node,
+        children: CategoryTreeView.trimToDepth(node.children, maxDepth),
+        hasChildren: node.children.length > 0,
+      };
+    });
   }
 }

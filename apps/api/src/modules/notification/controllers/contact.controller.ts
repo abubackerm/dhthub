@@ -1,12 +1,11 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import axios from 'axios';
 import { EmailService } from '../services/email.service';
 import { SendContactEmailDto } from '../dto';
 
 @Controller('contact')
-@UseGuards(ThrottlerGuard)
 export class ContactController {
   private readonly logger = new Logger(ContactController.name);
 

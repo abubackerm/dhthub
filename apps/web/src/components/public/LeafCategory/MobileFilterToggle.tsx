@@ -21,27 +21,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { X } from "lucide-react";
 import type {
   LeafFilterableAttributeView,
-  LeafVariantView,
+  FacetStats,
 } from "@/lib/api/catalog/types";
 
 interface MobileFilterToggleProps {
   attributes: LeafFilterableAttributeView[];
-  variants: Array<
-    LeafVariantView & {
-      productId: string;
-      productName: string;
-      productSlug: string;
-      cellId: string;
-      cellName: string;
-    }
-  >;
+  facets: Record<string, FacetStats>;
   basePath: string;
 }
 
-export function MobileFilterToggle({ attributes, variants, basePath }: MobileFilterToggleProps) {
+export function MobileFilterToggle({ attributes, facets, basePath }: MobileFilterToggleProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
@@ -130,17 +121,16 @@ export function MobileFilterToggle({ attributes, variants, basePath }: MobileFil
                   {attr.filterType === "RANGE" && (
                     <RangeFilter
                       attr={attr}
-                      variants={variants}
+                      facets={facets}
                       searchParams={searchParams}
                       basePath={basePath}
                       router={router}
-                      onClose={() => setIsOpen(false)}
                     />
                   )}
                   {(attr.filterType === "CHECKBOX" || attr.filterType === "SELECT") && (
                     <CheckboxFilter
                       attr={attr}
-                      variants={variants}
+                      facets={facets}
                       searchParams={searchParams}
                       basePath={basePath}
                       router={router}
@@ -160,37 +150,25 @@ export function MobileFilterToggle({ attributes, variants, basePath }: MobileFil
 // Range Filter Component
 function RangeFilter({
   attr,
-  variants,
+  facets,
   searchParams,
   basePath,
   router,
-  onClose,
 }: {
   attr: LeafFilterableAttributeView;
-  variants: MobileFilterToggleProps["variants"];
+  facets: Record<string, FacetStats>;
   searchParams: URLSearchParams;
   basePath: string;
   router: ReturnType<typeof useRouter>;
-  onClose: () => void;
 }) {
   const currentMin = searchParams.get(`${attr.slug}_min`) || "";
   const currentMax = searchParams.get(`${attr.slug}_max`) || "";
 
   const bounds = useMemo(() => {
-    const values = variants
-      .map((v) => {
-        const av = v.attributeValues.find((av) => av.attributeId === attr.id);
-        return av?.numberValue;
-      })
-      .filter((v): v is number => v !== null && !isNaN(v));
-
-    if (values.length === 0) return { min: 0, max: 100 };
-
-    return {
-      min: Math.min(...values),
-      max: Math.max(...values),
-    };
-  }, [variants, attr.id]);
+    const stats = facets[attr.id];
+    if (!stats || stats.min == null || stats.max == null) return { min: 0, max: 100 };
+    return { min: stats.min, max: stats.max };
+  }, [facets, attr.id]);
 
   const updateFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -239,14 +217,14 @@ function RangeFilter({
 // Checkbox Filter Component
 function CheckboxFilter({
   attr,
-  variants,
+  facets,
   searchParams,
   basePath,
   router,
   onClose,
 }: {
   attr: LeafFilterableAttributeView;
-  variants: MobileFilterToggleProps["variants"];
+  facets: Record<string, FacetStats>;
   searchParams: URLSearchParams;
   basePath: string;
   router: ReturnType<typeof useRouter>;
@@ -255,27 +233,14 @@ function CheckboxFilter({
   const selectedValues = searchParams.getAll(attr.slug);
 
   const valueCounts = useMemo(() => {
+    const stats = facets[attr.id];
+    if (!stats?.buckets) return {};
     const counts: Record<string, number> = {};
-    variants.forEach((variant) => {
-      const av = variant.attributeValues.find((v) => v.attributeId === attr.id);
-      if (av) {
-        let value: string | null = null;
-        if (av.dataType === "enum" && av.optionValue) {
-          value = av.optionValue;
-        } else if (av.dataType === "text" && av.textValue) {
-          value = av.textValue;
-        } else if (av.dataType === "boolean") {
-          value = av.booleanValue ? "true" : "false";
-        } else if (av.dataType === "number" && av.numberValue !== null) {
-          value = String(av.numberValue);
-        }
-        if (value) {
-          counts[value] = (counts[value] || 0) + 1;
-        }
-      }
-    });
+    for (const bucket of stats.buckets) {
+      counts[bucket.value] = bucket.count;
+    }
     return counts;
-  }, [variants, attr.id]);
+  }, [facets, attr.id]);
 
   const toggleValue = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());

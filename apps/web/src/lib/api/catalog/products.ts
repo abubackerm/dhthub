@@ -1,4 +1,5 @@
 import { apiClient } from '../client';
+import { serverFetch } from '../server-fetch';
 import type {
   BulkUpdateProductInput,
   BulkUpdateResult,
@@ -52,8 +53,16 @@ export async function getProductBySku(sku: string): Promise<ProductView> {
   return apiClient.get<ProductView>(`/v1/catalog/products/by-sku/${sku}`);
 }
 
+export const CACHE_TAG_PRODUCT = 'product';
+
 export async function getProductBySlug(slug: string): Promise<ProductDetailView> {
   return apiClient.get<ProductDetailView>(`/v1/catalog/products/by-slug/${slug}`);
+}
+
+export async function getServerProductBySlug(slug: string): Promise<ProductDetailView> {
+  return serverFetch<ProductDetailView>(`/v1/catalog/products/by-slug/${slug}`, {
+    tags: [CACHE_TAG_PRODUCT],
+  });
 }
 
 export async function createProduct(data: CreateProductInput): Promise<ProductView> {

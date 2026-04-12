@@ -8,7 +8,7 @@ import { getCategoryIconName } from "@/lib/utils/category-icon-map";
 import { useSearchParams, useRouter } from "next/navigation";
 
 export default function ProductsPage() {
-  const { data: categories = [], isLoading } = useCategoryTree();
+  const { data: categories = [], isLoading } = useCategoryTree({ maxDepth: 1 });
   const searchParams = useSearchParams();
   const router = useRouter();
 

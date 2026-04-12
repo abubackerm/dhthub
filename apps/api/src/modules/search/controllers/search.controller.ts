@@ -1,5 +1,4 @@
-import { Controller, Get, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Controller, Get, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { SearchQueryDto } from '../dto';
 import { IndexHealthView } from '../dto';
 import { SearchService } from '../services/search.service';
@@ -7,7 +6,6 @@ import { IndexerService } from '../services/indexer.service';
 import { SearchIndexNotFoundError } from '../domain/errors/search.errors';
 
 @Controller('search')
-@UseGuards(ThrottlerGuard)
 export class SearchController {
   constructor(
     private readonly searchService: SearchService,

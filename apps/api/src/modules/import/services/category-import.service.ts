@@ -8,6 +8,8 @@ import { CategoryRepository } from '../../catalog/repositories/category.reposito
 import { CellRepository } from '../../cell/repositories/cell.repository';
 import { randomBytes } from 'crypto';
 import * as fs from 'fs';
+import { CacheInvalidationService } from '@core/cache';
+import { NextJsRevalidationService } from '@core/cache';
 
 export interface CategoryImportResult {
   categoriesCreated: number;
@@ -51,6 +53,8 @@ export class CategoryImportService {
     private readonly importErrorRepository: ImportErrorRepository,
     private readonly categoryRepo: CategoryRepository,
     private readonly cellRepo: CellRepository,
+    private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly nextJsRevalidation: NextJsRevalidationService,
   ) {}
 
   private generateSKU(prefix: string = 'CG'): string {
@@ -299,6 +303,10 @@ export class CategoryImportService {
         `Category CREATE import completed: ${result.categoriesCreated} categories created, ${result.skippedRows} skipped, ${result.failedRows} errors`,
       );
 
+      // Invalidate Redis caches and trigger Next.js ISR revalidation
+      await this.cacheInvalidation.invalidateCatalog('category-import-create');
+      await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-import-create');
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Category CREATE import failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
@@ -529,6 +537,10 @@ export class CategoryImportService {
         `Category UPDATE import completed: ${result.categoriesCreated} categories, ${result.cellsCreated} cells created, ${result.skippedRows} skipped, ${result.failedRows} errors`,
       );
 
+      // Invalidate Redis caches and trigger Next.js ISR revalidation
+      await this.cacheInvalidation.invalidateCatalog('category-import-update');
+      await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-import-update');
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`Category UPDATE import failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
@@ -689,6 +701,10 @@ export class CategoryImportService {
       this.logger.log(
         `Category EDIT import completed: ${result.categoriesUpdated} items updated, ${result.failedRows} errors`,
       );
+
+      // Invalidate Redis caches and trigger Next.js ISR revalidation
+      await this.cacheInvalidation.invalidateCatalog('category-import-edit');
+      await this.nextJsRevalidation.revalidateTags(['catalog'], 'category-import-edit');
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

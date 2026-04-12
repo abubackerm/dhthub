@@ -207,6 +207,24 @@
 - PM2 ecosystem config must load .env from project root and inject into all process envs (workers need REDIS_PASSWORD etc.)
 - Shell script bin entries (node_modules/.bin/next, node_modules/.bin/tsx) cannot be used as PM2 script directly — use actual JS entry points (node_modules/next/dist/bin/next, node_modules/tsx/dist/cli.mjs) with `interpreter: 'node'`
 - Redis for BullMQ must use `--maxmemory-policy noeviction` (not allkeys-lru) to prevent job data loss
+- Redis maxmemory is configured via `REDIS_MAXMEMORY` env var in docker-compose (default `1gb`) — bumped from 512MB to accommodate HTTP read-through cache
+- Redis memory budget formula: `~100-200MB typical` (BullMQ ~15MB + HTTP cache ~50-100MB hot + attribute caches ~5MB + Redis overhead ~40MB); `~300MB worst-case` (all slugs hot)
+- HTTP cache TTLs are configurable via env vars: `CACHE_TTL_CATEGORY_TREE=300`, `CACHE_TTL_CATEGORY_LEAF=120`, `CACHE_TTL_CATEGORY_CONSOLIDATED=120`, `CACHE_TTL_CATEGORY_FILTER=300`, `CACHE_TTL_PRODUCT_SLUG=120`
+- TTL alignment: Nginx (~30-60s) < Redis (60-300s) < ISR safety net (60-120s) < on-demand revalidation (primary freshness)
 - PowerShell on Windows mangles `$VARIABLE` and heredoc syntax when wrapping SSH commands — use single quotes to prevent local interpolation
 - Certbot requires HTTP-only nginx config first, then SSL config after certs are obtained
 - Prisma migrations may have gaps (tables created via db push but no migration files) — resolve by db push + migrate resolve --applied on fresh DB
+
+- Category tree API supports `maxDepth` query parameter to limit tree depth returned by `GET /v1/catalog/categories/tree?maxDepth=1`
+- `CategoryTreeView` includes `hasChildren: boolean` field — set to `true` even when children are trimmed by `maxDepth`
+- Public-facing pages should use `maxDepth=1` (or lower) to avoid fetching the full tree; admin pages use full tree (no `maxDepth`)
+- `GET /v1/catalog/categories/:slug/lookup` returns category + ancestors (for breadcrumbs) + `hasChildren` flag without the full tree
+- `getCategoryTree(options?: { maxDepth?: number })` is backward-compatible — no options returns full tree
+- `CategoryTreeNode` type now includes `hasChildren: boolean` field
+
+- Post-deploy cache warming runs automatically after `pm2 restart all` in `deploy/deploy.sh`
+- Warming script: `deploy/cache-warm.sh` — warms category tree (Redis), `/products` (ISR), top-N priority URLs, and triggers Next.js tag revalidation
+- Priority URLs sourced from: `--priority-list` arg > `deploy/cache-warm-priority.txt` (repo-committed) > dynamic (top-level categories from tree API)
+- Capped to `WARM_MAX_URLS` env var (default 10) to keep deploy fast — does NOT walk all leaf slugs
+- `deploy.sh` polls `/v1/health` for up to 60s before warming; skips warming if API doesn't become ready
+- Long-tail pages cold-start on first request (acceptable with Redis + Nginx after first hit)
