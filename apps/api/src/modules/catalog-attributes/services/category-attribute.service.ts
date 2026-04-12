@@ -1,12 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { BaseService } from '@shared/domain';
 import { CategoryAttributeRepository } from '../repositories';
 import { AttributeDefinitionRepository } from '../repositories/attribute-definition.repository';
 import { CategoryRepository } from '@modules/catalog/repositories/category.repository';
 import { CategoryAttributeEntity } from '../entities';
-import { CacheService } from '@core/cache';
 
 export interface AssignCategoryAttributeData {
   categoryId: string;
@@ -20,22 +18,8 @@ export class CategoryAttributeService extends BaseService {
     private readonly categoryAttributeRepo: CategoryAttributeRepository,
     private readonly attributeRepo: AttributeDefinitionRepository,
     private readonly categoryRepo: CategoryRepository,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
   ) {
     super(eventEmitter);
-  }
-
-  private get ttl(): number {
-    return this.configService.get('cache.ttl.categoryAttribute') ?? 1800;
-  }
-
-  private getCacheKey(categoryId: string): string {
-    return `category-attributes:${categoryId}`;
-  }
-
-  private getCacheKeyById(id: string): string {
-    return `category-attribute:${id}`;
   }
 
   async assignAttribute(
@@ -59,8 +43,6 @@ export class CategoryAttributeService extends BaseService {
 
     const categoryAttribute = await this.categoryAttributeRepo.create(data);
 
-    await this.cacheService.del(this.getCacheKey(data.categoryId));
-
     this.emit('category.attribute.assigned', {
       id: categoryAttribute.id,
       categoryId: categoryAttribute.categoryId,
@@ -71,18 +53,12 @@ export class CategoryAttributeService extends BaseService {
   }
 
   async getCategoryAttributes(categoryId: string): Promise<CategoryAttributeEntity[]> {
-    return this.cacheService.wrap(
-      this.getCacheKey(categoryId),
-      async () => {
-        const category = await this.categoryRepo.findById(categoryId);
-        if (!category) {
-          throw new NotFoundException('Category not found');
-        }
+    const category = await this.categoryRepo.findById(categoryId);
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
 
-        return this.categoryAttributeRepo.findByCategoryId(categoryId);
-      },
-      this.ttl,
-    );
+    return this.categoryAttributeRepo.findByCategoryId(categoryId);
   }
 
   async removeAttribute(id: string): Promise<void> {
@@ -92,9 +68,6 @@ export class CategoryAttributeService extends BaseService {
     }
 
     await this.categoryAttributeRepo.delete(id);
-
-    await this.cacheService.del(this.getCacheKey(existing.categoryId));
-    await this.cacheService.del(this.getCacheKeyById(id));
 
     this.emit('category.attribute.removed', {
       id,
@@ -110,8 +83,6 @@ export class CategoryAttributeService extends BaseService {
     }
 
     await this.categoryAttributeRepo.deleteByCategoryId(categoryId);
-
-    await this.cacheService.del(this.getCacheKey(categoryId));
 
     this.emit('category.attributes.removed', { categoryId });
   }

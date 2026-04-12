@@ -139,7 +139,7 @@ export class IndexerService {
 
   async configureIndexSettings(indexName: string = this.ALIAS_NAME): Promise<void> {
     try {
-      const settings: IndexSettings = {
+      const settings: IndexSettings & { pagination: { maxTotalHits: number } } = {
         searchableAttributes: ['productName', 'sku', 'categoryPath', 'cellName'],
         filterableAttributes: [
           'categoryPath',
@@ -149,13 +149,11 @@ export class IndexerService {
           'cellName',
           'price',
           'stock',
-          'attributes.material',
-          'attributes.finish',
-          'attributes.diameter',
           'attributes.*',
         ],
         sortableAttributes: ['price', 'stock'],
         rankingRules: ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'],
+        pagination: { maxTotalHits: 10000 },
       };
 
       await this.meiliClient.index(indexName).updateSettings(settings);

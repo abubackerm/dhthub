@@ -224,7 +224,7 @@ export class ImportController {
 
     const filename = `${job.fileName ?? 'import'}-errors.csv`;
 
-    const header = ['rowNumber', 'sku', 'error'];
+    const header = ['rowNumber', 'name', 'sku', 'error'];
     const escape = (value: string | number | null): string => {
       if (value === null || value === undefined) {
         return '';
@@ -236,8 +236,20 @@ export class ImportController {
       return str;
     };
 
+    const extractName = (rawData: Record<string, unknown> | null): string => {
+      if (!rawData) return '';
+      if (typeof rawData.name === 'string' && rawData.name.trim()) return rawData.name.trim();
+      for (let i = 6; i >= 0; i--) {
+        const key = i === 0 ? 'main_branch' : `branch${i}`;
+        const value = rawData[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+      return '';
+    };
+
     const rows = errors.map((error) => [
       escape(error.rowNumber),
+      escape(extractName(error.rawData as Record<string, unknown> | null)),
       escape(error.sku),
       escape(error.message),
     ]);

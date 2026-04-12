@@ -1,10 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { BaseService } from '@shared/domain';
 import { UnitDefinitionRepository } from '../repositories';
 import { UnitDefinitionEntity } from '../entities';
-import { CacheService } from '@core/cache';
 
 export interface CreateUnitData {
   name: string;
@@ -19,22 +17,8 @@ export class UnitService extends BaseService {
   constructor(
     eventEmitter: EventEmitter2,
     private readonly unitRepo: UnitDefinitionRepository,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
   ) {
     super(eventEmitter);
-  }
-
-  private get ttl(): number {
-    return this.configService.get('cache.ttl.unitDefinition') ?? 7200;
-  }
-
-  private getCacheKey(id: string): string {
-    return `unit:${id}`;
-  }
-
-  private getCacheKeyByName(name: string): string {
-    return `unit:name:${name}`;
   }
 
   async create(data: CreateUnitData): Promise<UnitDefinitionEntity> {
@@ -44,8 +28,6 @@ export class UnitService extends BaseService {
     }
 
     const unit = await this.unitRepo.create(data);
-
-    await this.cacheService.del('units:all');
 
     this.emit('unit.created', {
       id: unit.id,
@@ -70,12 +52,6 @@ export class UnitService extends BaseService {
 
     const updated = await this.unitRepo.update(id, data);
 
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyByName(existing.name));
-    if (data.name && data.name !== existing.name) {
-      await this.cacheService.del(this.getCacheKeyByName(data.name));
-    }
-
     this.emit('unit.updated', {
       id: updated.id,
       name: updated.name,
@@ -85,41 +61,23 @@ export class UnitService extends BaseService {
   }
 
   async findById(id: string): Promise<UnitDefinitionEntity> {
-    return this.cacheService.wrap(
-      this.getCacheKey(id),
-      async () => {
-        const unit = await this.unitRepo.findById(id);
-        if (!unit) {
-          throw new NotFoundException('Unit not found');
-        }
-        return unit;
-      },
-      this.ttl,
-    );
+    const unit = await this.unitRepo.findById(id);
+    if (!unit) {
+      throw new NotFoundException('Unit not found');
+    }
+    return unit;
   }
 
   async findByName(name: string): Promise<UnitDefinitionEntity> {
-    return this.cacheService.wrap(
-      this.getCacheKeyByName(name),
-      async () => {
-        const unit = await this.unitRepo.findByName(name);
-        if (!unit) {
-          throw new NotFoundException('Unit not found');
-        }
-        return unit;
-      },
-      this.ttl,
-    );
+    const unit = await this.unitRepo.findByName(name);
+    if (!unit) {
+      throw new NotFoundException('Unit not found');
+    }
+    return unit;
   }
 
   async findAll(): Promise<UnitDefinitionEntity[]> {
-    return this.cacheService.wrap(
-      'units:all',
-      async () => {
-        return this.unitRepo.findAll();
-      },
-      this.ttl,
-    );
+    return this.unitRepo.findAll();
   }
 
   async delete(id: string): Promise<void> {
@@ -129,10 +87,6 @@ export class UnitService extends BaseService {
     }
 
     await this.unitRepo.delete(id);
-
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyByName(existing.name));
-    await this.cacheService.del('units:all');
 
     this.emit('unit.deleted', {
       id,

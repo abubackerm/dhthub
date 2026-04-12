@@ -190,8 +190,6 @@ model Product {
 
   @@index([status])
   @@index([cellId])
-  @@index([sku])
-  @@index([slug])
   @@index([createdAt])
   @@index([name])
   @@map("products")
@@ -227,7 +225,6 @@ model ProductVariant {
   enquiryItems    EnquiryItem[]
 
   @@index([productId])
-  @@index([sku])
   @@map("product_variants")
 }
 
@@ -253,11 +250,8 @@ model Category {
   categoryAttributes CategoryAttribute[]
   images             CategoryImage[]
 
-  @@index([slug])
   @@index([parentId])
-  @@index([path])
   @@index([path, isActive])
-  @@index([sku])
   @@map("categories")
 }
 
@@ -296,7 +290,6 @@ model ProductImage {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@unique([productId, sortOrder])
-  @@index([productId])
   @@index([variantId])
   @@map("product_images")
 }
@@ -376,7 +369,6 @@ model AttributeDefinition {
   cellAttributes     CellAttribute[]
   productTableColumns ProductTableColumn[]
 
-  @@index([slug])
   @@index([dataType])
   @@index([group])
   @@map("attribute_definitions")
@@ -394,7 +386,6 @@ model AttributeOption {
   values    VariantAttributeValue[]
 
   @@unique([attributeId, value])
-  @@index([attributeId])
   @@map("attribute_options")
 }
 
@@ -414,9 +405,7 @@ model VariantAttributeValue {
   option    AttributeOption?    @relation(fields: [optionId], references: [id])
 
   @@unique([variantId, attributeId])
-  @@index([variantId])
   @@index([attributeId])
-  @@index([variantId, attributeId])
   @@index([attributeId, numberValue])
   @@index([attributeId, optionId])
   @@index([attributeId, booleanValue])
@@ -443,7 +432,6 @@ model CategoryAttribute {
   attribute AttributeDefinition @relation(fields: [attributeId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, attributeId])
-  @@index([categoryId, attributeId])
   @@map("category_attributes")
 }
 
@@ -471,9 +459,6 @@ model Cell {
   cellAttributes  CellAttribute[]
   images          CellImage[]
 
-  @@index([slug])
-  @@index([sku])
-  @@index([categoryId])
   @@index([categoryId, isActive, sortOrder])
   @@map("cells")
 }
@@ -547,7 +532,6 @@ model Price {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([variantId, currencyId])
-  @@index([variantId])
   @@map("prices")
 }
 
@@ -561,8 +545,6 @@ model PriceTier {
 
   price     Price   @relation(fields: [priceId], references: [id], onDelete: Cascade)
 
-  @@index([priceId])
-  @@index([priceId, minQty])
   @@unique([priceId, minQty])
   @@map("price_tiers")
 }
@@ -605,7 +587,6 @@ model InventoryLevel {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([variantId, warehouseId])
-  @@index([variantId])
   @@index([warehouseId])
   @@map("inventory_levels")
 }
@@ -626,7 +607,6 @@ model InventoryReservation {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([referenceId])
   @@index([referenceId, referenceType])
   @@map("inventory_reservations")
 }
@@ -834,7 +814,6 @@ model Enquiry {
 
   @@index([userId])
   @@index([status])
-  @@index([enquiryNumber])
   @@map("enquiries")
 }
 

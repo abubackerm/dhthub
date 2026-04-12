@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -12,13 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+
 import { Label } from "@/components/ui/label";
 import { X, SlidersHorizontal } from "lucide-react";
 import type {
   LeafFilterableAttributeView,
   LeafVariantView,
-  LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
 
 interface FilterPanelProps {
@@ -147,7 +146,7 @@ export function FilterPanel({ attributes, variants, basePath }: FilterPanelProps
           const av = v.attributeValues.find((av) => av.attributeId === attr.id);
           return av?.numberValue;
         })
-        .filter((v): v is number => v !== null && !isNaN(v));
+        .filter((v): v is number => v != null && !isNaN(v));
 
       if (values.length === 0) return { min: 0, max: 100 };
 
@@ -285,6 +284,24 @@ function RangeFilter({
 }) {
   const currentMin = searchParams.get(`${attr.slug}_min`) || "";
   const currentMax = searchParams.get(`${attr.slug}_max`) || "";
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const updateRange = useCallback(
+    (key: string, value: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+        const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+        router.push(newUrl);
+      }, 300);
+    },
+    [searchParams, basePath, router],
+  );
 
   return (
     <div className="space-y-3">
@@ -295,16 +312,7 @@ function RangeFilter({
             type="number"
             placeholder={bounds.min.toFixed(2)}
             value={currentMin}
-            onChange={(e) => {
-              const params = new URLSearchParams(searchParams.toString());
-              if (e.target.value) {
-                params.set(`${attr.slug}_min`, e.target.value);
-              } else {
-                params.delete(`${attr.slug}_min`);
-              }
-              const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
-              router.push(newUrl);
-            }}
+            onChange={(e) => updateRange(`${attr.slug}_min`, e.target.value)}
             className="h-8 text-sm mt-1"
             step="any"
           />
@@ -315,16 +323,7 @@ function RangeFilter({
             type="number"
             placeholder={bounds.max.toFixed(2)}
             value={currentMax}
-            onChange={(e) => {
-              const params = new URLSearchParams(searchParams.toString());
-              if (e.target.value) {
-                params.set(`${attr.slug}_max`, e.target.value);
-              } else {
-                params.delete(`${attr.slug}_max`);
-              }
-              const newUrl = params.toString() ? `${basePath}?${params.toString()}` : basePath;
-              router.push(newUrl);
-            }}
+            onChange={(e) => updateRange(`${attr.slug}_max`, e.target.value)}
             className="h-8 text-sm mt-1"
             step="any"
           />

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
@@ -23,7 +23,7 @@ import { MeiliClient } from './meilisearch/meili.client';
     DatabaseModule,
     CoreCacheModule,
     CatalogModule,
-    CatalogAttributesModule,
+    forwardRef(() => CatalogAttributesModule),
     PricingModule,
     InventoryModule,
   ],

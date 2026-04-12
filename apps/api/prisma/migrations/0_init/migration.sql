@@ -267,6 +267,7 @@ CREATE TABLE "product_table_columns" (
     "product_id" TEXT NOT NULL,
     "attribute_id" TEXT NOT NULL,
     "position" INTEGER NOT NULL,
+    "unit_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -282,7 +283,6 @@ CREATE TABLE "attribute_definitions" (
     "group_name" TEXT,
     "sort_order" INTEGER NOT NULL DEFAULT 0,
     "filter_type" "AttributeFilterType",
-    "unit_id" TEXT,
     "is_filterable" BOOLEAN NOT NULL DEFAULT false,
     "is_required" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -310,6 +310,7 @@ CREATE TABLE "variant_attribute_values" (
     "id" TEXT NOT NULL,
     "variant_id" TEXT NOT NULL,
     "attribute_id" TEXT NOT NULL,
+    "raw_value" TEXT,
     "number_value" DOUBLE PRECISION,
     "text_value" TEXT,
     "option_id" TEXT,
@@ -323,7 +324,6 @@ CREATE TABLE "variant_attribute_values" (
 CREATE TABLE "unit_definitions" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "symbol" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "unit_definitions_pkey" PRIMARY KEY ("id")
@@ -633,12 +633,6 @@ CREATE INDEX "products_status_idx" ON "products"("status");
 CREATE INDEX "products_cell_id_idx" ON "products"("cell_id");
 
 -- CreateIndex
-CREATE INDEX "products_sku_idx" ON "products"("sku");
-
--- CreateIndex
-CREATE INDEX "products_slug_idx" ON "products"("slug");
-
--- CreateIndex
 CREATE INDEX "products_created_at_idx" ON "products"("created_at");
 
 -- CreateIndex
@@ -651,9 +645,6 @@ CREATE UNIQUE INDEX "product_variants_sku_key" ON "product_variants"("sku");
 CREATE INDEX "product_variants_product_id_idx" ON "product_variants"("product_id");
 
 -- CreateIndex
-CREATE INDEX "product_variants_sku_idx" ON "product_variants"("sku");
-
--- CreateIndex
 CREATE UNIQUE INDEX "categories_slug_key" ON "categories"("slug");
 
 -- CreateIndex
@@ -662,17 +653,11 @@ CREATE UNIQUE INDEX "categories_path_key" ON "categories"("path");
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_sku_key" ON "categories"("sku");
 
--- CreateIndex
-CREATE INDEX "categories_slug_idx" ON "categories"("slug");
+-- Composite index on categories(path, is_active) for leaf-descendant queries
+CREATE INDEX "categories_path_is_active_idx" ON "categories"("path", "is_active");
 
 -- CreateIndex
 CREATE INDEX "categories_parent_id_idx" ON "categories"("parent_id");
-
--- CreateIndex
-CREATE INDEX "categories_path_idx" ON "categories"("path");
-
--- CreateIndex
-CREATE INDEX "categories_sku_idx" ON "categories"("sku");
 
 -- CreateIndex
 CREATE INDEX "category_images_sku_idx" ON "category_images"("sku");
@@ -681,13 +666,10 @@ CREATE INDEX "category_images_sku_idx" ON "category_images"("sku");
 CREATE UNIQUE INDEX "category_images_category_id_position_key" ON "category_images"("category_id", "position");
 
 -- CreateIndex
-CREATE INDEX "product_images_product_id_idx" ON "product_images"("product_id");
+CREATE UNIQUE INDEX "product_images_product_id_sort_order_key" ON "product_images"("product_id", "sort_order");
 
 -- CreateIndex
 CREATE INDEX "product_images_variant_id_idx" ON "product_images"("variant_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "product_images_product_id_sort_order_key" ON "product_images"("product_id", "sort_order");
 
 -- CreateIndex
 CREATE INDEX "variant_images_sku_idx" ON "variant_images"("sku");
@@ -708,28 +690,16 @@ CREATE UNIQUE INDEX "product_table_columns_product_id_attribute_id_key" ON "prod
 CREATE UNIQUE INDEX "attribute_definitions_slug_key" ON "attribute_definitions"("slug");
 
 -- CreateIndex
-CREATE INDEX "attribute_definitions_slug_idx" ON "attribute_definitions"("slug");
-
--- CreateIndex
 CREATE INDEX "attribute_definitions_data_type_idx" ON "attribute_definitions"("data_type");
 
 -- CreateIndex
 CREATE INDEX "attribute_definitions_group_name_idx" ON "attribute_definitions"("group_name");
 
 -- CreateIndex
-CREATE INDEX "attribute_options_attribute_id_idx" ON "attribute_options"("attribute_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "attribute_options_attribute_id_value_key" ON "attribute_options"("attribute_id", "value");
 
 -- CreateIndex
-CREATE INDEX "variant_attribute_values_variant_id_idx" ON "variant_attribute_values"("variant_id");
-
--- CreateIndex
 CREATE INDEX "variant_attribute_values_attribute_id_idx" ON "variant_attribute_values"("attribute_id");
-
--- CreateIndex
-CREATE INDEX "variant_attribute_values_variant_id_attribute_id_idx" ON "variant_attribute_values"("variant_id", "attribute_id");
 
 -- CreateIndex
 CREATE INDEX "variant_attribute_values_attribute_id_number_value_idx" ON "variant_attribute_values"("attribute_id", "number_value");
@@ -744,10 +714,7 @@ CREATE INDEX "variant_attribute_values_attribute_id_boolean_value_idx" ON "varia
 CREATE UNIQUE INDEX "variant_attribute_values_variant_id_attribute_id_key" ON "variant_attribute_values"("variant_id", "attribute_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "unit_definitions_symbol_key" ON "unit_definitions"("symbol");
-
--- CreateIndex
-CREATE INDEX "category_attributes_category_id_attribute_id_idx" ON "category_attributes"("category_id", "attribute_id");
+CREATE UNIQUE INDEX "unit_definitions_name_key" ON "unit_definitions"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "category_attributes_category_id_attribute_id_key" ON "category_attributes"("category_id", "attribute_id");
@@ -758,14 +725,8 @@ CREATE UNIQUE INDEX "cells_slug_key" ON "cells"("slug");
 -- CreateIndex
 CREATE UNIQUE INDEX "cells_sku_key" ON "cells"("sku");
 
--- CreateIndex
-CREATE INDEX "cells_slug_idx" ON "cells"("slug");
-
--- CreateIndex
-CREATE INDEX "cells_sku_idx" ON "cells"("sku");
-
--- CreateIndex
-CREATE INDEX "cells_category_id_idx" ON "cells"("category_id");
+-- Composite index on cells(category_id, is_active, sort_order)
+CREATE INDEX "cells_category_id_is_active_sort_order_idx" ON "cells"("category_id", "is_active", "sort_order");
 
 -- CreateIndex
 CREATE INDEX "cell_images_sku_idx" ON "cell_images"("sku");
@@ -783,16 +744,7 @@ CREATE UNIQUE INDEX "cell_attributes_cell_id_attribute_id_key" ON "cell_attribut
 CREATE UNIQUE INDEX "currencies_code_key" ON "currencies"("code");
 
 -- CreateIndex
-CREATE INDEX "prices_variant_id_idx" ON "prices"("variant_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "prices_variant_id_currency_id_key" ON "prices"("variant_id", "currency_id");
-
--- CreateIndex
-CREATE INDEX "price_tiers_price_id_idx" ON "price_tiers"("price_id");
-
--- CreateIndex
-CREATE INDEX "price_tiers_price_id_min_qty_idx" ON "price_tiers"("price_id", "min_qty");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "price_tiers_price_id_min_qty_key" ON "price_tiers"("price_id", "min_qty");
@@ -801,16 +753,10 @@ CREATE UNIQUE INDEX "price_tiers_price_id_min_qty_key" ON "price_tiers"("price_i
 CREATE UNIQUE INDEX "warehouses_code_key" ON "warehouses"("code");
 
 -- CreateIndex
-CREATE INDEX "inventory_levels_variant_id_idx" ON "inventory_levels"("variant_id");
-
--- CreateIndex
-CREATE INDEX "inventory_levels_warehouse_id_idx" ON "inventory_levels"("warehouse_id");
-
--- CreateIndex
 CREATE UNIQUE INDEX "inventory_levels_variant_id_warehouse_id_key" ON "inventory_levels"("variant_id", "warehouse_id");
 
 -- CreateIndex
-CREATE INDEX "inventory_reservations_reference_id_idx" ON "inventory_reservations"("reference_id");
+CREATE INDEX "inventory_levels_warehouse_id_idx" ON "inventory_levels"("warehouse_id");
 
 -- CreateIndex
 CREATE INDEX "inventory_reservations_reference_id_reference_type_idx" ON "inventory_reservations"("reference_id", "reference_type");
@@ -859,9 +805,6 @@ CREATE INDEX "enquiries_user_id_idx" ON "enquiries"("user_id");
 
 -- CreateIndex
 CREATE INDEX "enquiries_status_idx" ON "enquiries"("status");
-
--- CreateIndex
-CREATE INDEX "enquiries_enquiry_number_idx" ON "enquiries"("enquiry_number");
 
 -- CreateIndex
 CREATE INDEX "enquiry_items_enquiry_id_idx" ON "enquiry_items"("enquiry_id");
@@ -921,7 +864,7 @@ ALTER TABLE "product_table_columns" ADD CONSTRAINT "product_table_columns_produc
 ALTER TABLE "product_table_columns" ADD CONSTRAINT "product_table_columns_attribute_id_fkey" FOREIGN KEY ("attribute_id") REFERENCES "attribute_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "attribute_definitions" ADD CONSTRAINT "attribute_definitions_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "unit_definitions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "product_table_columns" ADD CONSTRAINT "product_table_columns_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "unit_definitions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "attribute_options" ADD CONSTRAINT "attribute_options_attribute_id_fkey" FOREIGN KEY ("attribute_id") REFERENCES "attribute_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;

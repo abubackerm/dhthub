@@ -10,7 +10,6 @@ import { ProductVariantRepository } from '@modules/catalog/repositories/product-
 import { ProductRepository } from '@modules/catalog/repositories/product.repository';
 import { VariantAttributeValueEntity } from '../entities';
 import { AttributeDataType } from '../entities/attribute-definition.entity';
-import { CacheService } from '@core/cache';
 import { CellRepository } from '@modules/cell';
 
 export interface AttributeValueInput {
@@ -37,13 +36,8 @@ export class VariantAttributeService extends BaseService {
     private readonly productVariantRepo: ProductVariantRepository,
     private readonly productRepo: ProductRepository,
     private readonly cellRepo: CellRepository,
-    private readonly cacheService: CacheService,
   ) {
     super(eventEmitter);
-  }
-
-  private getCacheKey(variantId: string): string {
-    return `variant-attributes:${variantId}`;
   }
 
   async assignAttributes(
@@ -142,8 +136,6 @@ export class VariantAttributeService extends BaseService {
       attributeCount: createdAttributes.length,
     });
 
-    await this.cacheService.del(this.getCacheKey(variantId));
-
     return createdAttributes;
   }
 
@@ -226,19 +218,11 @@ export class VariantAttributeService extends BaseService {
   }
 
   async getVariantAttributes(variantId: string): Promise<VariantAttributeValueEntity[]> {
-    return this.cacheService.wrap(
-      this.getCacheKey(variantId),
-      async () => {
-        return this.variantAttributeRepo.findByVariantIdWithAttribute(variantId);
-      },
-      600,
-    );
+    return this.variantAttributeRepo.findByVariantIdWithAttribute(variantId);
   }
 
   async deleteAttributeValues(variantId: string): Promise<void> {
     await this.variantAttributeRepo.deleteByVariantId(variantId);
-
-    await this.cacheService.del(this.getCacheKey(variantId));
 
     this.emit('variant.attributes.deleted', { variantId });
   }

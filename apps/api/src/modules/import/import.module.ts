@@ -27,6 +27,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { StorageModule } from '../storage/storage.module';
 import { AuditModule } from '@shared/audit';
+import { SearchModule } from '../search/search.module';
 
 @Module({
   imports: [
@@ -107,6 +108,8 @@ import { AuditModule } from '@shared/audit';
     PricingModule,
     // Import InventoryModule for InventoryService, WarehouseRepository
     InventoryModule,
+    // Import SearchModule for IndexerService (bulk search indexing after import)
+    forwardRef(() => SearchModule),
   ],
   controllers: [ImportController, ImportWorkerController],
   providers: [

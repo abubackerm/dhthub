@@ -1,10 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { BaseService } from '@shared/domain';
 import { AttributeDefinitionRepository } from '../repositories';
 import { AttributeDefinitionEntity, AttributeDataType, AttributeFilterType } from '../entities';
-import { CacheService } from '@core/cache';
 
 export interface CreateAttributeDefinitionData {
   name: string;
@@ -35,22 +33,8 @@ export class AttributeDefinitionService extends BaseService {
   constructor(
     eventEmitter: EventEmitter2,
     private readonly attributeRepo: AttributeDefinitionRepository,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
   ) {
     super(eventEmitter);
-  }
-
-  private get ttl(): number {
-    return this.configService.get('cache.ttl.attributeDefinition') ?? 3600;
-  }
-
-  private getCacheKey(id: string): string {
-    return `attribute:${id}`;
-  }
-
-  private getCacheKeyBySlug(slug: string): string {
-    return `attribute:slug:${slug}`;
   }
 
   /**
@@ -138,12 +122,6 @@ export class AttributeDefinitionService extends BaseService {
 
     const updated = await this.attributeRepo.update(id, data);
 
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyBySlug(existing.slug));
-    if (data.slug && data.slug !== existing.slug) {
-      await this.cacheService.del(this.getCacheKeyBySlug(data.slug));
-    }
-
     this.emit('attribute.updated', {
       id: updated.id,
       name: updated.name,
@@ -154,31 +132,19 @@ export class AttributeDefinitionService extends BaseService {
   }
 
   async findById(id: string): Promise<AttributeDefinitionEntity> {
-    return this.cacheService.wrap(
-      this.getCacheKey(id),
-      async () => {
-        const attribute = await this.attributeRepo.findById(id);
-        if (!attribute) {
-          throw new NotFoundException('Attribute definition not found');
-        }
-        return attribute;
-      },
-      this.ttl,
-    );
+    const attribute = await this.attributeRepo.findById(id);
+    if (!attribute) {
+      throw new NotFoundException('Attribute definition not found');
+    }
+    return attribute;
   }
 
   async findBySlug(slug: string): Promise<AttributeDefinitionEntity> {
-    return this.cacheService.wrap(
-      this.getCacheKeyBySlug(slug),
-      async () => {
-        const attribute = await this.attributeRepo.findBySlug(slug);
-        if (!attribute) {
-          throw new NotFoundException('Attribute definition not found');
-        }
-        return attribute;
-      },
-      this.ttl,
-    );
+    const attribute = await this.attributeRepo.findBySlug(slug);
+    if (!attribute) {
+      throw new NotFoundException('Attribute definition not found');
+    }
+    return attribute;
   }
 
   async findByDataType(dataType: AttributeDataType): Promise<AttributeDefinitionEntity[]> {
@@ -204,9 +170,6 @@ export class AttributeDefinitionService extends BaseService {
     }
 
     await this.attributeRepo.delete(id);
-
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyBySlug(existing.slug));
 
     this.emit('attribute.deleted', {
       id,

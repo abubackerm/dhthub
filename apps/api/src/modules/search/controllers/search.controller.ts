@@ -1,9 +1,12 @@
-import { Controller, Get, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { SearchQueryDto } from '../dto';
 import { IndexHealthView } from '../dto';
 import { SearchService } from '../services/search.service';
 import { IndexerService } from '../services/indexer.service';
 import { SearchIndexNotFoundError } from '../domain/errors/search.errors';
+import { AuthGuard } from '../../auth/auth.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 
 @Controller('search')
 export class SearchController {
@@ -50,5 +53,23 @@ export class SearchController {
       }
       throw error;
     }
+  }
+
+  @Post('reindex')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'super_admin')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async reindex(): Promise<{ message: string }> {
+    await this.indexerService.bulkIndexVariants();
+    return { message: 'Reindex initiated successfully' };
+  }
+
+  @Delete('index')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'super_admin')
+  @HttpCode(HttpStatus.OK)
+  async clearIndex(): Promise<{ message: string }> {
+    await this.indexerService.clearIndex();
+    return { message: 'Search index cleared successfully' };
   }
 }

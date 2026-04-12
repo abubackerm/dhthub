@@ -6,12 +6,12 @@ import { ImportErrorRepository } from '../repositories/import-error.repository';
 import { ExtractedFiles } from '../dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ImageImportService } from './image-import.service';
 import { createHash } from 'crypto';
 import { StorageService } from '../../storage/storage.service';
 import { CacheInvalidationService } from '@core/cache';
 import { NextJsRevalidationService } from '@core/cache';
+import { IndexerService } from '../../search/services/indexer.service';
 
 const SYSTEM_FIELDS = ['product_sku', 'sku', 'price', 'stock'];
 
@@ -91,11 +91,11 @@ export class CatalogImportService {
     private readonly csvParserService: CsvParserService,
     private readonly importJobService: ImportJobService,
     private readonly importErrorRepository: ImportErrorRepository,
-    private readonly eventEmitter: EventEmitter2,
     private readonly imageImportService: ImageImportService,
     private readonly storageService: StorageService,
     private readonly cacheInvalidation: CacheInvalidationService,
     private readonly nextJsRevalidation: NextJsRevalidationService,
+    private readonly indexerService: IndexerService,
   ) {}
 
   private async updateJobProgress(
@@ -1029,10 +1029,14 @@ export class CatalogImportService {
    * Step 5: Update search index
    */
   private async step5_updateSearchIndex(jobId: string): Promise<void> {
-    // TODO: Integrate with Meilisearch IndexerService
-    // For now, emit event to trigger search indexing
-    this.eventEmitter.emit('import.catalog.completed', { jobId });
-    this.logger.log('Search index update queued');
+    try {
+      await this.indexerService.bulkIndexVariants();
+      this.logger.log(`Search index updated for job ${jobId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to update search index for job ${jobId}: ${errorMessage}`);
+      // Don't fail the entire import if search indexing fails
+    }
   }
 
   /**

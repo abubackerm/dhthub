@@ -51,9 +51,9 @@ export class VariantDocumentBuilder {
       categoryPath: variant.product.cell?.category?.path ?? null,
       categoryName: variant.product.cell?.category?.name ?? null,
       cellName: variant.product.cell?.name ?? null,
-      price: pricing.price,
+      price: pricing.price ?? 0,
       currency: pricing.currency,
-      stock: inventory.stock,
+      stock: inventory.stock ?? 0,
       image: variant.images[0]?.url ?? null,
       attributes: this.normalizeAttributes(attributes),
     };

@@ -31,6 +31,12 @@ export class SearchService {
             limit: query.limit ?? 20,
             offset: ((query.page ?? 1) - 1) * (query.limit ?? 20),
             sort: this.buildSort(query),
+            matchingStrategy: 'frequency' as const,
+            attributesToRetrieve: [
+              'variantId', 'productId', 'productName', 'sku',
+              'categoryId', 'categoryPath', 'price', 'stock',
+              'image', 'attributes',
+            ],
             attributesToHighlight: ['productName', 'sku', 'categoryPath'],
             highlightPreTag: '<em>',
             highlightPostTag: '</em>',
@@ -85,9 +91,10 @@ export class SearchService {
 
   private buildFilters(query: SearchQueryDto): string[] {
     const filters: string[] = [];
+    const escapeFilterValue = (value: string) => value.replace(/"/g, '\\"');
 
     if (query.category) {
-      filters.push(`categoryPath = "${query.category}"`);
+      filters.push(`categoryPath = "${escapeFilterValue(query.category)}"`);
     }
 
     if (query.priceMin !== undefined || query.priceMax !== undefined) {
@@ -107,7 +114,7 @@ export class SearchService {
     if (query.attributes) {
       for (const [key, value] of Object.entries(query.attributes)) {
         if (typeof value === 'string') {
-          filters.push(`attributes.${key} = "${value}"`);
+          filters.push(`attributes.${key} = "${escapeFilterValue(value)}"`);
         } else {
           filters.push(`attributes.${key} = ${value}`);
         }
@@ -119,11 +126,12 @@ export class SearchService {
 
   private buildSort(query: SearchQueryDto): string[] | undefined {
     const sorts: string[] = [];
+    const order = query.sortOrder === 'desc' ? 'desc' : 'asc';
 
     if (query.sortBy === 'price') {
-      sorts.push(`price:${query.sortOrder ?? 'asc'}`);
+      sorts.push(`price:${order}`);
     } else if (query.sortBy === 'stock') {
-      sorts.push(`stock:${query.sortOrder ?? 'desc'}`);
+      sorts.push(`stock:${order}`);
     }
 
     return sorts.length > 0 ? sorts : undefined;

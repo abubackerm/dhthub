@@ -1,29 +1,34 @@
-import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { Injectable, Inject, Logger, Optional, OnModuleInit } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name);
 
   constructor(
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Optional() @Inject(REDIS_CLIENT) private readonly redisClient?: Redis,
   ) {}
 
-  private get isRedisAvailable(): boolean {
-    return this.redisClient !== undefined;
+  onModuleInit() {
+    if (this.redisClient) {
+      this.logger.log('Cache store initialized (Redis client available)');
+    } else {
+      this.logger.warn(
+        'Cache store initialized without Redis — caching is disabled. Set REDIS_HOST to enable.',
+      );
+    }
   }
 
   async get<T>(key: string): Promise<T | undefined> {
+    if (!this.redisClient) return undefined;
+
     try {
-      const value = await this.cacheManager.get<T>(key);
-      if (value !== null && value !== undefined) {
+      const raw = await this.redisClient.get(key);
+      if (raw !== null) {
         this.logger.debug(`Cache HIT: ${key}`);
-        return value;
+        return JSON.parse(raw) as T;
       }
       this.logger.debug(`Cache MISS: ${key}`);
       return undefined;
@@ -35,8 +40,15 @@ export class CacheService {
   }
 
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+    if (!this.redisClient) return;
+
     try {
-      await this.cacheManager.set(key, value, ttl ? ttl * 1000 : undefined);
+      const serialized = JSON.stringify(value);
+      if (ttl) {
+        await this.redisClient.setex(key, ttl, serialized);
+      } else {
+        await this.redisClient.set(key, serialized);
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to set cache key "${key}": ${errorMessage}`);
@@ -44,75 +56,33 @@ export class CacheService {
   }
 
   async del(key: string): Promise<void> {
+    if (!this.redisClient) return;
+
     try {
-      await this.cacheManager.del(key);
+      await this.redisClient.del(key);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to delete cache key "${key}": ${errorMessage}`);
     }
   }
 
-  /**
-   * Delete multiple known keys in a single pipelined round-trip.
-   * Prefer this over individual `del()` calls when you have 2+ keys.
-   */
   async delMany(keys: string[]): Promise<number> {
-    if (keys.length === 0) return 0;
-
-    if (!this.isRedisAvailable) {
-      this.logger.warn(
-        `delMany: Redis client not available, falling back to individual deletes for ${keys.length} key(s)`,
-      );
-      let count = 0;
-      for (const key of keys) {
-        try {
-          await this.cacheManager.del(key);
-          count++;
-        } catch {
-          // logged per-key inside del()
-        }
-      }
-      return count;
-    }
+    if (keys.length === 0 || !this.redisClient) return 0;
 
     try {
-      const pipeline = this.redisClient!.pipeline();
-      for (const key of keys) {
-        pipeline.unlink(key);
-      }
-      const results = await pipeline.exec();
-      let deleted = 0;
-      for (const [err, result] of results ?? []) {
-        if (!err && (result as number) > 0) deleted++;
-      }
-      return deleted;
+      return await this.redisClient.del(...keys);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`delMany failed for ${keys.length} key(s): ${errorMessage}`);
+      this.logger.warn(`Failed to delete ${keys.length} cache keys: ${errorMessage}`);
       return 0;
     }
   }
 
-  /**
-   * Delete all keys matching a glob pattern (e.g. `catalog:v2:*`).
-   *
-   * Uses SCAN + UNLINK in chunks to avoid blocking Redis. Safe for
-   * production — never uses the blocking KEYS command.
-   *
-   * @param pattern  Redis glob pattern (supports `*`, `?`, `[...]`)
-   * @param chunkSize  Keys per pipeline batch (default 100)
-   * @returns Total number of keys deleted
-   */
   async delPattern(pattern: string, chunkSize = 100): Promise<number> {
-    if (!this.isRedisAvailable) {
-      this.logger.warn(
-        `delPattern: Redis client not available — pattern "${pattern}" not deleted`,
-      );
-      return 0;
-    }
+    if (!this.redisClient) return 0;
 
     let totalDeleted = 0;
-    const stream = this.redisClient!.scanStream({
+    const stream = this.redisClient.scanStream({
       match: pattern,
       count: chunkSize,
     });
@@ -130,7 +100,7 @@ export class CacheService {
       }
     };
 
-    return new Promise<number>((resolve) => {
+    await new Promise<void>((resolve) => {
       stream.on('data', async (resultKeys: string[]) => {
         chunk.push(...resultKeys);
         if (chunk.length >= chunkSize) {
@@ -159,25 +129,27 @@ export class CacheService {
             );
           }
         }
-        this.logger.log(
-          `delPattern("${pattern}"): ${totalDeleted} key(s) deleted`,
-        );
-        resolve(totalDeleted);
+        resolve();
       });
 
       stream.on('error', (error: Error) => {
         this.logger.warn(
           `delPattern scan error for "${pattern}": ${error.message}`,
         );
-        resolve(totalDeleted);
+        resolve();
       });
     });
+
+    this.logger.log(`delPattern("${pattern}"): ${totalDeleted} key(s) deleted from Redis`);
+    return totalDeleted;
   }
 
   async reset(): Promise<void> {
+    if (!this.redisClient) return;
+
     try {
-      // Reset not available in cache-manager v7
-      this.logger.warn('reset not implemented in cache-manager v7');
+      await this.redisClient.flushdb();
+      this.logger.log('Cache reset: all keys flushed from Redis');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to reset cache: ${errorMessage}`);

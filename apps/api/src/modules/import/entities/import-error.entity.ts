@@ -4,5 +4,7 @@ export class ImportErrorEntity {
   rowNumber: number;
   sku: string | null;
   message: string;
+  rawData: Record<string, unknown> | null;
+  sourceFile: string | null;
   createdAt: Date;
 }

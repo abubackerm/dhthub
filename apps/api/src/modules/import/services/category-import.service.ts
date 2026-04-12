@@ -192,10 +192,11 @@ export class CategoryImportService {
               continue;
             }
 
-            // Check if category already exists in database
+            // Check if category already exists in database (parent-scoped)
             const slug = this.generateSlug(categoryName);
             const existingCategory = await this.categoryRepo.findBySlug(slug);
-            if (existingCategory) {
+            if (existingCategory && existingCategory.parentId === parentId) {
+              // Same parent + same slug: true duplicate — skip
               parentId = existingCategory.id;
               createdItems.set(cacheKey, {
                 id: existingCategory.id,
@@ -204,8 +205,7 @@ export class CategoryImportService {
                 slug: existingCategory.slug,
                 type: 'CATEGORY',
               });
-              
-              // Track skipped item
+
               result.skippedRows++;
               result.skippedItems.push({
                 rowNumber: row.rowNumber,
@@ -214,19 +214,24 @@ export class CategoryImportService {
                 reason: 'Category already exists',
                 sku: existingCategory.sku || undefined,
               });
-              
-              // Store skipped item in database for persistence
+
               await this.importErrorRepository.create({
                 jobId,
                 rowNumber: row.rowNumber,
+                sku: existingCategory.sku || undefined,
                 message: `Skipped: Category already exists (${existingCategory.sku})`,
                 rawData: rowData,
                 sourceFile: filePath,
               });
-              
+
               this.logger.debug(`Skipped existing category: ${categoryName} (${existingCategory.sku})`);
               continue;
             }
+
+            // Slug collision with a different parent — deduplicate the slug
+            const uniqueSlug = existingCategory
+              ? await this.findUniqueSlug(slug, (s) => this.categoryRepo.findBySlug(s))
+              : slug;
 
             // Validate branch/leaf constraint if not root
             if (parentId) {
@@ -240,7 +245,7 @@ export class CategoryImportService {
             const sku = this.generateSKU();
             const category = await this.categoryRepo.create({
               name: categoryName,
-              slug,
+              slug: uniqueSlug,
               description: null,
               parentId,
               path: currentPath,
@@ -263,6 +268,9 @@ export class CategoryImportService {
 
             parentId = category.id;
 
+            if (uniqueSlug !== slug) {
+              this.logger.debug(`Slug collision resolved: ${slug} -> ${uniqueSlug}`);
+            }
             this.logger.debug(
               `Created category at depth ${depth}: ${categoryName} (${category.sku})`,
             );
@@ -401,6 +409,7 @@ export class CategoryImportService {
               await this.importErrorRepository.create({
                 jobId,
                 rowNumber: row.rowNumber,
+                sku: existingCell.sku || undefined,
                 message: `Skipped: Cell "${name}" already exists under ${parentSku} (${existingCell.sku})`,
                 rawData: rowData,
                 sourceFile: filePath,
@@ -459,6 +468,7 @@ export class CategoryImportService {
               await this.importErrorRepository.create({
                 jobId,
                 rowNumber: row.rowNumber,
+                sku: existingCategory.sku || undefined,
                 message: `Skipped: Category "${name}" already exists under ${parentSku} (${existingCategory.sku})`,
                 rawData: rowData,
                 sourceFile: filePath,

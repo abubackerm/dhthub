@@ -1,11 +1,9 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { BaseService } from '@shared/domain';
 import { AttributeOptionRepository } from '../repositories';
 import { AttributeDefinitionRepository } from '../repositories/attribute-definition.repository';
 import { AttributeOptionEntity } from '../entities';
-import { CacheService } from '@core/cache';
 
 export interface CreateAttributeOptionData {
   attributeId: string;
@@ -26,22 +24,8 @@ export class AttributeOptionService extends BaseService {
     eventEmitter: EventEmitter2,
     private readonly optionRepo: AttributeOptionRepository,
     private readonly attributeRepo: AttributeDefinitionRepository,
-    private readonly cacheService: CacheService,
-    private readonly configService: ConfigService,
   ) {
     super(eventEmitter);
-  }
-
-  private get ttl(): number {
-    return this.configService.get('cache.ttl.attributeOption') ?? 3600;
-  }
-
-  private getCacheKey(id: string): string {
-    return `attribute-option:${id}`;
-  }
-
-  private getCacheKeyByAttributeId(attributeId: string): string {
-    return `attribute-options:${attributeId}`;
   }
 
   async create(data: CreateAttributeOptionData): Promise<AttributeOptionEntity> {
@@ -78,9 +62,6 @@ export class AttributeOptionService extends BaseService {
 
     const updated = await this.optionRepo.update(id, data);
 
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyByAttributeId(updated.attributeId));
-
     this.emit('attribute.option.updated', {
       id: updated.id,
       attributeId: updated.attributeId,
@@ -91,32 +72,20 @@ export class AttributeOptionService extends BaseService {
   }
 
   async findById(id: string): Promise<AttributeOptionEntity> {
-    return this.cacheService.wrap(
-      this.getCacheKey(id),
-      async () => {
-        const option = await this.optionRepo.findById(id);
-        if (!option) {
-          throw new NotFoundException('Attribute option not found');
-        }
-        return option;
-      },
-      this.ttl,
-    );
+    const option = await this.optionRepo.findById(id);
+    if (!option) {
+      throw new NotFoundException('Attribute option not found');
+    }
+    return option;
   }
 
   async findByAttributeId(attributeId: string): Promise<AttributeOptionEntity[]> {
-    return this.cacheService.wrap(
-      this.getCacheKeyByAttributeId(attributeId),
-      async () => {
-        const attribute = await this.attributeRepo.findById(attributeId);
-        if (!attribute) {
-          throw new NotFoundException('Attribute definition not found');
-        }
+    const attribute = await this.attributeRepo.findById(attributeId);
+    if (!attribute) {
+      throw new NotFoundException('Attribute definition not found');
+    }
 
-        return this.optionRepo.findByAttributeId(attributeId);
-      },
-      this.ttl,
-    );
+    return this.optionRepo.findByAttributeId(attributeId);
   }
 
   async delete(id: string): Promise<void> {
@@ -126,9 +95,6 @@ export class AttributeOptionService extends BaseService {
     }
 
     await this.optionRepo.delete(id);
-
-    await this.cacheService.del(this.getCacheKey(id));
-    await this.cacheService.del(this.getCacheKeyByAttributeId(existing.attributeId));
 
     this.emit('attribute.option.deleted', {
       id,
