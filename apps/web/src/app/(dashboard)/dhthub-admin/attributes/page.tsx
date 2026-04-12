@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Ruler, Search, Trash2, Upload } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Ruler, Search, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
   SelectContent,
@@ -40,17 +39,13 @@ import {
 } from "@/components/ui/table"
 import { ApiError } from "@/lib/api/client"
 import {
-  assignAttributeToCategory,
   createAttribute,
   createAttributeOption,
   deleteAttributeOption,
   deleteAttribute,
-  getCategoryAttributes,
-  removeAttributeFromCategory,
   updateAttribute,
   updateAttributeOption,
   getAllAttributes,
-  useCategoryTree,
   uploadAttributesCsv,
   uploadAttributesZip,
   downloadAttributeTemplate,
@@ -59,8 +54,6 @@ import {
   deleteUnit,
   type AttributeDataType,
   type AttributeFilterType,
-  type CategoryAttributeView,
-  type CategoryTreeNode,
   type AttributeView,
   type ImportJobView,
   type UnitSummary,
@@ -74,14 +67,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs"
 
-type SheetMode = "create" | "edit" | "view"
+type SheetMode = "create" | "edit"
 type FilterTypeValue = Exclude<AttributeFilterType, null> | "NONE"
 
 interface AttributeOptionDraft {
@@ -190,133 +177,15 @@ function getStatusVariant(status: string): "default" | "destructive" | "outline"
   }
 }
 
-function flattenLeafCategories(categories: CategoryTreeNode[]) {
-  const result: Array<{
-    id: string
-    name: string
-    path: string
-    productCount: number
-  }> = []
-
-  const walk = (items: CategoryTreeNode[], parentPath = "") => {
-    for (const item of items) {
-      const path = parentPath ? `${parentPath} > ${item.name}` : item.name
-
-      if (item.children.length === 0) {
-        result.push({
-          id: item.id,
-          name: item.name,
-          path,
-          productCount: item.productCount,
-        })
-        continue
-      }
-
-      walk(item.children, path)
-    }
-  }
-
-  walk(categories)
-  return result
-}
-
-function formDataFromAttribute(record: CategoryAttributeView): AttributeFormData {
-  return {
-    name: record.attribute.name,
-    slug: record.attribute.slug,
-    dataType: record.attribute.dataType,
-    group: record.attribute.group ?? "",
-    sortOrder: record.attribute.sortOrder,
-    filterType: record.attribute.filterType ?? "NONE",
-    isFilterable: record.attribute.isFilterable,
-    options: record.options.map((option) => ({
-      id: option.id,
-      label: option.label,
-      value: option.value,
-    })),
-  }
-}
-
-function AttributeDetails({
-  record,
-}: {
-  record: CategoryAttributeView
-}) {
-  return (
-    <div className="rounded-md border p-4">
-      <div className="grid gap-4 text-sm">
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Slug</span>
-          <span className="font-mono">{record.attribute.slug}</span>
-        </div>
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Type</span>
-          <span>{getDataTypeLabel(record.attribute.dataType)}</span>
-        </div>
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Group</span>
-          <span>{record.attribute.group || "-"}</span>
-        </div>
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Filter</span>
-          <span>{getFilterLabel(record.attribute.filterType)}</span>
-        </div>
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Unit</span>
-          <span>{record.attribute.unitName || "-"}</span>
-        </div>
-        <div className="grid gap-1">
-          <span className="text-muted-foreground">Required</span>
-          <span>{record.attribute.isRequired ? "Yes" : "No"}</span>
-        </div>
-      </div>
-
-      {record.options.length > 0 && (
-        <>
-          <Separator className="my-4" />
-          <div className="grid gap-3">
-            <div className="text-sm font-medium">Options</div>
-            <div className="grid gap-2">
-              {record.options.map((option) => (
-                <div
-                  key={option.id}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                >
-                  <span>{option.label}</span>
-                  <span className="font-mono text-muted-foreground">{option.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 export default function AttributesPage() {
   const queryClient = useQueryClient()
   const { confirm } = useConfirmDialog()
   const router = useRouter()
-  const {
-    data: categoryTree = [],
-    isLoading: categoriesLoading,
-    error: categoriesError,
-  } = useCategoryTree()
 
-  const leafCategories = useMemo(
-    () => flattenLeafCategories(categoryTree),
-    [categoryTree],
-  )
-
-  const [activeTab, setActiveTab] = useState<"global" | "assignment">("global")
-  const [selectedCategoryId, setSelectedCategoryId] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetMode, setSheetMode] = useState<SheetMode>("create")
-  const [activeAttribute, setActiveAttribute] = useState<CategoryAttributeView | AttributeView | null>(null)
+  const [activeAttribute, setActiveAttribute] = useState<AttributeView | null>(null)
   const [formData, setFormData] = useState<AttributeFormData>(initialFormData)
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [selectedAttributeToAssign, setSelectedAttributeToAssign] = useState("")
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [unitsDialogOpen, setUnitsDialogOpen] = useState(false)
   const [newUnitName, setNewUnitName] = useState("")
@@ -325,31 +194,9 @@ export default function AttributesPage() {
   const [importJob, setImportJob] = useState<any>(null)
   const [isPolling, setIsPolling] = useState(false)
   
-  // Pagination and search state for global attributes
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 100
-
-  useEffect(() => {
-    if (!selectedCategoryId && leafCategories.length > 0) {
-      setSelectedCategoryId(leafCategories[0].id)
-    }
-  }, [leafCategories, selectedCategoryId])
-
-  const selectedCategory = useMemo(
-    () => leafCategories.find((category) => category.id === selectedCategoryId) ?? null,
-    [leafCategories, selectedCategoryId],
-  )
-
-  const {
-    data: categoryAttributes = [],
-    isLoading: attributesLoading,
-    error: attributesError,
-  } = useQuery({
-    queryKey: ["category-attributes", selectedCategoryId],
-    queryFn: () => getCategoryAttributes(selectedCategoryId),
-    enabled: Boolean(selectedCategoryId) && activeTab === "assignment",
-  })
 
   const {
     data: globalAttributesResponse,
@@ -362,7 +209,7 @@ export default function AttributesPage() {
       take: pageSize,
       search: searchQuery || undefined,
     }),
-    enabled: activeTab === "global",
+    enabled: true,
   })
 
   const globalAttributes = globalAttributesResponse?.data ?? []
@@ -370,7 +217,7 @@ export default function AttributesPage() {
   const totalPages = Math.ceil(totalAttributes / pageSize)
 
   const createMutation = useMutation({
-    mutationFn: async (payload: { categoryId: string; formData: AttributeFormData }) => {
+    mutationFn: async (payload: { formData: AttributeFormData }) => {
       const attribute = await createAttribute({
         name: payload.formData.name.trim(),
         slug: payload.formData.slug,
@@ -384,12 +231,6 @@ export default function AttributesPage() {
         isFilterable: payload.formData.isFilterable,
       })
 
-      if (payload.categoryId) {
-        await assignAttributeToCategory(payload.categoryId, {
-          attributeId: attribute.id,
-        })
-      }
-
       if (payload.formData.dataType === "enum") {
         for (const [index, option] of payload.formData.options.entries()) {
           await createAttributeOption(attribute.id, {
@@ -400,15 +241,8 @@ export default function AttributesPage() {
         }
       }
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
-
-      if (variables.categoryId) {
-        await queryClient.invalidateQueries({
-          queryKey: ["category-attributes", variables.categoryId],
-        })
-      }
-
       toast.success("Attribute created successfully")
       handleCloseSheet()
     },
@@ -419,11 +253,10 @@ export default function AttributesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (payload: {
-      categoryId: string
-      record: CategoryAttributeView
+      record: AttributeView
       formData: AttributeFormData
     }) => {
-      await updateAttribute(payload.record.attribute.id, {
+      await updateAttribute(payload.record.id, {
         name: payload.formData.name.trim(),
         dataType: payload.formData.dataType,
         group: payload.formData.group.trim() || undefined,
@@ -434,44 +267,9 @@ export default function AttributesPage() {
             : undefined,
         isFilterable: payload.formData.isFilterable,
       })
-
-      const existingOptionIds = new Set(payload.record.options.map((option) => option.id))
-      const nextOptionIds = new Set(
-        payload.formData.options
-          .map((option) => option.id)
-          .filter((optionId): optionId is string => Boolean(optionId)),
-      )
-
-      for (const option of payload.record.options) {
-        if (!nextOptionIds.has(option.id)) {
-          await deleteAttributeOption(payload.record.attribute.id, option.id)
-        }
-      }
-
-      if (payload.formData.dataType === "enum") {
-        for (const [index, option] of payload.formData.options.entries()) {
-          const optionPayload = {
-            label: option.label.trim(),
-            value: option.value.trim(),
-            sortOrder: index + 1,
-          }
-
-          if (option.id && existingOptionIds.has(option.id)) {
-            await updateAttributeOption(
-              payload.record.attribute.id,
-              option.id,
-              optionPayload,
-            )
-          } else {
-            await createAttributeOption(payload.record.attribute.id, optionPayload)
-          }
-        }
-      }
     },
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["category-attributes", variables.categoryId],
-      })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
       toast.success("Attribute updated successfully")
       handleCloseSheet()
     },
@@ -481,20 +279,6 @@ export default function AttributesPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (payload: { categoryId: string; assignmentId: string }) =>
-      removeAttributeFromCategory(payload.categoryId, payload.assignmentId),
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["category-attributes", variables.categoryId],
-      })
-      toast.success("Attribute removed from category")
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "Failed to delete attribute"))
-    },
-  })
-
-  const deleteGlobalAttributeMutation = useMutation({
     mutationFn: async (attributeId: string) => deleteAttribute(attributeId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
@@ -502,23 +286,6 @@ export default function AttributesPage() {
     },
     onError: (error) => {
       toast.error(getErrorMessage(error, "Failed to delete attribute"))
-    },
-  })
-
-  const assignAttributeMutation = useMutation({
-    mutationFn: async (payload: { categoryId: string; attributeId: string }) => {
-      await assignAttributeToCategory(payload.categoryId, { attributeId: payload.attributeId })
-    },
-    onSuccess: async (_, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["category-attributes", variables.categoryId],
-      })
-      toast.success("Attribute assigned to category")
-      setAssignDialogOpen(false)
-      setSelectedAttributeToAssign("")
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "Failed to assign attribute"))
     },
   })
 
@@ -576,12 +343,6 @@ export default function AttributesPage() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["global-attributes"] })
-
-      if (selectedCategoryId) {
-        await queryClient.invalidateQueries({
-          queryKey: ["category-attributes", selectedCategoryId],
-        })
-      }
 
       setImportDialogOpen(false)
       setImportFile(null)
@@ -657,21 +418,14 @@ export default function AttributesPage() {
     setActiveAttribute(null)
     setFormData({
       ...initialFormData,
-      sortOrder: categoryAttributes.length + 1,
+      sortOrder: globalAttributes.length + 1,
     })
     setSheetOpen(true)
   }
 
-  function openEditSheet(record: CategoryAttributeView) {
+  function openEditSheet(attribute: AttributeView) {
     setSheetMode("edit")
-    setActiveAttribute(record)
-    setFormData(formDataFromAttribute(record))
-    setSheetOpen(true)
-  }
-
-  function openEditGlobalSheet(attribute: AttributeView) {
-    setSheetMode("edit")
-    setActiveAttribute(attribute as any)
+    setActiveAttribute(attribute)
     setFormData({
       name: attribute.name,
       slug: attribute.slug,
@@ -683,36 +437,6 @@ export default function AttributesPage() {
       options: [],
     })
     setSheetOpen(true)
-  }
-
-  function openViewSheet(record: CategoryAttributeView) {
-    setSheetMode("view")
-    setActiveAttribute(record)
-    setFormData(formDataFromAttribute(record))
-    setSheetOpen(true)
-  }
-
-  async function handleDelete(record: CategoryAttributeView) {
-    if (!selectedCategoryId) {
-      return
-    }
-
-    const confirmed = await confirm({
-      title: "Delete attribute?",
-      description: `Remove "${record.attribute.name}" from this category schema?`,
-      confirmLabel: "Delete",
-      cancelLabel: "Cancel",
-      variant: "destructive",
-    })
-
-    if (!confirmed) {
-      return
-    }
-
-    deleteMutation.mutate({
-      categoryId: selectedCategoryId,
-      assignmentId: record.assignmentId,
-    })
   }
 
   async function handleDeleteGlobal(attribute: AttributeView) {
@@ -728,7 +452,7 @@ export default function AttributesPage() {
       return
     }
 
-    deleteGlobalAttributeMutation.mutate(attribute.id)
+    deleteMutation.mutate(attribute.id)
   }
 
   function handleNameChange(name: string) {
@@ -837,41 +561,20 @@ export default function AttributesPage() {
       return
     }
 
-    if (activeTab === "global" && sheetMode === "create") {
-      createMutation.mutate({
-        categoryId: "",
-        formData,
-      })
-      return
-    }
-
-    if (activeTab === "assignment" && sheetMode === "create") {
-      if (!selectedCategoryId) {
-        toast.error("Select a category first")
-        return
-      }
-      createMutation.mutate({
-        categoryId: selectedCategoryId,
-        formData,
-      })
+    if (sheetMode === "create") {
+      createMutation.mutate({ formData })
       return
     }
 
     if (sheetMode === "edit" && activeAttribute) {
-      if (activeTab === "assignment" && !selectedCategoryId) {
-        toast.error("Select a category first")
-        return
-      }
       updateMutation.mutate({
-        categoryId: selectedCategoryId,
-        record: activeAttribute as CategoryAttributeView,
+        record: activeAttribute,
         formData,
       })
     }
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
-  const isReadOnly = sheetMode === "view"
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
@@ -879,9 +582,7 @@ export default function AttributesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Attributes</h1>
           <p className="text-muted-foreground">
-            {activeTab === "global"
-              ? "Manage global attribute definitions available across all categories."
-              : "Assign attributes to specific leaf categories."}
+            Manage global attribute definitions available across all categories.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -896,13 +597,7 @@ export default function AttributesPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "global" | "assignment")}>
-        <TabsList>
-          <TabsTrigger value="global">Global Attributes</TabsTrigger>
-          <TabsTrigger value="assignment">Category Assignment</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="global" className="mt-4">
+      <div>
           <Card>
             <CardHeader className="flex-row items-start justify-between space-y-0">
               <div>
@@ -991,7 +686,7 @@ export default function AttributesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => openEditGlobalSheet(attribute)}
+                                onClick={() => openEditSheet(attribute)}
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -1000,7 +695,7 @@ export default function AttributesPage() {
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 onClick={() => handleDeleteGlobal(attribute)}
-                                disabled={deleteGlobalAttributeMutation.isPending}
+                                disabled={deleteMutation.isPending}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1043,159 +738,7 @@ export default function AttributesPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="assignment" className="mt-4">
-
-      <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-lg">Leaf Categories</CardTitle>
-            <CardDescription>Select a category to manage its attributes.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[560px]">
-              {categoriesLoading ? (
-                <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading categories...
-                </div>
-              ) : categoriesError ? (
-                <div className="p-4 text-sm text-destructive">
-                  {getErrorMessage(categoriesError, "Failed to load categories")}
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {leafCategories.map((category) => {
-                    const isSelected = category.id === selectedCategoryId
-
-                    return (
-                      <button
-                        key={category.id}
-                        onClick={() => setSelectedCategoryId(category.id)}
-                        className={`w-full p-4 text-left transition-colors ${
-                          isSelected
-                            ? "border-l-2 border-l-primary bg-primary/5"
-                            : "hover:bg-muted/50"
-                        }`}
-                      >
-                        <div className="font-medium">{category.name}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{category.path}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {category.productCount} products
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-start justify-between space-y-0">
-            <div>
-              <CardTitle className="text-lg">
-                {selectedCategory?.name ?? "Select a category"}
-              </CardTitle>
-              <CardDescription>{selectedCategory?.path ?? "No category selected"}</CardDescription>
-            </div>
-            <Button onClick={() => setAssignDialogOpen(true)} disabled={!selectedCategory}>
-              <Plus className="mr-2 h-4 w-4" />
-              Assign Attribute
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {attributesLoading ? (
-              <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading attributes...
-              </div>
-            ) : attributesError ? (
-              <div className="py-4 text-sm text-destructive">
-                {getErrorMessage(attributesError, "Failed to load attributes")}
-              </div>
-            ) : categoryAttributes.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                <p>No attributes found for this category.</p>
-                <p className="mt-1 text-sm">Create the first attribute to start defining its schema.</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Filter</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Required</TableHead>
-                    <TableHead>Options</TableHead>
-                    <TableHead className="w-[140px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categoryAttributes.map((record) => (
-                    <TableRow key={record.assignmentId}>
-                      <TableCell className="font-medium">{record.attribute.name}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {record.attribute.slug}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {getDataTypeLabel(record.attribute.dataType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getFilterLabel(record.attribute.filterType)}</TableCell>
-                      <TableCell>{record.attribute.unitName || "-"}</TableCell>
-                      <TableCell>
-                        {record.attribute.isRequired ? (
-                          <Check className="h-4 w-4 text-(--dht-green)" />
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{record.options.length}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openViewSheet(record)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEditSheet(record)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(record)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
       </div>
-        </TabsContent>
-      </Tabs>
 
       <Sheet open={sheetOpen} onOpenChange={(open) => (open ? setSheetOpen(true) : handleCloseSheet())}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
@@ -1208,18 +751,12 @@ export default function AttributesPage() {
                   : "View Attribute"}
             </SheetTitle>
             <SheetDescription>
-              {activeTab === "assignment" && selectedCategory
-                ? `Category: ${selectedCategory.path}`
-                : "Managing global attribute definition."}
+              Managing global attribute definition.
             </SheetDescription>
           </SheetHeader>
 
           <div className="grid gap-4 py-6">
-            {sheetMode === "view" && activeAttribute ? (
-              <AttributeDetails record={activeAttribute} />
-            ) : (
-              <>
-                <div className="grid gap-2">
+            <div className="grid gap-2">
                   <Label htmlFor="attribute-name">
                     Attribute Name <span className="text-destructive">*</span>
                   </Label>
@@ -1228,7 +765,6 @@ export default function AttributesPage() {
                     value={formData.name}
                     onChange={(event) => handleNameChange(event.target.value)}
                     placeholder="e.g. Thread Size"
-                    disabled={isReadOnly}
                   />
                 </div>
 
@@ -1241,7 +777,6 @@ export default function AttributesPage() {
                       setFormData((prev) => ({ ...prev, slug: event.target.value }))
                     }
                     className="font-mono text-sm"
-                    disabled
                   />
                 </div>
 
@@ -1250,7 +785,6 @@ export default function AttributesPage() {
                   <Select
                     value={formData.dataType}
                     onValueChange={(value: AttributeDataType) => handleDataTypeChange(value)}
-                    disabled={isReadOnly}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a data type" />
@@ -1273,7 +807,6 @@ export default function AttributesPage() {
                       setFormData((prev) => ({ ...prev, group: event.target.value }))
                     }
                     placeholder="e.g. Technical Specs"
-                    disabled={isReadOnly}
                   />
                 </div>
 
@@ -1290,7 +823,6 @@ export default function AttributesPage() {
                         sortOrder: Number(event.target.value) || 0,
                       }))
                     }
-                    disabled={isReadOnly}
                   />
                 </div>
 
@@ -1315,7 +847,7 @@ export default function AttributesPage() {
                           : "NONE",
                       }))
                     }
-                    disabled={isReadOnly || formData.dataType === "text"}
+                    disabled={formData.dataType === "text"}
                   />
                 </div>
 
@@ -1326,7 +858,7 @@ export default function AttributesPage() {
                     onValueChange={(value: FilterTypeValue) =>
                       setFormData((prev) => ({ ...prev, filterType: value }))
                     }
-                    disabled={isReadOnly || !formData.isFilterable}
+                    disabled={!formData.isFilterable}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a filter type" />
@@ -1375,7 +907,6 @@ export default function AttributesPage() {
                                       handleOptionChange(index, "label", event.target.value)
                                     }
                                     placeholder="e.g. Zinc Plated"
-                                    disabled={isReadOnly}
                                   />
                                 </div>
                                 <div className="grid gap-2">
@@ -1388,7 +919,6 @@ export default function AttributesPage() {
                                     }
                                     placeholder="e.g. zinc-plated"
                                     className="font-mono text-sm"
-                                    disabled={isReadOnly}
                                   />
                                 </div>
                                 <div className="flex items-end">
@@ -1398,7 +928,6 @@ export default function AttributesPage() {
                                     size="icon"
                                     className="text-destructive hover:text-destructive"
                                     onClick={() => handleRemoveOption(index)}
-                                    disabled={isReadOnly}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1411,75 +940,19 @@ export default function AttributesPage() {
                     </div>
                   </>
                 )}
-              </>
-            )}
           </div>
 
           <SheetFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={handleCloseSheet}>
-              {sheetMode === "view" ? "Close" : "Cancel"}
+              Cancel
             </Button>
-            {!isReadOnly && (
-              <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {sheetMode === "create" ? "Create Attribute" : "Update Attribute"}
               </Button>
-            )}
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Assign Attribute to Category</DialogTitle>
-            <DialogDescription>
-              Select a global attribute to assign to {selectedCategory?.name}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Attribute</Label>
-              <Select value={selectedAttributeToAssign} onValueChange={setSelectedAttributeToAssign}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an attribute" />
-                </SelectTrigger>
-                <SelectContent>
-                  {globalAttributes.map((attr) => (
-                    <SelectItem key={attr.id} value={attr.id}>
-                      {attr.name} ({attr.slug})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setAssignDialogOpen(false)
-              setSelectedAttributeToAssign("")
-            }}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedCategoryId && selectedAttributeToAssign) {
-                  assignAttributeMutation.mutate({
-                    categoryId: selectedCategoryId,
-                    attributeId: selectedAttributeToAssign,
-                  })
-                }
-              }}
-              disabled={!selectedAttributeToAssign || assignAttributeMutation.isPending}
-            >
-              {assignAttributeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Assign
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={(open) => {
         setImportDialogOpen(open)
