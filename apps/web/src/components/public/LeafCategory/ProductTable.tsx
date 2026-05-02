@@ -16,7 +16,7 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, ShoppingCart } from "lucide-rea
 import { Attribute, Product } from "@/lib/mock-data";
 import { useMemo, useCallback } from "react";
 import { useAddToCart } from "@/lib/api/cart";
-import { useRequireAuth } from "@/providers/auth-provider";
+import { AddToCartIsland } from "@/components/public/AddToCartIsland";
 
 interface ProductTableProps {
   products: Product[];
@@ -36,7 +36,6 @@ export function ProductTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
-  const { requireAuth } = useRequireAuth();
 
   // Get visible attributes for table columns
   const visibleAttributes = useMemo(
@@ -205,21 +204,27 @@ export function ProductTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    size="sm"
-                    className="bg-[--dht-red] hover:bg-[--dht-red-hover] text-white"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                  <AddToCartIsland
+                    onAuthenticated={() => {
                       if (product.id) {
-                        requireAuth(() => {
-                          addToCart.mutate({ variantId: product.id, qty: 1 });
-                        });
+                        addToCart.mutate({ variantId: product.id, qty: 1 });
                       }
                     }}
                   >
-                    <ShoppingCart className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
+                    {({ trigger }) => (
+                      <Button
+                        size="sm"
+                        className="bg-[--dht-red] hover:bg-[--dht-red-hover] text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          trigger();
+                        }}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-1" />
+                        Add
+                      </Button>
+                    )}
+                  </AddToCartIsland>
                 </TableCell>
               </TableRow>
             ))}

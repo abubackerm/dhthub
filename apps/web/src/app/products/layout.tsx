@@ -1,8 +1,7 @@
-import { DHTHeader } from "@/app/(home)/components/dht-header";
+import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 import { DHTFooter } from "@/app/(home)/components/dht-footer";
 import { CatalogSidebar } from "@/components/public/CatalogSidebar";
 import { FilterProvider } from "@/contexts/filter-context";
-import { AuthProvider } from "@/providers/auth-provider";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,22 +11,20 @@ export const metadata: Metadata = {
 
 export default function ProductsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
-      <div className="min-h-screen flex flex-col">
-        <DHTHeader />
+    <div className="min-h-screen flex flex-col">
+      <DHTHeaderShell />
 
-        {/* Main Layout: Sidebar + Content */}
-        <div className="catalog-layout">
-          <FilterProvider>
-            <CatalogSidebar />
-            <main className="catalog-content">
-              {children}
-            </main>
-          </FilterProvider>
-        </div>
-
-        <DHTFooter />
+      {/* Main Layout: Sidebar + Content */}
+      <div className="catalog-layout">
+        <FilterProvider>
+          <CatalogSidebar />
+          <main className="catalog-content">
+            {children}
+          </main>
+        </FilterProvider>
       </div>
-    </AuthProvider>
+
+      <DHTFooter />
+    </div>
   );
 }

@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import type { ProductDetailView, Category } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
-import { useRequireAuth } from "@/providers/auth-provider";
+import { AddToCartIsland } from "@/components/public/AddToCartIsland";
 
 interface ProductDetailProps {
   product: ProductDetailView;
@@ -46,7 +46,6 @@ export function ProductDetailPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
-  const { requireAuth } = useRequireAuth();
 
   const variantSku = searchParams.get("variant");
 
@@ -361,20 +360,24 @@ export function ProductDetailPage({
               </p>
             </div>
 
-            <Button
-              className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white h-12 text-lg"
-              disabled={!inStock || !selectedVariantId}
-              onClick={() => {
+            <AddToCartIsland
+              onAuthenticated={() => {
                 if (selectedVariantId) {
-                  requireAuth(() => {
-                    addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
-                  });
+                  addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
                 }
               }}
             >
-              <ShoppingCart className="w-5 h-5 mr-2" />
-              Add to Cart
-            </Button>
+              {({ trigger }) => (
+                <Button
+                  className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white h-12 text-lg"
+                  disabled={!inStock || !selectedVariantId}
+                  onClick={trigger}
+                >
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  Add to Cart
+                </Button>
+              )}
+            </AddToCartIsland>
           </div>
 
           {/* Shipping Info */}

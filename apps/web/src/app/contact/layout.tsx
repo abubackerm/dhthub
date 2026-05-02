@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { DHTHeader } from "../(home)/components/dht-header";
+import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 import { DHTFooter } from "../(home)/components/dht-footer";
-import { ContactClientLayout } from "./contact-client-layout";
 
 export const metadata: Metadata = {
   title: "Contact Us | Dynamic Hub Trading",
@@ -15,12 +14,10 @@ export default function ContactLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ContactClientLayout>
-      <div className="min-h-screen flex flex-col">
-        <DHTHeader />
-        <main className="flex-1">{children}</main>
-        <DHTFooter />
-      </div>
-    </ContactClientLayout>
+    <div className="min-h-screen flex flex-col">
+      <DHTHeaderShell />
+      <main className="flex-1">{children}</main>
+      <DHTFooter />
+    </div>
   );
 }

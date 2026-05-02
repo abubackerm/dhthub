@@ -26,7 +26,7 @@ import type {
   LeafAttributeValueView,
 } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
-import { useRequireAuth } from "@/providers/auth-provider";
+import { AddToCartIsland } from "@/components/public/AddToCartIsland";
 
 interface CellProductTableProps {
   products: LeafProductView[];
@@ -44,7 +44,6 @@ export function CellProductTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
-  const { requireAuth } = useRequireAuth();
 
   // Get visible attributes for table columns.
   // Use product-level tableColumns (at_head) for ordering when available,
@@ -301,9 +300,8 @@ export function CellProductTable({
 
                   {/* Add to Cart */}
                   <TableCell className="p-2">
-                    <QuantityPopover
+                    <CellAddToCartButton
                       variantId={variant.id}
-                      requireAuth={requireAuth}
                       addToCart={addToCart}
                     />
                   </TableCell>
@@ -322,30 +320,56 @@ export function CellProductTable({
   );
 }
 
-function QuantityPopover({
+function CellAddToCartButton({
   variantId,
-  requireAuth,
   addToCart,
 }: {
   variantId: string;
-  requireAuth: (fn: () => void) => void;
   addToCart: { mutate: (data: { variantId: string; qty: number }) => void; isPending: boolean };
 }) {
-  const [open, setOpen] = useState(false);
   const [qty, setQty] = useState(1);
+
+  const handleAddToCart = useCallback(() => {
+    addToCart.mutate({ variantId, qty });
+    setQty(1);
+  }, [variantId, qty, addToCart]);
+
+  return (
+    <AddToCartIsland onAuthenticated={handleAddToCart}>
+      {({ trigger }) => (
+        <QuantityPopoverUI
+          qty={qty}
+          setQty={setQty}
+          onConfirm={trigger}
+          isPending={addToCart.isPending}
+        />
+      )}
+    </AddToCartIsland>
+  );
+}
+
+function QuantityPopoverUI({
+  qty,
+  setQty,
+  onConfirm,
+  isPending,
+}: {
+  qty: number;
+  setQty: (q: number) => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const handleAdd = useCallback(() => {
-    requireAuth(() => {
-      addToCart.mutate({ variantId, qty });
-      setOpen(false);
-      setQty(1);
-    });
-  }, [variantId, qty, requireAuth, addToCart]);
+    onConfirm();
+    setOpen(false);
+  }, [onConfirm]);
 
   const adjustQty = useCallback((delta: number) => {
-    setQty((prev) => Math.max(1, prev + delta));
-  }, []);
+    setQty(Math.max(1, qty + delta));
+  }, [qty, setQty]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -414,7 +438,7 @@ function QuantityPopover({
               e.stopPropagation();
               handleAdd();
             }}
-            disabled={addToCart.isPending}
+            disabled={isPending}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
           </Button>

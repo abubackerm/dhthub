@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { DHTHeader } from "./components/dht-header";
+import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 import { DHTFooter } from "./components/dht-footer";
-import { HomeClientLayout } from "./components/home-client-layout";
 
 export const metadata: Metadata = {
     title: "Dynamic Hub - From Infrastructure to Offshore",
@@ -15,12 +14,10 @@ export default function HomeLayout({
     children: React.ReactNode;
 }) {
     return (
-        <HomeClientLayout>
-            <div className="min-h-screen flex flex-col">
-                <DHTHeader />
-                <main className="flex-1">{children}</main>
-                <DHTFooter />
-            </div>
-        </HomeClientLayout>
+        <div className="min-h-screen flex flex-col">
+            <DHTHeaderShell />
+            <main className="flex-1">{children}</main>
+            <DHTFooter />
+        </div>
     );
 }
