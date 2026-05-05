@@ -63,4 +63,26 @@ export class UserRepository {
   async count(where?: Record<string, any>): Promise<number> {
     return this.getClient().user.count({ where });
   }
+
+  async getMonthlyNewUsers(year: number, month: number): Promise<number> {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+
+    return this.getClient().user.count({
+      where: {
+        createdAt: { gte: start, lt: end },
+      },
+    });
+  }
+
+  async getActiveUsersCount(days: number = 30): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    return this.getClient().user.count({
+      where: {
+        lastLoginAt: { gte: cutoff },
+      },
+    });
+  }
 }

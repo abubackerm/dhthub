@@ -10,6 +10,8 @@ import type {
   LeafProductView,
   LeafFilterableAttributeView,
   LeafAttributeValueView,
+  LeafPageView,
+  AggregatedFilterDataView,
 } from "@/lib/api/catalog/types";
 import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,14 +25,25 @@ interface LeafCategoryPageProps {
   categorySlug: string;
   pathNames: string[];
   pathSlugs: string[];
+  serverData?: LeafPageView | null;
+  serverFilterData?: AggregatedFilterDataView | null;
 }
 
-export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCategoryPageProps) {
-  const { data, isLoading, error } = useLeafPageData(categorySlug);
-  const { data: filterData } = useAggregatedFilterData(categorySlug);
+export function LeafCategoryPage({
+  categorySlug,
+  pathNames,
+  pathSlugs,
+  serverData,
+  serverFilterData,
+}: LeafCategoryPageProps) {
+  const { data: clientData, isLoading, error } = useLeafPageData(serverData ? "" : categorySlug);
+  const { data: clientFilterData } = useAggregatedFilterData(serverFilterData ? "" : categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
   const { setFilterData: setFilterContext } = useFilterContext();
+
+  const data = serverData ?? clientData;
+  const filterData = serverFilterData ?? clientFilterData;
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
@@ -40,7 +53,6 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
   const facets = filterData?.facets ?? {};
   const filterableAttributes = filterData?.filterableAttributes ?? data?.filterableAttributes ?? [];
 
-  // Set filter data in context when data is loaded
   useEffect(() => {
     if (filterData && filterData.filterableAttributes.length > 0) {
       setFilterContext({
@@ -52,7 +64,6 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
       setFilterContext(null);
     }
 
-    // Cleanup when unmounting
     return () => setFilterContext(null);
   }, [filterData, basePath, setFilterContext]);
 
@@ -98,10 +109,10 @@ export function LeafCategoryPage({ categorySlug, pathNames, pathSlugs }: LeafCat
     })).filter((cell) => cell.products.length > 0);
   }, [data, filterableAttributes, searchParams]);
 
-  if (isLoading) {
+  if (!serverData && isLoading) {
     return <LeafCategoryPageSkeleton />;
   }
-  if (error || !data) {
+  if (!data) {
     return (
       <div className="catalog-page">
         <div className="text-center py-16">

@@ -1,5 +1,3 @@
-"use client";
-
 import { User, MapPin, Mail } from "lucide-react";
 
 const teamMembers = [

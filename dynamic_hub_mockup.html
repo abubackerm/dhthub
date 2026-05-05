@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Hub — B2B Industrial Catalogue</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:      #0A1628;
+    --navy-mid:  #112240;
+    --navy-soft: #1A3260;
+    --orange:    #F5620F;
+    --orange-lt: #FF7A2B;
+    --steel:     #8A9BB8;
+    --steel-lt:  #C4CDD9;
+    --white:     #F4F6FA;
+    --pure:      #FFFFFF;
+    --card-bg:   #0E1E38;
+    --border:    #1F3558;
+    --green:     #2ECC71;
+    --yellow:    #F1C40F;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Barlow', sans-serif; background:var(--navy); color:var(--white); }
+
+  /* ─── TOP BAR ─────────────────────────────────────────── */
+  .topbar {
+    background:#070F1E;
+    padding:7px 40px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; color:var(--steel); border-bottom:1px solid var(--border);
+  }
+  .topbar a { color:var(--steel); text-decoration:none; margin-left:18px; transition:.2s; }
+  .topbar a:hover { color:var(--orange); }
+  .topbar-left { display:flex; gap:20px; }
+  .topbar-left span { display:flex; align-items:center; gap:6px; }
+  .topbar-left span::before { content:''; display:inline-block; width:6px; height:6px; background:var(--orange); border-radius:50%; }
+
+  /* ─── NAVBAR ──────────────────────────────────────────── */
+  nav {
+    background:var(--navy-mid);
+    padding:0 40px;
+    display:flex; align-items:center; justify-content:space-between;
+    height:70px; border-bottom:2px solid var(--orange);
+    position:sticky; top:0; z-index:100;
+    box-shadow:0 4px 30px rgba(0,0,0,.5);
+  }
+  .logo { display:flex; align-items:center; gap:12px; text-decoration:none; }
+  .logo-box {
+    background:var(--orange);
+    width:44px; height:44px; border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:22px; color:#fff;
+  }
+  .logo-text { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:var(--pure); line-height:1; }
+  .logo-text span { display:block; font-size:10px; font-weight:400; color:var(--steel); letter-spacing:2px; text-transform:uppercase; }
+
+  .nav-links { display:flex; align-items:center; gap:4px; }
+  .nav-links a {
+    color:var(--steel-lt); text-decoration:none; padding:8px 14px; border-radius:4px;
+    font-size:13px; font-weight:500; letter-spacing:.3px; transition:.2s;
+  }
+  .nav-links a:hover, .nav-links a.active { color:var(--pure); background:rgba(255,255,255,.07); }
+  .nav-links a.active { color:var(--orange); }
+
+  .nav-actions { display:flex; align-items:center; gap:10px; }
+  .btn-rfq {
+    background:var(--orange); color:#fff; border:none; padding:9px 20px;
+    border-radius:5px; font-size:13px; font-weight:600; cursor:pointer;
+    font-family:'Barlow',sans-serif; transition:.2s; letter-spacing:.3px;
+  }
+  .btn-rfq:hover { background:var(--orange-lt); }
+  .btn-account {
+    background:transparent; color:var(--steel-lt); border:1px solid var(--border);
+    padding:8px 16px; border-radius:5px; font-size:13px; cursor:pointer;
+    font-family:'Barlow',sans-serif; transition:.2s;
+  }
+  .btn-account:hover { border-color:var(--steel); color:var(--pure); }
+
+  .cart-icon {
+    position:relative; cursor:pointer; color:var(--steel-lt); display:flex;
+    align-items:center; justify-content:center; width:38px; height:38px;
+    border:1px solid var(--border); border-radius:5px; transition:.2s;
+  }
+  .cart-icon:hover { border-color:var(--orange); color:var(--orange); }
+  .cart-badge {
+    position:absolute; top:-6px; right:-6px; background:var(--orange);
+    color:#fff; font-size:10px; font-weight:700; width:18px; height:18px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+  }
+
+  /* ─── HERO / SEARCH ───────────────────────────────────── */
+  .hero {
+    background:linear-gradient(135deg, #070F1E 0%, var(--navy-mid) 50%, #0D1F40 100%);
+    padding:50px 40px 40px;
+    border-bottom:1px solid var(--border);
+    position:relative; overflow:hidden;
+  }
+  .hero::before {
+    content:'';
+    position:absolute; inset:0;
+    background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  .hero-inner { position:relative; max-width:860px; margin:0 auto; text-align:center; }
+  .hero-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    background:rgba(245,98,15,.12); border:1px solid rgba(245,98,15,.3);
+    color:var(--orange-lt); padding:5px 14px; border-radius:20px;
+    font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
+    margin-bottom:18px;
+  }
+  .hero-badge::before { content:'●'; font-size:7px; }
+  .hero h1 {
+    font-family:'Barlow Condensed',sans-serif; font-size:48px; font-weight:800;
+    color:var(--pure); line-height:1.05; margin-bottom:10px; letter-spacing:-1px;
+  }
+  .hero h1 span { color:var(--orange); }
+  .hero p { color:var(--steel); font-size:15px; margin-bottom:28px; font-weight:300; }
+
+  .search-bar {
+    display:flex; align-items:center;
+    background:var(--pure); border-radius:8px;
+    overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.4);
+    border:2px solid transparent;
+    transition:.3s;
+  }
+  .search-bar:focus-within { border-color:var(--orange); }
+  .search-select {
+    background:#E8ECF2; border:none; padding:0 16px; height:52px;
+    font-family:'Barlow',sans-serif; font-size:13px; font-weight:600;
+    color:#1A3260; cursor:pointer; border-right:2px solid #D0D8E4;
+    min-width:160px;
+  }
+  .search-input {
+    flex:1; border:none; outline:none; padding:0 18px; height:52px;
+    font-family:'Barlow',sans-serif; font-size:15px; color:#1A3260;
+    background:transparent;
+  }
+  .search-input::placeholder { color:#8A9BB8; }
+  .search-btn {
+    background:var(--orange); border:none; padding:0 28px; height:52px;
+    color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; letter-spacing:.5px;
+    transition:.2s; white-space:nowrap;
+  }
+  .search-btn:hover { background:var(--orange-lt); }
+
+  .search-tags { margin-top:14px; display:flex; align-items:center; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .search-tags span { color:var(--steel); font-size:12px; }
+  .search-tags a {
+    background:rgba(255,255,255,.07); color:var(--steel-lt); font-size:11px;
+    padding:4px 10px; border-radius:3px; text-decoration:none; transition:.2s;
+    border:1px solid var(--border);
+  }
+  .search-tags a:hover { background:var(--orange); color:#fff; border-color:var(--orange); }
+
+  /* ─── SECTION LABEL ───────────────────────────────────── */
+  .section-label {
+    display:flex; align-items:center; gap:10px;
+    font-family:'Barlow Condensed',sans-serif; font-size:11px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; color:var(--orange); margin-bottom:14px;
+  }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* ─── CATEGORY GRID ───────────────────────────────────── */
+  .categories { padding:40px 40px; background:var(--navy); }
+  .cat-grid {
+    display:grid; grid-template-columns:repeat(6,1fr); gap:14px;
+  }
+  .cat-card {
+    background:var(--card-bg); border:1px solid var(--border); border-radius:8px;
+    padding:20px 14px; text-align:center; cursor:pointer; transition:.25s;
+    text-decoration:none; color:var(--white); display:block;
+    position:relative; overflow:hidden;
+  }
+  .cat-card::after {
+    content:''; position:absolute; bottom:0; left:0; right:0;
+    height:3px; background:var(--orange); transform:scaleX(0);
+    transition:.25s; transform-origin:left;
+  }
+  .cat-card:hover { border-color:var(--orange); transform:translateY(-3px); box-shadow:0 8px 30px rgba(245,98,15,.15); }
+  .cat-card:hover::after { transform:scaleX(1); }
+  .cat-card:hover .cat-icon { background:var(--orange); color:#fff; }
+  .cat-icon {
+    width:52px; height:52px; background:rgba(245,98,15,.12); border-radius:8px;
+    display:flex; align-items:center; justify-content:center; margin:0 auto 12px;
+    font-size:24px; transition:.25s;
+  }
+  .cat-card h4 { font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; margin-bottom:4px; }
+  .cat-card span { color:var(--steel); font-size:11px; }
+
+  /* ─── TRUST BAR ───────────────────────────────────────── */
+  .trust-bar {
+    background:#070F1E; border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:16px 40px; display:flex; align-items:center; justify-content:space-around; gap:20px;
+  }
+  .trust-item { display:flex; align-items:center; gap:10px; }
+  .trust-item .t-icon { font-size:22px; }
+  .trust-item .t-text strong { display:block; font-size:13px; font-weight:600; color:var(--pure); }
+  .trust-item .t-text span { font-size:11px; color:var(--steel); }
+  .trust-sep { width:1px; height:36px; background:var(--border); }
+
+  /* ─── CATALOGUE SECTION ───────────────────────────────── */
+  .catalogue { padding:40px; display:flex; gap:24px; }
+
+  /* Sidebar */
+  .sidebar {
+    width:240px; flex-shrink:0;
+    background:var(--card-bg); border:1px solid var(--border); border-radius:8px;
+    padding:20px; align-self:start; position:sticky; top:80px;
+  }
+  .sidebar h3 {
+    font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+    letter-spacing:1px; text-transform:uppercase; color:var(--steel); margin-bottom:16px;
+  }
+  .filter-group { margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+  .filter-group:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .filter-group h4 { font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--steel); margin-bottom:10px; }
+  .filter-item { display:flex; align-items:center; gap:8px; margin-bottom:7px; cursor:pointer; }
+  .filter-item input { accent-color:var(--orange); width:14px; height:14px; cursor:pointer; }
+  .filter-item label { font-size:13px; color:var(--steel-lt); cursor:pointer; transition:.2s; }
+  .filter-item:hover label { color:var(--pure); }
+  .filter-count { margin-left:auto; font-size:10px; background:rgba(255,255,255,.08); color:var(--steel); padding:1px 6px; border-radius:10px; }
+
+  .btn-clear {
+    width:100%; background:transparent; border:1px solid var(--border); color:var(--steel);
+    padding:8px; border-radius:5px; font-size:12px; cursor:pointer;
+    font-family:'Barlow',sans-serif; transition:.2s; margin-top:4px;
+  }
+  .btn-clear:hover { border-color:var(--orange); color:var(--orange); }
+
+  /* Product Grid */
+  .product-area { flex:1; min-width:0; }
+  .catalogue-toolbar {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .catalogue-toolbar .results { color:var(--steel); font-size:13px; }
+  .catalogue-toolbar .results strong { color:var(--pure); }
+  .toolbar-right { display:flex; align-items:center; gap:10px; }
+  .sort-select {
+    background:var(--card-bg); border:1px solid var(--border); color:var(--steel-lt);
+    padding:7px 12px; border-radius:5px; font-size:13px; cursor:pointer;
+    font-family:'Barlow',sans-serif;
+  }
+
+  .product-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+
+  .product-card {
+    background:var(--card-bg); border:1px solid var(--border); border-radius:8px;
+    overflow:hidden; transition:.25s; cursor:pointer; position:relative;
+  }
+  .product-card:hover { border-color:var(--orange); transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,0,0,.4); }
+
+  .aramco-badge {
+    position:absolute; top:10px; right:10px; z-index:2;
+    background:rgba(245,98,15,.9); color:#fff; font-size:9px; font-weight:700;
+    padding:3px 7px; border-radius:3px; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .approved-tick {
+    position:absolute; top:10px; left:10px; z-index:2;
+    width:26px; height:26px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.2); background:rgba(10,22,40,.7);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:.2s; font-size:12px; color:var(--steel);
+  }
+  .approved-tick.active { background:var(--green); border-color:var(--green); color:#fff; }
+
+  .product-img {
+    width:100%; height:160px; object-fit:cover;
+    background:linear-gradient(135deg,#0D1F40,#1A3260);
+    display:flex; align-items:center; justify-content:center;
+    font-size:48px; position:relative;
+  }
+  .product-img.color-1 { background:linear-gradient(135deg,#0D2035,#1A4060); }
+  .product-img.color-2 { background:linear-gradient(135deg,#1A2010,#2A4020); }
+  .product-img.color-3 { background:linear-gradient(135deg,#1A1020,#2A1840); }
+
+  .product-body { padding:14px; }
+  .product-brand { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--orange); margin-bottom:5px; }
+  .product-name { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700; color:var(--pure); margin-bottom:6px; line-height:1.2; }
+  .product-spec { font-size:11px; color:var(--steel); margin-bottom:10px; line-height:1.6; }
+
+  .spec-tags { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:12px; }
+  .spec-tag { background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--steel-lt); font-size:10px; padding:2px 7px; border-radius:3px; }
+
+  .product-footer { display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--border); }
+  .stock-status { font-size:11px; display:flex; align-items:center; gap:5px; }
+  .stock-dot { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; }
+  .stock-dot.low { background:var(--yellow); }
+  .stock-dot.out { background:#E74C3C; }
+  .stock-status span { color:var(--steel); }
+
+  .btn-quote {
+    background:var(--orange); color:#fff; border:none; padding:7px 14px;
+    border-radius:5px; font-size:12px; font-weight:700; cursor:pointer;
+    font-family:'Barlow Condensed',sans-serif; letter-spacing:.3px; transition:.2s;
+  }
+  .btn-quote:hover { background:var(--orange-lt); }
+
+  /* ─── FEATURED / QUICK ACCESS ─────────────────────────── */
+  .quick-section { padding:0 40px 40px; }
+  .quick-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:16px; }
+  .quick-card {
+    background:var(--card-bg); border:1px solid var(--border); border-radius:8px;
+    padding:20px; display:flex; gap:16px; align-items:center;
+    transition:.25s; cursor:pointer;
+  }
+  .quick-card:hover { border-color:var(--orange); }
+  .qc-icon { width:48px; height:48px; background:rgba(245,98,15,.12); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+  .qc-text h4 { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700; margin-bottom:3px; }
+  .qc-text p { font-size:12px; color:var(--steel); }
+  .qc-arrow { margin-left:auto; color:var(--orange); font-size:18px; }
+
+  /* ─── WHATSAPP FLOAT ──────────────────────────────────── */
+  .wa-btn {
+    position:fixed; bottom:30px; right:30px; z-index:999;
+    width:56px; height:56px; border-radius:50%; background:#25D366;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 20px rgba(37,211,102,.4); cursor:pointer;
+    font-size:26px; transition:.25s;
+    animation: wa-pulse 2s infinite;
+  }
+  .wa-btn:hover { transform:scale(1.1); }
+  @keyframes wa-pulse {
+    0%,100% { box-shadow:0 4px 20px rgba(37,211,102,.4); }
+    50% { box-shadow:0 4px 40px rgba(37,211,102,.7); }
+  }
+
+  /* ─── FOOTER ──────────────────────────────────────────── */
+  footer {
+    background:#070F1E; border-top:1px solid var(--border);
+    padding:30px 40px 20px;
+  }
+  .footer-inner { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:30px; margin-bottom:24px; }
+  .footer-brand .logo { margin-bottom:12px; }
+  .footer-brand p { font-size:12px; color:var(--steel); line-height:1.7; }
+  .footer-col h5 { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--orange); margin-bottom:12px; }
+  .footer-col a { display:block; font-size:12px; color:var(--steel); text-decoration:none; margin-bottom:7px; transition:.2s; }
+  .footer-col a:hover { color:var(--pure); }
+  .footer-bottom { display:flex; justify-content:space-between; align-items:center; padding-top:16px; border-top:1px solid var(--border); }
+  .footer-bottom p { font-size:11px; color:var(--steel); }
+  .cert-badges { display:flex; gap:8px; }
+  .cert-badge {
+    background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--steel-lt);
+    padding:4px 10px; border-radius:3px; font-size:10px; font-weight:600;
+  }
+
+  /* ─── PAGE SECTION HEADERS ────────────────────────────── */
+  .page-header {
+    background:linear-gradient(to right, #070F1E, var(--navy-mid));
+    padding:30px 40px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px;
+  }
+  .page-header h2 { font-family:'Barlow Condensed',sans-serif; font-size:32px; font-weight:800; }
+  .page-header .breadcrumb { font-size:12px; color:var(--steel); margin-top:4px; }
+  .page-header .breadcrumb a { color:var(--orange); text-decoration:none; }
+
+  /* ─── ANNOTATIONS ─────────────────────────────────────── */
+  .dev-note {
+    position:relative; border:2px dashed rgba(245,98,15,.5); border-radius:6px;
+  }
+  .dev-note-label {
+    position:absolute; top:-12px; left:12px; z-index:10;
+    background:var(--orange); color:#fff; font-size:10px; font-weight:700;
+    padding:2px 10px; border-radius:3px; letter-spacing:1px; text-transform:uppercase;
+    font-family:'Barlow Condensed',sans-serif;
+  }
+
+  /* ─── DEV GUIDE PANEL ─────────────────────────────────── */
+  .dev-guide {
+    background:#050D1A; border-top:3px solid var(--orange); padding:40px;
+  }
+  .dev-guide h2 {
+    font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800;
+    color:var(--pure); margin-bottom:24px; display:flex; align-items:center; gap:10px;
+  }
+  .dev-guide h2::before { content:''; display:block; width:6px; height:28px; background:var(--orange); border-radius:2px; }
+  .guide-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  .guide-card {
+    background:var(--card-bg); border:1px solid var(--border); border-radius:8px; padding:20px;
+  }
+  .guide-card h4 { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; color:var(--orange); margin-bottom:12px; }
+  .guide-card ul { list-style:none; }
+  .guide-card ul li { font-size:12px; color:var(--steel-lt); padding:4px 0; border-bottom:1px solid rgba(255,255,255,.05); display:flex; gap:8px; line-height:1.5; }
+  .guide-card ul li::before { content:'→'; color:var(--orange); flex-shrink:0; }
+
+  .color-palette { display:flex; gap:8px; flex-wrap:wrap; }
+  .color-swatch {
+    width:60px; text-align:center;
+  }
+  .color-swatch .sw { height:40px; border-radius:6px; margin-bottom:4px; border:1px solid var(--border); }
+  .color-swatch p { font-size:9px; color:var(--steel); }
+
+  /* ─── TOGGLE SECTIONS ─────────────────────────────────── */
+  .section-toggle { cursor:pointer; user-select:none; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:var(--navy); }
+  ::-webkit-scrollbar-thumb { background:var(--navy-soft); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span>Aramco Approved Vendor #10117241</span>
+    <span>ISO 9001:2015 Certified</span>
+    <span>Eastern Province, Saudi Arabia</span>
+  </div>
+  <div>
+    <a href="#">+966 XX XXX XXXX</a>
+    <a href="#">info@dynamichub.com.sa</a>
+    <a href="#">العربية</a>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-box">DH</div>
+    <div class="logo-text">
+      Dynamic Hub
+      <span>Industrial Trading Co. Ltd.</span>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#" class="active">Catalogue</a>
+    <a href="#">Brands</a>
+    <a href="#">Aramco Items</a>
+    <a href="#">My Quotes</a>
+    <a href="#">Orders</a>
+    <a href="#">About Us</a>
+  </div>
+  <div class="nav-actions">
+    <div class="cart-icon" title="My Quote Basket">
+      🗂
+      <div class="cart-badge">3</div>
+    </div>
+    <button class="btn-account">Login / Register</button>
+    <button class="btn-rfq">Request Quote (RFQ)</button>
+  </div>
+</nav>
+
+<!-- HERO + SEARCH -->
+<section class="hero dev-note">
+  <div class="dev-note-label">🔑 KEY SECTION — User lands here first</div>
+  <div class="hero-inner">
+    <div class="hero-badge">Saudi Arabia's B2B Industrial Marketplace</div>
+    <h1>Find the Right Part.<br><span>Get a Quote. Done.</span></h1>
+    <p>Trusted by Aramco contractors, EPC companies, and drilling teams across the Eastern Province.</p>
+    <div class="search-bar">
+      <select class="search-select">
+        <option>All Categories</option>
+        <option>General Consumables</option>
+        <option>Painting & Coatings</option>
+        <option>Rotating Equipment</option>
+        <option>Instrumentation</option>
+        <option>PPE & Safety</option>
+        <option>Valves & Fittings</option>
+        <option>Office Stationery</option>
+      </select>
+      <input class="search-input" type="text" placeholder="Search by part number, description, or Aramco spec…">
+      <button class="search-btn">🔍 SEARCH</button>
+    </div>
+    <div class="search-tags">
+      <span>Popular:</span>
+      <a href="#">Butterfly Valves</a>
+      <a href="#">High-Pressure Hose</a>
+      <a href="#">Lubrication Systems</a>
+      <a href="#">Tarpaulin</a>
+      <a href="#">Protective Coatings</a>
+      <a href="#">Welding Consumables</a>
+      <a href="#">PPE</a>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <div class="trust-item"><div class="t-icon">✅</div><div class="t-text"><strong>Aramco Approved</strong><span>Vendor #10117241</span></div></div>
+  <div class="trust-sep"></div>
+  <div class="trust-item"><div class="t-icon">🏭</div><div class="t-text"><strong>15+ Years</strong><span>Eastern Province Operations</span></div></div>
+  <div class="trust-sep"></div>
+  <div class="trust-item"><div class="t-icon">📋</div><div class="t-text"><strong>RFQ in 24 Hours</strong><span>Fast Quote Turnaround</span></div></div>
+  <div class="trust-sep"></div>
+  <div class="trust-item"><div class="t-icon">🚚</div><div class="t-text"><strong>Local Stock</strong><span>Dammam Warehouse</span></div></div>
+  <div class="trust-sep"></div>
+  <div class="trust-item"><div class="t-icon">🤝</div><div class="t-text"><strong>EPC & Contractor Accounts</strong><span>Credit Terms Available</span></div></div>
+</div>
+
+<!-- CATEGORIES -->
+<section class="categories dev-note">
+  <div class="dev-note-label">📦 PRODUCT CATEGORIES — Click to browse</div>
+  <div class="section-label">Browse by Category</div>
+  <div class="cat-grid">
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🔧</div>
+      <h4>General Consumables</h4>
+      <span>420+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🎨</div>
+      <h4>Painting & Coatings</h4>
+      <span>150+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">⚙️</div>
+      <h4>Rotating Equipment</h4>
+      <span>230+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🔩</div>
+      <h4>Valves & Fittings</h4>
+      <span>340+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🛡️</div>
+      <h4>PPE & Safety</h4>
+      <span>180+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🩺</div>
+      <h4>Instrumentation</h4>
+      <span>90+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🪣</div>
+      <h4>Spill Control</h4>
+      <span>60+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🏗️</div>
+      <h4>Rigging & Lifting</h4>
+      <span>120+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🪛</div>
+      <h4>Welding Consumables</h4>
+      <span>200+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">🏭</div>
+      <h4>Aluminium Foundry</h4>
+      <span>80+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">📦</div>
+      <h4>Hessian & Tarpaulin</h4>
+      <span>45+ items</span>
+    </a>
+    <a class="cat-card" href="#">
+      <div class="cat-icon">📎</div>
+      <h4>Office Stationery</h4>
+      <span>300+ items</span>
+    </a>
+  </div>
+</section>
+
+<!-- QUICK ACCESS CARDS -->
+<section class="quick-section">
+  <div class="section-label">Quick Access</div>
+  <div class="quick-cards">
+    <div class="quick-card">
+      <div class="qc-icon">📤</div>
+      <div class="qc-text">
+        <h4>Upload Excel BOM</h4>
+        <p>Upload your bill of materials and get an instant quote for all items at once.</p>
+      </div>
+      <div class="qc-arrow">→</div>
+    </div>
+    <div class="quick-card">
+      <div class="qc-icon">⭐</div>
+      <div class="qc-text">
+        <h4>My Approved Items</h4>
+        <p>Your company's saved and pre-approved product list for repeat orders.</p>
+      </div>
+      <div class="qc-arrow">→</div>
+    </div>
+    <div class="quick-card">
+      <div class="qc-icon">🛢️</div>
+      <div class="qc-text">
+        <h4>Aramco-Approved Items</h4>
+        <p>Browse only items on the Aramco Approved Vendor List (AVL).</p>
+      </div>
+      <div class="qc-arrow">→</div>
+    </div>
+  </div>
+</section>
+
+<!-- CATALOGUE WITH SIDEBAR + GRID -->
+<div class="page-header dev-note">
+  <div class="dev-note-label">📂 CATALOGUE PAGE — with sidebar filters</div>
+  <div>
+    <h2>Product Catalogue — General Consumables</h2>
+    <div class="breadcrumb"><a href="#">Home</a> → <a href="#">Catalogue</a> → General Consumables</div>
+  </div>
+</div>
+
+<section class="catalogue">
+  <!-- SIDEBAR FILTERS -->
+  <div class="sidebar">
+    <h3>⚙ Filters</h3>
+
+    <div class="filter-group">
+      <h4>Category</h4>
+      <div class="filter-item"><input type="checkbox" checked id="fc1"><label for="fc1">General Consumables <span class="filter-count">420</span></label></div>
+      <div class="filter-item"><input type="checkbox" id="fc2"><label for="fc2">Painting & Coatings <span class="filter-count">150</span></label></div>
+      <div class="filter-item"><input type="checkbox" id="fc3"><label for="fc3">Rotating Equipment <span class="filter-count">230</span></label></div>
+      <div class="filter-item"><input type="checkbox" id="fc4"><label for="fc4">Valves & Fittings <span class="filter-count">340</span></label></div>
+    </div>
+
+    <div class="filter-group">
+      <h4>Brand</h4>
+      <div class="filter-item"><input type="checkbox" checked id="fb1"><label for="fb1">Wouter Witzel</label></div>
+      <div class="filter-item"><input type="checkbox" id="fb2"><label for="fb2">SPIR STAR</label></div>
+      <div class="filter-item"><input type="checkbox" id="fb3"><label for="fb3">Danfoss</label></div>
+      <div class="filter-item"><input type="checkbox" id="fb4"><label for="fb4">Lincoln Industrial</label></div>
+      <div class="filter-item"><input type="checkbox" id="fb5"><label for="fb5">Sari Coat</label></div>
+    </div>
+
+    <div class="filter-group">
+      <h4>Aramco Compliance</h4>
+      <div class="filter-item"><input type="checkbox" id="fa1"><label for="fa1">Aramco AVL Only</label></div>
+      <div class="filter-item"><input type="checkbox" id="fa2"><label for="fa2">SAES Compliant</label></div>
+      <div class="filter-item"><input type="checkbox" id="fa3"><label for="fa3">9COM Listed</label></div>
+    </div>
+
+    <div class="filter-group">
+      <h4>Stock Status</h4>
+      <div class="filter-item"><input type="checkbox" id="fs1"><label for="fs1">In Stock</label></div>
+      <div class="filter-item"><input type="checkbox" id="fs2"><label for="fs2">Available to Order</label></div>
+    </div>
+
+    <button class="btn-clear">Clear All Filters</button>
+  </div>
+
+  <!-- PRODUCT GRID -->
+  <div class="product-area">
+    <div class="catalogue-toolbar">
+      <p class="results">Showing <strong>24</strong> of <strong>420</strong> products</p>
+      <div class="toolbar-right">
+        <select class="sort-select">
+          <option>Sort: Relevance</option>
+          <option>Sort: Newest</option>
+          <option>Sort: A–Z</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="product-grid dev-note">
+      <div class="dev-note-label">🛒 PRODUCT CARDS — grid layout</div>
+
+      <!-- Card 1 -->
+      <div class="product-card">
+        <div class="aramco-badge">Aramco AVL</div>
+        <div class="approved-tick active" title="Saved to My Approved Items">✓</div>
+        <div class="product-img color-1">🔩</div>
+        <div class="product-body">
+          <div class="product-brand">Wouter Witzel</div>
+          <div class="product-name">Butterfly Valve — Triple Offset</div>
+          <div class="product-spec">Sizes: 2" – 48" | Body: Carbon Steel | Rating: ANSI 150–600</div>
+          <div class="spec-tags">
+            <span class="spec-tag">ASME B16.34</span>
+            <span class="spec-tag">API 609</span>
+            <span class="spec-tag">Fire Safe</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot"></div><span>In Stock</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="product-card">
+        <div class="aramco-badge">Aramco AVL</div>
+        <div class="approved-tick" title="Save to My Approved Items">☆</div>
+        <div class="product-img color-2">🛢️</div>
+        <div class="product-body">
+          <div class="product-brand">SPIR STAR</div>
+          <div class="product-name">High-Pressure Hose Assembly</div>
+          <div class="product-spec">Pressure: up to 3,000 bar | Temp: -40°C to +200°C | Multiple end fittings</div>
+          <div class="spec-tags">
+            <span class="spec-tag">SAE 100R15</span>
+            <span class="spec-tag">Oil & Gas</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot"></div><span>In Stock</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="product-card">
+        <div class="approved-tick" title="Save to My Approved Items">☆</div>
+        <div class="product-img color-3">🌡️</div>
+        <div class="product-body">
+          <div class="product-brand">Danfoss</div>
+          <div class="product-name">Pressure Transmitter</div>
+          <div class="product-spec">Range: 0–600 bar | Output: 4–20mA HART | IP67 Protection</div>
+          <div class="spec-tags">
+            <span class="spec-tag">ATEX</span>
+            <span class="spec-tag">IECEx</span>
+            <span class="spec-tag">4–20mA</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot low"></div><span>Low Stock (4 pcs)</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="product-card">
+        <div class="aramco-badge">9COM</div>
+        <div class="approved-tick active" title="Saved to My Approved Items">✓</div>
+        <div class="product-img color-1">🔧</div>
+        <div class="product-body">
+          <div class="product-brand">Lincoln Industrial</div>
+          <div class="product-name">Automatic Lubrication System</div>
+          <div class="product-spec">Single-point & multi-point | Pump capacity: 0.5L–5L | 24VDC</div>
+          <div class="spec-tags">
+            <span class="spec-tag">ISO 6743</span>
+            <span class="spec-tag">Grease & Oil</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot"></div><span>In Stock</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="product-card">
+        <div class="product-img color-2">🎨</div>
+        <div class="approved-tick" title="Save to My Approved Items">☆</div>
+        <div class="product-body">
+          <div class="product-brand">Sari Coat</div>
+          <div class="product-name">Epoxy Protective Coating</div>
+          <div class="product-spec">2-part epoxy | DFT: 100–300 microns | Offshore & Onshore grade</div>
+          <div class="spec-tags">
+            <span class="spec-tag">NACE SP0169</span>
+            <span class="spec-tag">Offshore</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot"></div><span>In Stock</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="product-card">
+        <div class="product-img color-3">🏗️</div>
+        <div class="approved-tick" title="Save to My Approved Items">☆</div>
+        <div class="product-body">
+          <div class="product-brand">Dynamic Hub</div>
+          <div class="product-name">Heavy-Duty Tarpaulin</div>
+          <div class="product-spec">GSM: 180–400 | Sizes: 3×4m to 10×15m | UV stabilised, PE/PP</div>
+          <div class="spec-tags">
+            <span class="spec-tag">UV Resistant</span>
+            <span class="spec-tag">Waterproof</span>
+          </div>
+          <div class="product-footer">
+            <div class="stock-status"><div class="stock-dot"></div><span>In Stock</span></div>
+            <button class="btn-quote">+ Add to Quote</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /product-grid -->
+  </div><!-- /product-area -->
+</section>
+
+<!-- WHATSAPP -->
+<a class="wa-btn" href="https://wa.me/966XXXXXXXXX" title="Chat on WhatsApp">💬</a>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo" style="margin-bottom:12px;">
+        <div class="logo-box">DH</div>
+        <div class="logo-text">Dynamic Hub<span>Industrial Trading Co.</span></div>
+      </div>
+      <p>Aramco Approved Vendor #10117241 · ISO 9001:2015<br>Eastern Province, Dammam, Saudi Arabia<br>15+ years supplying EPC and oil & gas contractors.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Catalogue</h5>
+      <a href="#">General Consumables</a>
+      <a href="#">Painting & Coatings</a>
+      <a href="#">Rotating Equipment</a>
+      <a href="#">Valves & Fittings</a>
+      <a href="#">Instrumentation</a>
+    </div>
+    <div class="footer-col">
+      <h5>Services</h5>
+      <a href="#">Request a Quote (RFQ)</a>
+      <a href="#">Upload BOM (Excel)</a>
+      <a href="#">Aramco AVL Items</a>
+      <a href="#">My Approved Items</a>
+      <a href="#">Vendor Registration</a>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <a href="#">About Dynamic Hub</a>
+      <a href="#">Our Brands</a>
+      <a href="#">Certifications</a>
+      <a href="#">Contact Us</a>
+      <a href="#">Careers</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 Dynamic Hub Trading Co. Ltd. All rights reserved.</p>
+    <div class="cert-badges">
+      <span class="cert-badge">Aramco AVL</span>
+      <span class="cert-badge">ISO 9001:2015</span>
+      <span class="cert-badge">IKTVA Participant</span>
+    </div>
+  </div>
+</footer>
+
+<!-- DEVELOPER GUIDE -->
+<div class="dev-guide">
+  <h2>Developer Reference Guide — Dynamic Hub B2B Platform</h2>
+
+  <div class="guide-grid">
+
+    <div class="guide-card">
+      <h4>🎨 Color System</h4>
+      <div style="margin-bottom:12px;">
+        <div class="color-palette">
+          <div class="color-swatch"><div class="sw" style="background:#0A1628;"></div><p>#0A1628<br>Primary Navy</p></div>
+          <div class="color-swatch"><div class="sw" style="background:#112240;"></div><p>#112240<br>Mid Navy</p></div>
+          <div class="color-swatch"><div class="sw" style="background:#F5620F;"></div><p>#F5620F<br>Orange CTA</p></div>
+          <div class="color-swatch"><div class="sw" style="background:#8A9BB8; border:none;"></div><p>#8A9BB8<br>Steel Text</p></div>
+          <div class="color-swatch"><div class="sw" style="background:#F4F6FA; border:1px solid #1F3558;"></div><p>#F4F6FA<br>Light Text</p></div>
+        </div>
+      </div>
+      <ul>
+        <li>Navy = background, trust, industrial feel</li>
+        <li>Orange = all CTAs, highlights, active states</li>
+        <li>Steel gray = secondary text, specs, labels</li>
+        <li>White/light = headings, product names</li>
+        <li>Green #2ECC71 = in-stock indicator only</li>
+      </ul>
+    </div>
+
+    <div class="guide-card">
+      <h4>📝 Typography</h4>
+      <ul>
+        <li>Headings: Barlow Condensed 700/800 — bold, industrial, compact</li>
+        <li>Body/UI: Barlow 400/500/600 — readable, modern</li>
+        <li>Page titles: 32–48px Barlow Condensed 800</li>
+        <li>Product names: 17px Barlow Condensed 700</li>
+        <li>Specs / Labels: 11–12px Barlow 400 in steel color</li>
+        <li>Buttons: 12–14px Barlow Condensed 700 uppercase</li>
+        <li>Arabic support: Noto Kufi Arabic (same weight feel)</li>
+      </ul>
+    </div>
+
+    <div class="guide-card">
+      <h4>🖥️ Page Structure</h4>
+      <ul>
+        <li>Top bar → Navbar (sticky) → Hero+Search → Trust bar</li>
+        <li>Categories grid (12 cards, 6-col desktop, 2-col mobile)</li>
+        <li>Quick Access cards (Excel BOM, Approved Items, AVL)</li>
+        <li>Catalogue: Left filter sidebar (240px) + Product grid (3-col)</li>
+        <li>Product detail: full-width image, specs table, quote CTA</li>
+        <li>Floating WhatsApp button (bottom-right, always visible)</li>
+        <li>Footer: 4-column with certs and company info</li>
+      </ul>
+    </div>
+
+    <div class="guide-card">
+      <h4>⚡ B2B Features Required</h4>
+      <ul>
+        <li>Company account + contractor approval workflow</li>
+        <li>RFQ basket (not direct checkout) — Add to Quote model</li>
+        <li>Quote submitted → DH team reviews → sends formal quotation</li>
+        <li>Excel BOM upload → auto-match to catalogue → bulk quote</li>
+        <li>✅ Approved tick per product — company-specific saved lists</li>
+        <li>Aramco AVL / 9COM filter — critical for contractors</li>
+        <li>Order history + repeat order in one click</li>
+        <li>Credit account / NET30 payment term support</li>
+      </ul>
+    </div>
+
+    <div class="guide-card">
+      <h4>📱 Mobile & Performance</h4>
+      <ul>
+        <li>Breakpoints: 1200 / 768 / 480px</li>
+        <li>Category grid: 6-col → 3-col → 2-col</li>
+        <li>Product grid: 3-col → 2-col → 1-col</li>
+        <li>Sidebar: collapsible drawer on mobile (filter button)</li>
+        <li>Target page load: under 2 seconds (contractors on site)</li>
+        <li>Lazy-load product images, skeleton loading states</li>
+        <li>WhatsApp button always visible on mobile — primary CTA</li>
+        <li>Sticky navbar stays visible while scrolling</li>
+      </ul>
+    </div>
+
+    <div class="guide-card">
+      <h4>🔌 Tech & Integration</h4>
+      <ul>
+        <li>Recommended stack: Laravel (backend) + Vue.js or React (frontend)</li>
+        <li>Or: Magento 2 / WooCommerce (B2B extension) for faster launch</li>
+        <li>Product import: Excel/CSV bulk upload with SKU mapping</li>
+        <li>Search: Algolia or Meilisearch for instant part-number search</li>
+        <li>WhatsApp: WATI.io or Twilio WhatsApp Business API</li>
+        <li>Payment: SADAD, bank transfer, credit account invoice</li>
+        <li>Language: Arabic/English toggle (RTL support required)</li>
+        <li>SSL, HTTPS, Saudi data residency if required</li>
+      </ul>
+    </div>
+
+  </div><!-- /guide-grid -->
+
+  <div style="margin-top:24px; background:rgba(245,98,15,.08); border:1px solid rgba(245,98,15,.3); border-radius:8px; padding:20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; color:var(--orange); margin-bottom:10px;">⚠️ Critical Developer Notes</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div>
+        <p style="font-size:13px; color:var(--steel-lt); line-height:1.8;">
+          1. <strong style="color:var(--pure);">No direct checkout by default.</strong> This is a B2B quote-first business. All products go into a "Quote Basket", not a shopping cart.<br>
+          2. <strong style="color:var(--pure);">User onboarding = company registration.</strong> Individual users register under a Company Account (contractor name, CR number, Aramco contractor ID).<br>
+          3. <strong style="color:var(--pure);">Product specs are critical.</strong> Every product MUST have: part number, full spec table, datasheet PDF download, brand, compliance standards.
+        </p>
+      </div>
+      <div>
+        <p style="font-size:13px; color:var(--steel-lt); line-height:1.8;">
+          4. <strong style="color:var(--pure);">Approved Tick = company-level bookmark.</strong> When a user ticks ✅ a product, it saves to their company's Approved Items list — shared across all users from that company.<br>
+          5. <strong style="color:var(--pure);">Arabic is not optional.</strong> Eastern Province contractors expect Arabic. Product names + navigation + checkout must be fully translated (RTL layout).<br>
+          6. <strong style="color:var(--pure);">Orange = action only.</strong> Never use orange for decorative purposes. It signals "click here" to users.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

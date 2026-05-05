@@ -1,12 +1,13 @@
-import { AboutHero } from "./components/about-hero";
-import { AboutStory } from "./components/about-story";
-import { AboutMission } from "./components/about-mission";
-import { AboutValues } from "./components/about-values";
-import { AboutTimeline } from "./components/about-timeline";
-import { AboutCertifications } from "./components/about-certifications";
-import { AboutTeam } from "./components/about-team";
-import { AboutCta } from "./components/about-cta";
-import { ScrollAnimationScript } from "@/components/scroll-animation-script";
+import { DHTHero } from "../(home)/components/dht-hero";
+import { DHTFeatureCards } from "../(home)/components/dht-feature-cards";
+import { DHTAbout } from "../(home)/components/dht-about";
+import { DHTMissionVision } from "../(home)/components/dht-mission-vision";
+import { DHTServices } from "../(home)/components/dht-services";
+import { DHTProcurement } from "../(home)/components/dht-procurement";
+import { DHTStats } from "../(home)/components/dht-stats";
+import { DHTClients } from "../(home)/components/dht-clients";
+import { DHTDealerCTA } from "../(home)/components/dht-dealer-cta";
+import { DHTExpertiseBanner } from "../(home)/components/dht-expertise-banner";
 
 export const metadata = {
   title: "About Us | Dynamic Hub Trading",
@@ -16,15 +17,16 @@ export const metadata = {
 export default function AboutPage() {
   return (
     <main>
-      <ScrollAnimationScript />
-      <AboutHero />
-      <AboutStory />
-      <AboutMission />
-      <AboutValues />
-      <AboutTimeline />
-      <AboutCertifications />
-      <AboutTeam />
-      <AboutCta />
+      <DHTHero />
+      <DHTFeatureCards />
+      <DHTAbout />
+      <DHTMissionVision />
+      <DHTServices />
+      <DHTProcurement />
+      <DHTStats />
+      <DHTClients />
+      <DHTDealerCTA />
+      <DHTExpertiseBanner />
     </main>
   );
 }

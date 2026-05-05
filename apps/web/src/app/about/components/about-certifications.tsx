@@ -1,5 +1,3 @@
-"use client";
-
 import { Award, CheckCircle, Shield, Star } from "lucide-react";
 
 const certifications = [

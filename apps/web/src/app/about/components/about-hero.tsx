@@ -1,24 +1,12 @@
 "use client";
 
-import { useScrollAnimation, useParallax } from "@/hooks/use-scroll-animation";
+import { useEffect, useRef, useState } from "react";
+import { useParallax } from "@/hooks/use-scroll-animation";
 import { ChevronDown } from "lucide-react";
 
 export function AboutHero() {
-  const { ref: titleRef, isVisible: titleVisible } = useScrollAnimation({
-    threshold: 0.2,
-  });
-
   const subtitleRef = useParallax(0.3);
   const patternRef = useParallax(0.15);
-
-  // Split text into letters for animation
-  const animateText = (text: string) => {
-    return text.split('').map((char, index) => (
-      <span key={index} style={{ animationDelay: `${index * 50}ms` }}>
-        {char === ' ' ? '\u00A0' : char}
-      </span>
-    ));
-  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-(--dht-dark)">
@@ -31,6 +19,7 @@ export function AboutHero() {
       {/* Red Accent Lines */}
       <div className="absolute top-0 left-0 w-1 h-full bg-linear-to-b from-transparent via-(--dht-red) to-transparent opacity-50" />
       <div className="absolute bottom-0 right-0 w-full h-1 bg-linear-to-r from-transparent via-(--dht-red) to-transparent opacity-50" />
+
       {/* Main Content */}
       <div className="relative z-10 text-center px-4 max-w-5xl mx-auto">
         {/* Pre-label */}
@@ -39,18 +28,7 @@ export function AboutHero() {
         </p>
 
         {/* Animated Headline */}
-        <h1
-          ref={titleRef as any}
-          className={`text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-8 leading-tight ${titleVisible ? 'letter-reveal animate-in' : ''}`}
-        >
-          {titleVisible && (
-            <>
-              {animateText("Built on Experience.")}
-              <br />
-              {animateText("Trusted Critically.")}
-            </>
-          )}
-        </h1>
+        <AboutHeroTitle />
 
         {/* Subtitle */}
         <p
@@ -71,5 +49,51 @@ export function AboutHero() {
       <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-(--dht-red) rounded-full opacity-5 blur-3xl" />
       <div className="absolute -top-20 -left-20 w-60 h-60 bg-(--dht-red) rounded-full opacity-5 blur-2xl" />
     </section>
+  );
+}
+
+function AboutHeroTitle() {
+  const ref = useRef<HTMLElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const animateText = (text: string) => {
+    return text.split("").map((char, index) => (
+      <span key={index} style={{ animationDelay: `${index * 50}ms` }}>
+        {char === " " ? "\u00A0" : char}
+      </span>
+    ));
+  };
+
+  return (
+    <h1
+      ref={ref as any}
+      className={`text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-8 leading-tight ${isVisible ? "letter-reveal animate-in" : ""}`}
+    >
+      {isVisible && (
+        <>
+          {animateText("Built on Experience.")}
+          <br />
+          {animateText("Trusted Critically.")}
+        </>
+      )}
+    </h1>
   );
 }

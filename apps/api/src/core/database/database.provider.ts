@@ -162,6 +162,10 @@ export class DatabaseProvider {
     return this.prisma.auditLog;
   }
 
+  get pageView(): PrismaDelegate<any> {
+    return this.prisma.pageView;
+  }
+
   get productTableColumn(): PrismaDelegate<any> {
     return this.prisma.productTableColumn;
   }

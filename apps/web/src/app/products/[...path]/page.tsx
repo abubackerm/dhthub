@@ -2,6 +2,11 @@ import { notFound } from "next/navigation";
 import { getServerCategoryBySlugLookup, getServerCategoryTree } from "@/lib/api/catalog";
 import { getCellsByCategorySlug } from "@/lib/api/catalog";
 import { getServerProductBySlug } from "@/lib/api/catalog/products";
+import {
+  getServerLeafPageData,
+  getServerConsolidatedLeafData,
+  getServerAggregatedFilterData,
+} from "@/lib/api/catalog/categories";
 import { LeafCategoryPage } from "@/components/public/LeafCategory";
 import { ProductDetailPage } from "@/components/public/ProductDetail";
 import { ConsolidatedLeafCategoryPage } from "@/components/public/LeafCategory/ConsolidatedLeafCategoryPage";
@@ -92,11 +97,18 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     ) ?? false;
 
     if (allChildrenAreLeaves) {
+      const [consolidatedData, filterData] = await Promise.all([
+        getServerConsolidatedLeafData(lastSlug).catch(() => null),
+        getServerAggregatedFilterData(lastSlug).catch(() => null),
+      ]);
+
       return (
         <ConsolidatedLeafCategoryPage
           categorySlug={lastSlug}
           pathNames={pathNames}
           pathSlugs={path}
+          serverData={consolidatedData}
+          serverFilterData={filterData}
         />
       );
     }
@@ -122,11 +134,18 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     );
   }
 
+  const [leafData, filterData] = await Promise.all([
+    getServerLeafPageData(lastSlug).catch(() => null),
+    getServerAggregatedFilterData(lastSlug).catch(() => null),
+  ]);
+
   return (
     <LeafCategoryPage
       categorySlug={lastSlug}
       pathNames={pathNames}
       pathSlugs={path}
+      serverData={leafData}
+      serverFilterData={filterData}
     />
   );
 }

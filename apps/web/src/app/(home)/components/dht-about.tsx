@@ -1,5 +1,3 @@
-"use client";
-
 export function DHTAbout() {
     return (
         <section className="py-20 bg-white">

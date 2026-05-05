@@ -1,5 +1,3 @@
-"use client";
-
 const services = [
     {
         title: "General Maintenance",

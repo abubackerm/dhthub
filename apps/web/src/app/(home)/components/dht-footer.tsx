@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
-import { Facebook, Twitter, Linkedin, Instagram, Send } from "lucide-react";
-import { useState } from "react";
+import { Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
+import { NewsletterForm } from "./dht-footer-newsletter";
 
 const footerLinks = {
     company: [
@@ -28,15 +26,6 @@ const socialLinks = [
 ];
 
 export function DHTFooter() {
-    const [email, setEmail] = useState("");
-
-    const handleSubscribe = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Handle newsletter subscription
-        console.log("Subscribe:", email);
-        setEmail("");
-    };
-
     return (
         <footer className="bg-(--dht-darker)">
             {/* Supplying Infrastructure Banner */}
@@ -68,26 +57,7 @@ export function DHTFooter() {
                                 Don&apos;t miss our future updates! Get Subscribed Today!
                             </p>
                         </div>
-                        <form
-                            onSubmit={handleSubscribe}
-                            className="flex w-full md:w-auto gap-2"
-                        >
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Enter your email"
-                                className="flex-1 md:w-80 px-4 py-3 rounded bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:border-(--dht-red)"
-                                required
-                            />
-                            <button
-                                type="submit"
-                                className="px-6 py-3 bg-(--dht-red) hover:bg-(--dht-red-hover) text-white rounded transition-colors flex items-center gap-2"
-                            >
-                                <Send className="w-4 h-4" />
-                                <span className="hidden sm:inline">Subscribe</span>
-                            </button>
-                        </form>
+                        <NewsletterForm />
                     </div>
                 </div>
             </div>

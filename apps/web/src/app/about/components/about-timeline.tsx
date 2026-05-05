@@ -1,7 +1,6 @@
-"use client";
-
-import { useScrollAnimation, useCounterAnimation } from "@/hooks/use-scroll-animation";
 import { Calendar, Building, Award, Globe, ChevronRight } from "lucide-react";
+import { ScrollReveal } from "@/components/public/ScrollReveal";
+import { CountUp } from "@/components/public/CountUp";
 
 const milestones = [
   {
@@ -43,14 +42,6 @@ const milestones = [
 ];
 
 export function AboutTimeline() {
-  const { ref: titleRef, getAnimationClass: getTitleClass } = useScrollAnimation({
-    threshold: 0.2,
-    animationType: "fade-up",
-  });
-
-  const projectsCounter = useCounterAnimation(500, 2000, 0.5);
-  const yearsCounter = useCounterAnimation(15, 1500, 0.5);
-
   return (
     <section className="py-24 bg-(--dht-dark) relative overflow-hidden">
       {/* Background Pattern */}
@@ -61,10 +52,7 @@ export function AboutTimeline() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
-        <div
-          ref={titleRef as React.RefObject<HTMLDivElement>}
-          className={`text-center mb-20 ${getTitleClass()}`}
-        >
+        <ScrollReveal animation="fade-up" threshold={0.2} className="text-center mb-20">
           <p className="text-(--dht-red) font-semibold uppercase tracking-wider mb-3 text-sm">
             Our Journey
           </p>
@@ -74,32 +62,24 @@ export function AboutTimeline() {
           <p className="text-(--dht-gray) max-w-2xl mx-auto">
             Key milestones that shaped our path to becoming industry leaders.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-20">
           <div className="text-center">
-            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">
-              {yearsCounter.count}+
-            </div>
+            <CountUp target={15} suffix="+" className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2" />
             <div className="text-(--dht-gray) text-sm uppercase tracking-wider">Years Experience</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">
-              {projectsCounter.count}+
-            </div>
+            <CountUp target={500} suffix="+" className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2" />
             <div className="text-(--dht-gray) text-sm uppercase tracking-wider">Projects Completed</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">
-              50+
-            </div>
+            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">50+</div>
             <div className="text-(--dht-gray) text-sm uppercase tracking-wider">Team Members</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">
-              99%
-            </div>
+            <div className="text-4xl md:text-5xl font-bold text-(--dht-red) mb-2">99%</div>
             <div className="text-(--dht-gray) text-sm uppercase tracking-wider">Client Satisfaction</div>
           </div>
         </div>
@@ -125,12 +105,39 @@ export function AboutTimeline() {
                   }`}
                 >
                   {/* Content Card */}
-                  <TimelineItem
-                    milestone={milestone}
-                    Icon={Icon}
-                    isLeft={isLeft}
-                    index={index}
-                  />
+                  <ScrollReveal
+                    animation={isLeft ? "fade-left" : "fade-right"}
+                    threshold={0.3}
+                    delay={index * 100}
+                    className={`w-full md:w-[calc(50%-2rem)] relative`}
+                  >
+                    {/* Card */}
+                    <div className={`bg-(--dht-darker) rounded-2xl p-8 hover:bg-(--dht-dark) transition-colors duration-300 group ${isLeft ? 'md:mr-8' : 'md:ml-8'}`}>
+                      {/* Year Badge */}
+                      <div className="inline-flex items-center gap-2 bg-(--dht-red) text-white px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider mb-4 pulse-red">
+                        {milestone.year}
+                      </div>
+
+                      {/* Icon */}
+                      <div className="w-12 h-12 bg-(--dht-red)/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-(--dht-red)/30 transition-colors duration-300">
+                        <Icon className="w-6 h-6 text-(--dht-red)" />
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-xl font-bold text-white mb-3">{milestone.title}</h3>
+
+                      {/* Description */}
+                      <p className="text-(--dht-gray) leading-relaxed">{milestone.description}</p>
+
+                      {/* Arrow Indicator (Desktop) */}
+                      <div className={`absolute top-1/2 ${isLeft ? 'md:-right-4 md:translate-x-1/2' : 'md:-left-4 md:-translate-x-1/2'} hidden md:flex items-center justify-center w-8 h-8 bg-(--dht-red) rounded-full`}>
+                        <ChevronRight className={`w-4 h-4 text-white ${isLeft ? '' : 'rotate-180'}`} />
+                      </div>
+                    </div>
+
+                    {/* Center Dot (Desktop) */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-(--dht-red) rounded-full border-4 border-(--dht-dark) hidden md:block z-10" />
+                  </ScrollReveal>
                 </div>
               );
             })}
@@ -138,57 +145,5 @@ export function AboutTimeline() {
         </div>
       </div>
     </section>
-  );
-}
-
-function TimelineItem({
-  milestone,
-  Icon,
-  isLeft,
-  index,
-}: {
-  milestone: (typeof milestones)[0];
-  Icon: any;
-  isLeft: boolean;
-  index: number;
-}) {
-  const { ref, getAnimationClass } = useScrollAnimation({
-    threshold: 0.3,
-    animationType: isLeft ? "fade-left" : "fade-right",
-  });
-
-  return (
-    <div
-      ref={ref as React.RefObject<HTMLDivElement>}
-      className={`w-full md:w-[calc(50%-2rem)] relative ${getAnimationClass()}`}
-      style={{ animationDelay: `${index * 100}ms` }}
-    >
-      {/* Card */}
-      <div className={`bg-(--dht-darker) rounded-2xl p-8 hover:bg-(--dht-dark) transition-colors duration-300 group ${isLeft ? 'md:mr-8' : 'md:ml-8'}`}>
-        {/* Year Badge */}
-        <div className="inline-flex items-center gap-2 bg-(--dht-red) text-white px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider mb-4 pulse-red">
-          {milestone.year}
-        </div>
-
-        {/* Icon */}
-        <div className="w-12 h-12 bg-(--dht-red)/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-(--dht-red)/30 transition-colors duration-300">
-          <Icon className="w-6 h-6 text-(--dht-red)" />
-        </div>
-
-        {/* Title */}
-        <h3 className="text-xl font-bold text-white mb-3">{milestone.title}</h3>
-
-        {/* Description */}
-        <p className="text-(--dht-gray) leading-relaxed">{milestone.description}</p>
-
-        {/* Arrow Indicator (Desktop) */}
-        <div className={`absolute top-1/2 ${isLeft ? 'md:-right-4 md:translate-x-1/2' : 'md:-left-4 md:-translate-x-1/2'} hidden md:flex items-center justify-center w-8 h-8 bg-(--dht-red) rounded-full`}>
-          <ChevronRight className={`w-4 h-4 text-white ${isLeft ? '' : 'rotate-180'}`} />
-        </div>
-      </div>
-
-      {/* Center Dot (Desktop) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-(--dht-red) rounded-full border-4 border-(--dht-dark) hidden md:block z-10" />
-    </div>
   );
 }

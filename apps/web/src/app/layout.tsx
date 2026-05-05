@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { QueryProvider } from "@/providers/query-provider";
-import { inter } from "@/lib/fonts";
+import { inter, barlow, barlowCondensed } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Dynamic Hub - From Infrastructure to Offshore",
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${barlow.variable} ${barlowCondensed.variable} antialiased`} suppressHydrationWarning>
       <body className={inter.className}>
         <QueryProvider>
           {children}

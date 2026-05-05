@@ -1,60 +1,95 @@
 "use client";
 
-import * as LucideIcons from "lucide-react";
-import { LucideProps } from "lucide-react";
+import {
+  Wrench,
+  Hammer,
+  Minus,
+  CircleDot,
+  Undo2,
+  CornerDownRight,
+  Hexagon,
+  Circle,
+  Pin,
+  Anchor,
+  Settings,
+  Disc,
+  Layers,
+  Scissors,
+  Sparkles,
+  Paintbrush,
+  Factory,
+  Square,
+  Flame,
+  Paperclip,
+  Zap,
+  Cable,
+  Plug,
+  ShieldCheck,
+  ToggleRight,
+  Grid3x3,
+  Cog,
+  RotateCcw,
+  Link,
+  Gauge,
+  Cylinder,
+  GitBranch,
+  Waves,
+  Settings2,
+  Package,
+  FolderOpen,
+} from "lucide-react";
+import type { LucideProps } from "lucide-react";
 
-// Map icon name string to lucide-react component
 const iconMap: Record<string, React.ComponentType<LucideProps>> = {
-    Wrench: LucideIcons.Wrench,
-    Bolt: LucideIcons.Hammer,
-    Minus: LucideIcons.Minus,
-    CircleDot: LucideIcons.CircleDot,
-    Undo2: LucideIcons.Undo2,
-    CornerDownRight: LucideIcons.CornerDownRight,
-    Hexagon: LucideIcons.Hexagon,
-    Circle: LucideIcons.Circle,
-    Pin: LucideIcons.Pin,
-    Anchor: LucideIcons.Anchor,
-    ScrewIcon: LucideIcons.Settings,
-    Settings: LucideIcons.Settings,
-    Disc: LucideIcons.Disc,
-    Layers: LucideIcons.Layers,
-    Scissors: LucideIcons.Scissors,
-    Sparkles: LucideIcons.Sparkles,
-    Brush: LucideIcons.Paintbrush,
-    Factory: LucideIcons.Factory,
-    Square: LucideIcons.Square,
-    Flame: LucideIcons.Flame,
-    Paperclip: LucideIcons.Paperclip,
-    Zap: LucideIcons.Zap,
-    Cable: LucideIcons.Cable,
-    Plug: LucideIcons.Plug,
-    ShieldCheck: LucideIcons.ShieldCheck,
-    ToggleRight: LucideIcons.ToggleRight,
-    Grid3x3: LucideIcons.Grid3x3,
-    Cog: LucideIcons.Cog,
-    RotateCcw: LucideIcons.RotateCcw,
-    Link: LucideIcons.Link,
-    Gauge: LucideIcons.Gauge,
-    Cylinder: LucideIcons.Cylinder,
-    GitBranch: LucideIcons.GitBranch,
-    Waves: LucideIcons.Waves,
-    Settings2: LucideIcons.Settings2,
-    Package: LucideIcons.Package,
-    FolderOpen: LucideIcons.FolderOpen,
+  Wrench,
+  Bolt: Hammer,
+  Minus,
+  CircleDot,
+  Undo2,
+  CornerDownRight,
+  Hexagon,
+  Circle,
+  Pin,
+  Anchor,
+  ScrewIcon: Settings,
+  Settings,
+  Disc,
+  Layers,
+  Scissors,
+  Sparkles,
+  Brush: Paintbrush,
+  Factory,
+  Square,
+  Flame,
+  Paperclip,
+  Zap,
+  Cable,
+  Plug,
+  ShieldCheck,
+  ToggleRight,
+  Grid3x3,
+  Cog,
+  RotateCcw,
+  Link,
+  Gauge,
+  Cylinder,
+  GitBranch,
+  Waves,
+  Settings2,
+  Package,
+  FolderOpen,
 };
 
 interface CategoryIconProps extends LucideProps {
-    iconName?: string;
+  iconName?: string;
 }
 
 export function CategoryIcon({ iconName, ...props }: CategoryIconProps) {
-    const IconComponent = iconName ? iconMap[iconName] : null;
+  const IconComponent = iconName ? iconMap[iconName] : null;
 
-    if (IconComponent) {
-        return <IconComponent {...props} />;
-    }
+  if (IconComponent) {
+    return <IconComponent {...props} />;
+  }
 
-    // Fallback
-    return <LucideIcons.Package {...props} />;
+  return <Package {...props} />;
 }

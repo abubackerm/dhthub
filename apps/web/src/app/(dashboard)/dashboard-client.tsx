@@ -9,9 +9,11 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ConfirmDialogProvider } from "@/providers/confirm-dialog-provider"
 import { SidebarConfigProvider, useSidebarConfig } from "@/contexts/sidebar-context"
 import { AuthProvider } from "@/providers/auth-provider"
+import { usePageViewTracker } from "@/hooks/use-page-view-tracker"
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { config } = useSidebarConfig()
+  usePageViewTracker()
 
   return (
     <SidebarProvider

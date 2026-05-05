@@ -1,7 +1,6 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCategoryTree } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
 import {
   Accordion,
@@ -22,12 +21,15 @@ import type {
   FacetStats,
 } from "@/lib/api/catalog/types";
 
-export function CatalogSidebar() {
+interface CatalogSidebarProps {
+  categories?: CategoryTreeNode[];
+}
+
+export function CatalogSidebar({ categories }: CatalogSidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const searchParams = useSearchParams();
     const { filterData } = useFilterContext();
-    const { data: categoryTree, isLoading, error } = useCategoryTree({ maxDepth: 1 });
 
     const selectedCategory = searchParams.get("category");
 
@@ -50,10 +52,12 @@ export function CatalogSidebar() {
         );
     }
 
-    // Show categories on /products, sorted A-Z
-    const topLevelCategories = (categoryTree?.filter(
-        (cat: CategoryTreeNode) => cat.depth === 0 && cat.children.length > 0 && cat.isActive
-    ) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    // Use server-fetched categories when provided; fall back to empty array
+    const topLevelCategories = (categories
+        ?.filter(
+            (cat: CategoryTreeNode) => cat.depth === 0 && cat.children.length > 0 && cat.isActive
+        ) ?? []
+    ).sort((a, b) => a.name.localeCompare(b.name));
 
     const handleCategoryClick = (slug: string) => {
         if (selectedCategory === slug) {
@@ -70,11 +74,7 @@ export function CatalogSidebar() {
             </div>
             <nav>
                 <ul className="catalog-sidebar__list">
-                    {isLoading ? (
-                        <li className="catalog-sidebar__link">Loading...</li>
-                    ) : error ? (
-                        <li className="catalog-sidebar__link">Error loading categories</li>
-                    ) : topLevelCategories.length === 0 ? (
+                    {topLevelCategories.length === 0 ? (
                         <li className="catalog-sidebar__link">No categories available</li>
                     ) : (
                         topLevelCategories.map((category) => {

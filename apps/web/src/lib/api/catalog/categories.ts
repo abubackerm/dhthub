@@ -70,6 +70,24 @@ export async function getAggregatedFilterData(slug: string): Promise<AggregatedF
   return apiClient.get<AggregatedFilterDataView>(`/v1/catalog/categories/${slug}/filter-data`);
 }
 
+export async function getServerLeafPageData(slug: string): Promise<LeafPageView> {
+  return serverFetch<LeafPageView>(`/v1/catalog/categories/${slug}/leaf-data`, {
+    tags: [CACHE_TAG_CATALOG],
+  });
+}
+
+export async function getServerConsolidatedLeafData(slug: string): Promise<ConsolidatedLeafPageView> {
+  return serverFetch<ConsolidatedLeafPageView>(`/v1/catalog/categories/${slug}/consolidated-leaf-data`, {
+    tags: [CACHE_TAG_CATALOG],
+  });
+}
+
+export async function getServerAggregatedFilterData(slug: string): Promise<AggregatedFilterDataView> {
+  return serverFetch<AggregatedFilterDataView>(`/v1/catalog/categories/${slug}/filter-data`, {
+    tags: [CACHE_TAG_CATALOG],
+  });
+}
+
 export async function createCategory(
   data: CreateCategoryInput,
 ): Promise<Category> {

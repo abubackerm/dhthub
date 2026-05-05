@@ -1,3 +1,5 @@
+"use client"
+
 import { TrendingDown, TrendingUp } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -9,29 +11,106 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useDashboardStats, type StatValue } from "@/lib/api/dashboard"
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-IN").format(value)
+}
+
+function TrendBadge({ stat }: { stat: StatValue }) {
+  if (stat.trend === "up") {
+    return (
+      <Badge variant="outline">
+        <TrendingUp />
+        +{stat.change}%
+      </Badge>
+    )
+  }
+  if (stat.trend === "down") {
+    return (
+      <Badge variant="outline">
+        <TrendingDown />
+        {stat.change}%
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline">0%</Badge>
+  )
+}
+
+function TrendFooter({ stat, upLabel, downLabel, neutralLabel }: { stat: StatValue; upLabel: string; downLabel: string; neutralLabel: string }) {
+  if (stat.trend === "up") {
+    return (
+      <div className="line-clamp-1 flex gap-2 font-medium">
+        {upLabel} <TrendingUp className="size-4" />
+      </div>
+    )
+  }
+  if (stat.trend === "down") {
+    return (
+      <div className="line-clamp-1 flex gap-2 font-medium">
+        {downLabel} <TrendingDown className="size-4" />
+      </div>
+    )
+  }
+  return (
+    <div className="line-clamp-1 flex gap-2 font-medium">
+      {neutralLabel}
+    </div>
+  )
+}
 
 export function SectionCards() {
+  const { data: stats, isLoading } = useDashboardStats()
+
+  if (isLoading || !stats) {
+    return (
+      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {["Total Revenue", "New Customers", "Active Users", "Total Orders"].map((label) => (
+          <Card key={label} className="@container/card">
+            <CardHeader>
+              <CardDescription>{label}</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                &mdash;
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Total Revenue</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
+            {formatCurrency(stats.totalOrderValue.value)}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              +12.5%
-            </Badge>
+            <TrendBadge stat={stats.totalOrderValue} />
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month <TrendingUp className="size-4" />
-          </div>
+          <TrendFooter
+            stat={stats.totalOrderValue}
+            upLabel="Trending up this month"
+            downLabel="Down this month"
+            neutralLabel="No change this month"
+          />
           <div className="text-muted-foreground">
-            Visitors for the last 6 months
+            Total order value for current month
           </div>
         </CardFooter>
       </Card>
@@ -39,62 +118,63 @@ export function SectionCards() {
         <CardHeader>
           <CardDescription>New Customers</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,234
+            {formatNumber(stats.newCustomers.value)}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingDown />
-              -20%
-            </Badge>
+            <TrendBadge stat={stats.newCustomers} />
+          </CardAction>
+        </CardHeader>
+        <CardFooter className="flex-col items-start gap-1.5 text-sm">
+          <TrendFooter
+            stat={stats.newCustomers}
+            upLabel="More new customers this month"
+            downLabel="Fewer new customers this month"
+            neutralLabel="Same as last month"
+          />
+          <div className="text-muted-foreground">
+            Users registered this month
+          </div>
+        </CardFooter>
+      </Card>
+      <Card className="@container/card">
+        <CardHeader>
+          <CardDescription>Active Users</CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {formatNumber(stats.activeUsers.value)}
+          </CardTitle>
+          <CardAction>
+            <Badge variant="outline">30d</Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period <TrendingDown className="size-4" />
+            Users active in last 30 days
           </div>
           <div className="text-muted-foreground">
-            Acquisition needs attention
+            Based on last login activity
           </div>
         </CardFooter>
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Active Accounts</CardDescription>
+          <CardDescription>Total Orders</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            45,678
+            {formatNumber(stats.totalOrders.value)}
           </CardTitle>
           <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              +12.5%
-            </Badge>
+            <TrendBadge stat={stats.totalOrders} />
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention <TrendingUp className="size-4" />
+          <TrendFooter
+            stat={stats.totalOrders}
+            upLabel="More orders this month"
+            downLabel="Fewer orders this month"
+            neutralLabel="Same as last month"
+          />
+          <div className="text-muted-foreground">
+            Enquiries created this month
           </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            4.5%
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendingUp />
-              +4.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance increase <TrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
         </CardFooter>
       </Card>
     </div>

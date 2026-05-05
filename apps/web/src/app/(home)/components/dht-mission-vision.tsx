@@ -1,5 +1,3 @@
-"use client";
-
 export function DHTMissionVision() {
     return (
         <section className="py-16 bg-[var(--dht-gray-light)]">

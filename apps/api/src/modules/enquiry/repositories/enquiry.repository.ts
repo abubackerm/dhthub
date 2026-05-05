@@ -281,4 +281,34 @@ export class EnquiryRepository {
       },
     });
   }
+
+  async getMonthlyOrderValue(year: number, month: number): Promise<{ total: number; count: number }> {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+
+    const result = await this.getClient().enquiry.aggregate({
+      _sum: { grandTotal: true },
+      _count: true,
+      where: {
+        createdAt: { gte: start, lt: end },
+        grandTotal: { not: null },
+      },
+    });
+
+    return {
+      total: result._sum.grandTotal ?? 0,
+      count: result._count,
+    };
+  }
+
+  async getMonthlyOrderCount(year: number, month: number): Promise<number> {
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+
+    return this.getClient().enquiry.count({
+      where: {
+        createdAt: { gte: start, lt: end },
+      },
+    });
+  }
 }

@@ -15,6 +15,8 @@ import { ImportModule } from './modules/import/import.module';
 import { EnquiryModule } from './modules/enquiry/enquiry.module';
 import { CellModule } from './modules/cell/cell.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { NotificationModule } from './modules/notification/notification.module';
     EnquiryModule,
     CellModule,
     NotificationModule,
+    DashboardModule,
+    AnalyticsModule,
   ],
   providers: [
     {

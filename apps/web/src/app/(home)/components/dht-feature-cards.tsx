@@ -1,5 +1,3 @@
-"use client";
-
 import { Settings, Boxes, ShieldCheck } from "lucide-react";
 
 const features = [

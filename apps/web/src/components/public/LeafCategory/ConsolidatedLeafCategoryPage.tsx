@@ -10,6 +10,8 @@ import type {
   LeafProductView,
   LeafFilterableAttributeView,
   LeafAttributeValueView,
+  ConsolidatedLeafPageView,
+  AggregatedFilterDataView,
 } from "@/lib/api/catalog/types";
 import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,14 +24,25 @@ interface ConsolidatedLeafCategoryPageProps {
   categorySlug: string;
   pathNames: string[];
   pathSlugs: string[];
+  serverData?: ConsolidatedLeafPageView | null;
+  serverFilterData?: AggregatedFilterDataView | null;
 }
 
-export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlugs }: ConsolidatedLeafCategoryPageProps) {
-  const { data, isLoading, error } = useConsolidatedLeafData(categorySlug);
-  const { data: filterData } = useAggregatedFilterData(categorySlug);
+export function ConsolidatedLeafCategoryPage({
+  categorySlug,
+  pathNames,
+  pathSlugs,
+  serverData,
+  serverFilterData,
+}: ConsolidatedLeafCategoryPageProps) {
+  const { data: clientData, isLoading, error } = useConsolidatedLeafData(serverData ? "" : categorySlug);
+  const { data: clientFilterData } = useAggregatedFilterData(serverFilterData ? "" : categorySlug);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
   const { setFilterData: setFilterContext } = useFilterContext();
+
+  const data = serverData ?? clientData;
+  const filterData = serverFilterData ?? clientFilterData;
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
@@ -39,7 +52,6 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
   const facets = filterData?.facets ?? {};
   const filterableAttributes = filterData?.filterableAttributes ?? data?.filterableAttributes ?? [];
 
-  // Set filter data in context when data is loaded
   useEffect(() => {
     if (filterData && filterData.filterableAttributes.length > 0) {
       setFilterContext({
@@ -51,7 +63,6 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
       setFilterContext(null);
     }
 
-    // Cleanup when unmounting
     return () => setFilterContext(null);
   }, [filterData, basePath, setFilterContext]);
 
@@ -110,10 +121,10 @@ export function ConsolidatedLeafCategoryPage({ categorySlug, pathNames, pathSlug
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [data?.leafCategories, filterableAttributes, searchParams]);
 
-  if (isLoading) {
+  if (!serverData && isLoading) {
     return <ConsolidatedLeafCategoryPageSkeleton />;
   }
-  if (error || !data) {
+  if (!data) {
     const tooManyLeaves = isCategoryTooManyLeavesError(error);
     const tooManyMessage = error instanceof ApiError ? getCategoryTooManyLeavesMessage(error) : undefined;
     return (

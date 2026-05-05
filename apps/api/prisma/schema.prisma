@@ -837,3 +837,30 @@ model EnquiryItem {
   @@index([productId])
   @@map("enquiry_items")
 }
+
+// ============================================
+// ANALYTICS MODULE - Page Views & Visitor Tracking
+// ============================================
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+}
+
+model PageView {
+  id         String     @id @default(cuid())
+  path       String
+  referrer   String?    @map("referrer")
+  userAgent  String?    @map("user_agent")
+  device     DeviceType @default(DESKTOP)
+  ip         String?    @map("ip_address")
+  sessionId  String?    @map("session_id")
+  userId     String?    @map("user_id")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([device])
+  @@index([path])
+  @@map("page_views")
+}
