@@ -499,6 +499,8 @@
   color: var(--dht-red);
   margin-bottom: -9px !important;
   margin-top: -9px !important;
+  padding-top: 21px !important;
+  padding-bottom: 21px !important;
   padding-left: 17px !important;
   padding-right: 17px !important;
 }
@@ -513,6 +515,9 @@
 .categories {
   padding: 40px 40px;
   background: var(--dht-navy);
+  border: 2px dashed rgba(220, 0, 0, 0.6);
+  border-radius: 8px;
+  margin: 16px;
 }
 .catGrid {
   display: grid;
@@ -523,7 +528,8 @@
   background: var(--dht-card-bg);
   border: 1px solid var(--dht-border);
   border-radius: 8px;
-  padding: 20px 14px;
+  padding: 48px 24px;
+  min-height: 140px;
   text-align: center;
   cursor: pointer;
   transition: 0.25s;
@@ -551,29 +557,33 @@
   box-shadow: 0 8px 30px rgba(220, 0, 0, 0.15);
 }
 .catCard:hover::after { transform: scaleX(1); }
-.catCard:hover .catIcon {
-  background: var(--dht-red);
-  color: #fff;
-}
 .catIcon {
-  width: 52px;
-  height: 52px;
+  width: 80px;
+  height: 80px;
   background: transparent;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 12px;
-  font-size: 24px;
+  margin: 0 auto 20px;
+  font-size: 28px;
   transition: 0.25s;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
 }
 .catCard h4 {
   font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
-.catCard span { color: var(--dht-steel); font-size: 11px; }
+.catCard span {
+  color: var(--dht-steel);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 2px;
+}
 
 /* ─── TRUST BAR ───────────────────────────────────────── */
 .trustBar {
@@ -581,6 +591,7 @@
   border-top: 1px solid var(--dht-border);
   border-bottom: 1px solid var(--dht-border);
   padding: 16px 40px;
+  height: 70px;
   margin-top: 14px !important;
   margin-bottom: 14px !important;
   display: flex;
@@ -607,7 +618,15 @@
 .trustSep { width: 1px; height: 36px; background: var(--dht-border); }
 
 /* ─── CATALOGUE SECTION ───────────────────────────────── */
-.catalogue { padding: 40px 40px 80px; display: flex; gap: 24px; min-height: 100vh; }
+.catalogue { 
+  padding: 40px 40px 80px; 
+  display: flex; 
+  gap: 24px; 
+  min-height: 100vh;
+  border: 2px dashed rgba(220, 0, 0, 0.6);
+  border-radius: 8px;
+  margin: 16px;
+}
 
 /* Sidebar */
 .sidebar {
@@ -971,12 +990,14 @@
 
 /* ─── PAGE SECTION HEADERS ────────────────────────────── */
 .pageHeader {
-  background: linear-gradient(to right, #070F1E, var(--dht-navy-mid));
-  padding: 30px 40px;
-  border-bottom: 1px solid var(--dht-border);
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  background: linear-gradient(to right, #070F1E, var(--dht-navy-mid)) !important;
+  padding: 20px 40px !important;
+  margin-top: 23px !important;
+  margin-bottom: 23px !important;
+  border-bottom: 1px solid var(--dht-border) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
 }
 .pageHeader h2 {
   font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
@@ -1018,7 +1039,7 @@
   .mobileFilterBtn { display: flex; }
   .sidebarOverlay.open { display: block; pointer-events: auto; }
   .productGrid { grid-template-columns: repeat(2, 1fr); }
-  .pageHeader { padding: 24px; }
+  .pageHeader { padding: 20px 24px !important; margin-top: 23px !important; margin-bottom: 23px !important; }
   .footerInner { grid-template-columns: 1fr 1fr; gap: 24px; }
   .footer { padding: 32px 24px 20px; }
   .quickCards { grid-template-columns: repeat(2, 1fr); }
@@ -1049,7 +1070,7 @@
   .trustItem { padding: 10px 14px; }
   .catalogue { padding: 20px; }
   .productGrid { grid-template-columns: 1fr; }
-  .pageHeader { padding: 20px; }
+  .pageHeader { padding: 20px !important; margin-top: 23px !important; margin-bottom: 23px !important; }
   .pageHeader h2 { font-size: 24px; }
   .footerInner { grid-template-columns: 1fr; gap: 20px; }
   .footerBottom { flex-direction: column; gap: 12px; text-align: center; }

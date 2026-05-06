@@ -81,6 +81,23 @@ export default function MockupHomepage() {
     return null;
   }, []);
 
+  // Helper function to count all subcategories recursively (all levels)
+  const countSubcategories = useCallback((category: CategoryTreeNode): number => {
+    let count = 0;
+    
+    if (category.children && category.children.length > 0) {
+      // Add direct children count
+      count += category.children.length;
+      
+      // Recursively count grandchildren and beyond
+      for (const child of category.children) {
+        count += countSubcategories(child);
+      }
+    }
+    
+    return count;
+  }, []);
+
   // Debug: Check if children are populated
   if (!isLoading && categoryTree && categoryTree.length > 0) {
     console.log('=== Category Tree Structure ===');
@@ -376,14 +393,15 @@ export default function MockupHomepage() {
                       <img
                         src={category.imageUrl}
                         alt={category.name}
-                        className="w-full h-full object-cover"
-                        style={{ borderRadius: '8px' }}
+                        className="w-full h-full object-contain"
+                        style={{ borderRadius: '8px', display: 'block', padding: '8px' }}
                       />
                     ) : (
                       '📦'
                     )}
                   </div>
                   <h4>{category.name}</h4>
+                  <span>{countSubcategories(category)}+ items</span>
                 </a>
               ))
           ) : (
@@ -397,12 +415,7 @@ export default function MockupHomepage() {
 
       {/* CATALOGUE PAGE HEADER */}
       <div className={s.pageHeader}>
-        <div>
-          <h2>Product Catalogue — General Consumables</h2>
-          <div className={s.breadcrumb}>
-            <a href="#">Home</a> → <a href="#">Catalogue</a> → General Consumables
-          </div>
-        </div>
+        <h2>Product Catalogue</h2>
       </div>
 
       {/* CATALOGUE WITH SIDEBAR + GRID */}
@@ -543,7 +556,8 @@ export default function MockupHomepage() {
                         <img
                           src={category.imageUrl}
                           alt={category.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
+                          style={{ padding: '12px' }}
                         />
                       ) : (
                         '📦'

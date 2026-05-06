@@ -14,27 +14,10 @@ const accountNav = [
 
 const settingsSections = [
     {
-        title: "Preferences",
-        description: "Manage your account preferences",
-        items: [
-            { icon: Bell, label: "Notifications", href: "#", description: "Manage your notification preferences" },
-            { icon: Globe, label: "Language & Region", href: "#", description: "Set your language and region" },
-        ],
-    },
-    {
         title: "Security",
         description: "Keep your account secure",
         items: [
-            { icon: Shield, label: "Password & Security", href: "#", description: "Update password and security settings" },
-            { icon: Shield, label: "Two-Factor Authentication", href: "#", description: "Add an extra layer of security" },
-        ],
-    },
-    {
-        title: "Payments",
-        description: "Manage payment methods",
-        items: [
-            { icon: CreditCard, label: "Payment Methods", href: "#", description: "Manage saved payment methods" },
-            { icon: CreditCard, label: "Billing History", href: "#", description: "View your billing history" },
+            { icon: Shield, label: "Password & Security", href: "/account/settings/password", description: "Update password and security settings" },
         ],
     },
 ];

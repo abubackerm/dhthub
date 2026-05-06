@@ -150,7 +150,7 @@ export default function ProfilePage() {
                                     <p className="text-xs text-gray-600 mt-1">Total Orders</p>
                                 </div>
                                 <div className="p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-2xl font-bold text-(--dht-red)">AED 0.00</p>
+                                    <p className="text-2xl font-bold text-(--dht-red)">SAR 0.00</p>
                                     <p className="text-xs text-gray-600 mt-1">Total Spent</p>
                                 </div>
                                 <div className="p-4 bg-gray-50 rounded-lg">
