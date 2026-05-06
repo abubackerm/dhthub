@@ -202,11 +202,10 @@ export default function MockupHomepage() {
             </button>
             {profileDropdownOpen && (
               <div className={s.profileDropdownMenu}>
-                <a href="/dashboard">Dashboard</a>
-                <a href="/profile">Profile</a>
-                <a href="/settings">Settings</a>
+                <a href="/account/profile">Profile</a>
+                <a href="/account/orders">Orders</a>
                 <div className={s.dropdownDivider}></div>
-                <a href="/sign-out" className={s.signOut}>Sign Out</a>
+                <a href="/sign-out" className={s.signOut}>Logout</a>
               </div>
             )}
           </div>
@@ -766,19 +765,18 @@ export default function MockupHomepage() {
             )}
           </div>
           <div className={s.footerCol}>
-            <h5>Services</h5>
-            <a href="#">Request a Quote (RFQ)</a>
-            <a href="#">Upload BOM (Excel)</a>
-            <a href="#">Aramco AVL Items</a>
-            <a href="#">My Approved Items</a>
-            <a href="#">Vendor Registration</a>
+            <h5>Legal</h5>
+            <a href="/terms">Terms & Conditions</a>
+            <a href="/privacy-policy">Privacy Policy</a>
+            <a href="#">Cookie Policy</a>
+            <a href="#">Terms of Sale</a>
           </div>
           <div className={s.footerCol}>
             <h5>Company</h5>
-            <a href="#">About Dynamic Hub</a>
+            <a href="/about">About Dynamic Hub</a>
             <a href="#">Our Brands</a>
             <a href="#">Certifications</a>
-            <a href="#">Contact Us</a>
+            <a href="/contact">Contact Us</a>
             <a href="#">Careers</a>
           </div>
         </div>

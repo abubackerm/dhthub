@@ -48,8 +48,8 @@ export function DHTHeader() {
     return (
         <header className="sticky top-0 z-50 bg-(--dht-darker) shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16 md:h-20">
-                    {/* Logo */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center h-16 md:h-20">
+                    {/* Logo - Left Column */}
                     <Link href="/" className="flex items-center">
                         <Image
                             src="/images/dynamic_hub_Logo.png"
@@ -61,8 +61,8 @@ export function DHTHeader() {
                         />
                     </Link>
 
-                    {/* Desktop Navigation */}
-                    <nav className="hidden md:flex items-center gap-8">
+                    {/* Desktop Navigation - Center Column */}
+                    <nav className="hidden md:flex items-center gap-8 justify-self-center">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.href}
@@ -72,7 +72,10 @@ export function DHTHeader() {
                                 {link.label}
                             </Link>
                         ))}
-                        
+                    </nav>
+
+                    {/* Desktop Actions - Right Column */}
+                    <div className="hidden md:flex items-center gap-4 justify-self-end">
                         {/* Cart Icon */}
                         <Link
                             href="/cart"
@@ -130,11 +133,11 @@ export function DHTHeader() {
                                 Sign In
                             </button>
                         )}
-                    </nav>
+                    </div>
 
-                    {/* Mobile Menu Button */}
+                    {/* Mobile Menu Button - Positioned absolutely to not affect grid */}
                     <button
-                        className="md:hidden p-2 text-white"
+                        className="md:hidden p-2 text-white absolute right-4 top-1/2 -translate-y-1/2"
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-label="Toggle menu"
                     >

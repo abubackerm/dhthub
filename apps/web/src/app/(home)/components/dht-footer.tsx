@@ -9,11 +9,10 @@ const footerLinks = {
         { label: "Contact Us", href: "/contact" },
         { label: "Dealer Portal", href: "/dealer-portal" },
     ],
-    services: [
-        { label: "General Maintenance", href: "/services/maintenance" },
-        { label: "Facility Management", href: "/services/facility-management" },
-        { label: "HVAC Services", href: "/services/hvac" },
-        { label: "Procurement", href: "/services/procurement" },
+    legal: [
+        { label: "Terms & Conditions", href: "/terms" },
+        { label: "Privacy Policy", href: "/privacy-policy" },
+        { label: "Cookie Policy", href: "/cookie-policy" },
     ],
 };
 
@@ -110,11 +109,11 @@ export function DHTFooter() {
                             </ul>
                         </div>
 
-                        {/* Services Links */}
+                        {/* Legal Links */}
                         <div>
-                            <h4 className="text-white font-bold mb-4">Services</h4>
+                            <h4 className="text-white font-bold mb-4">Legal</h4>
                             <ul className="space-y-3">
-                                {footerLinks.services.map((link, index) => (
+                                {footerLinks.legal.map((link, index) => (
                                     <li key={index}>
                                         <Link
                                             href={link.href}

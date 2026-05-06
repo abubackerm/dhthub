@@ -9,15 +9,15 @@ export const metadata: Metadata = {
 };
 
 export default function TermsLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen flex flex-col bg-(--dht-darker)">
-      <DHTHeaderShell />
-      <main className="flex-1">{children}</main>
-      <DHTFooter />
-    </div>
-  );
+    return (
+        <div className="min-h-screen flex flex-col">
+            <DHTHeaderShell />
+            <main className="flex-1">{children}</main>
+            <DHTFooter />
+        </div>
+    );
 }

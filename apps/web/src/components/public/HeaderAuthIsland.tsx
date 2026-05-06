@@ -85,7 +85,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
               suppressHydrationWarning
             >
               {isClient && <CircleUser className="h-5 w-5" />}
-              <span>{session?.user?.name || "Profile"}</span>
+              <span suppressHydrationWarning>{session?.user?.name || "Profile"}</span>
             </Link>
             <Link
               href="/account/orders"
@@ -143,7 +143,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
               suppressHydrationWarning
             >
               {isClient && <CircleUser className="h-5 w-5" />}
-              <span>{session?.user?.name || "Profile"}</span>
+              <span suppressHydrationWarning>{session?.user?.name || "Profile"}</span>
               {isClient && <ChevronDown className="h-4 w-4" />}
             </button>
           </DropdownMenuTrigger>

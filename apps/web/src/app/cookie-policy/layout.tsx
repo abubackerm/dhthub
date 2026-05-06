@@ -3,12 +3,11 @@ import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 import { DHTFooter } from "../(home)/components/dht-footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Dynamic Hub Trading",
-  description:
-    "Privacy Policy for Dynamic Hub Trading - Learn how we collect, use, and safeguard your personal information.",
+    title: "Cookie Policy | Dynamic Hub Trading",
+    description: "Learn about how Dynamic Hub Trading uses cookies and similar technologies on our website.",
 };
 
-export default function PrivacyPolicyLayout({
+export default function CookiePolicyLayout({
     children,
 }: {
     children: React.ReactNode;
