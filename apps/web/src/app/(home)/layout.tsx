@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
+import { DHTFooter } from "./components/dht-footer";
 
 export const metadata: Metadata = {
     title: "Dynamic Hub — B2B Industrial Catalogue",
@@ -12,8 +14,10 @@ export default function HomeLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen">
-            <main className="min-h-screen">{children}</main>
+        <div className="min-h-screen flex flex-col">
+            <DHTHeaderShell />
+            <main className="flex-1">{children}</main>
+            <DHTFooter />
         </div>
     );
 }

@@ -14,11 +14,9 @@ import s from './mockup-homepage.module.css';
 import './mockup-homepage.global.css';
 
 export default function MockupHomepage() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(['Stock Status']));
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const { data: categoryTree, isLoading } = useCategoryTree({ maxDepth: 2 });
   
   // Search query state
@@ -101,14 +99,6 @@ export default function MockupHomepage() {
     }
   }
 
-  const toggleMenu = useCallback(() => {
-    setMenuOpen((prev) => !prev);
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-  }, []);
-
   const toggleFilterGroup = useCallback((groupName: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -127,10 +117,6 @@ export default function MockupHomepage() {
 
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false);
-  }, []);
-
-  const toggleProfileDropdown = useCallback(() => {
-    setProfileDropdownOpen((prev) => !prev);
   }, []);
 
   // Get random categories for popular search tags (memoized to stay stable)
@@ -161,128 +147,7 @@ export default function MockupHomepage() {
 
   return (
     <div className="mockup-homepage">
-      {/* TOP BAR */}
-      <div className={s.topbar}>
-        <div className={s.topbarLeft}>
-          <span>Aramco Approved Vendor #10117241</span>
-          <span>ISO 9001:2015 Certified</span>
-          <span>Eastern Province, Saudi Arabia</span>
-        </div>
-        <div>
-          <a href="#">+966 XX XXX XXXX</a>
-          <a href="#">info@dynamichub.com.sa</a>
-          <a href="#">العربية</a>
-        </div>
-      </div>
-
-      {/* NAVBAR */}
-      <nav className={s.navbar}>
-        <a href="/" className={s.logo}>
-          <div className={s.logoBox}>DH</div>
-          <div className={s.logoText}>
-            Dynamic Hub
-            <span>Industrial Trading Co. Ltd.</span>
-          </div>
-        </a>
-        <div className={s.navLinks}>
-          <a href="/" className={s.active}>Home</a>
-          <a href="/products">Products</a>
-          <a href="/about">About Us</a>
-          <a href="/contact">Contact Us</a>
-        </div>
-        <div className={s.navActions}>
-          <button
-            className={`${s.mobileMenuBtn} ${menuOpen ? s.active : ''}`}
-            onClick={toggleMenu}
-            aria-label="Open menu"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-          <a href="/cart" className={s.cartIcon} title="Cart">
-            🛒
-            <div className={s.cartBadge}>0</div>
-          </a>
-          <div className={s.profileDropdown}>
-            <button className={s.profileBtn} onClick={toggleProfileDropdown}>
-              👤 Super Admin
-              <span className={s.dropdownChevron}>▼</span>
-            </button>
-            {profileDropdownOpen && (
-              <div className={s.profileDropdownMenu}>
-                <a href="/account/profile">Profile</a>
-                <a href="/account/orders">Orders</a>
-                <div className={s.dropdownDivider}></div>
-                <a href="/sign-out" className={s.signOut}>Logout</a>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* MOBILE MENU */}
-      <div className={`${s.mobileMenu} ${menuOpen ? s.open : ''}`}>
-        <button
-          className={s.mobileMenuClose}
-          onClick={closeMenu}
-          aria-label="Close menu"
-        >
-          ✕
-        </button>
-        <a href="/" className={s.active} onClick={closeMenu}>Home</a>
-        <a href="/products" onClick={closeMenu}>Products</a>
-        <a href="/about" onClick={closeMenu}>About Us</a>
-        <a href="#" onClick={closeMenu}>Contact Us</a>
-        <div className={s.mobileMenuDivider}></div>
-        <a
-          href="#"
-          onClick={closeMenu}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          🛒 Cart{' '}
-          <span
-            style={{
-              background: 'var(--dht-red)',
-              color: '#fff',
-              fontSize: '10px',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            0
-          </span>
-        </a>
-        <a href="/cart" onClick={closeMenu}>
-          🛒 Cart{' '}
-          <span
-            style={{
-              background: 'var(--dht-red)',
-              color: '#fff',
-              fontSize: '10px',
-              fontWeight: 700,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            0
-          </span>
-        </a>
-        <a href="/dashboard" onClick={closeMenu} style={{ color: 'var(--dht-red)' }}>
-          👤 Dashboard
-        </a>
-      </div>
-
-      {/* HERO + SEARCH */}
+      {/* HERO +SEARCH */}
       <section className={s.hero}>
         <div className={s.heroInner}>
           <div className={s.heroBadge}>Saudi Arabia&apos;s B2B Industrial Marketplace</div>
@@ -740,64 +605,6 @@ export default function MockupHomepage() {
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413" />
         </svg>
       </a>
-
-      {/* FOOTER */}
-      <footer className={s.footer}>
-        <div className={s.footerInner}>
-          <div className={s.footerBrand}>
-            <div className={s.logo} style={{ marginBottom: '12px' }}>
-              <div className={s.logoBox}>DH</div>
-              <div className={s.logoText}>
-                Dynamic Hub<span>Industrial Trading Co.</span>
-              </div>
-            </div>
-            <p>
-              Aramco Approved Vendor #10117241 · ISO 9001:2015
-              <br />
-              Eastern Province, Dammam, Saudi Arabia
-              <br />
-              15+ years supplying EPC and oil &amp; gas contractors.
-            </p>
-          </div>
-          <div className={s.footerCol}>
-            <h5>Catalogue</h5>
-            {isLoading ? (
-              <a href="#">Loading...</a>
-            ) : categoryTree && categoryTree.length > 0 ? (
-              categoryTree.slice(0, 5).map((category) => (
-                <a key={category.id} href={`/products/${category.slug}`}>
-                  {category.name}
-                </a>
-              ))
-            ) : (
-              <a href="/products">All Products</a>
-            )}
-          </div>
-          <div className={s.footerCol}>
-            <h5>Legal</h5>
-            <a href="/terms">Terms & Conditions</a>
-            <a href="/privacy-policy">Privacy Policy</a>
-            <a href="#">Cookie Policy</a>
-            <a href="#">Terms of Sale</a>
-          </div>
-          <div className={s.footerCol}>
-            <h5>Company</h5>
-            <a href="/about">About Dynamic Hub</a>
-            <a href="#">Our Brands</a>
-            <a href="#">Certifications</a>
-            <a href="/contact">Contact Us</a>
-            <a href="#">Careers</a>
-          </div>
-        </div>
-        <div className={s.footerBottom}>
-          <p>© 2026 Dynamic Hub Trading Co. Ltd. All rights reserved.</p>
-          <div className={s.certBadges}>
-            <span className={s.certBadge}>Aramco AVL</span>
-            <span className={s.certBadge}>ISO 9001:2015</span>
-            <span className={s.certBadge}>IKTVA Participant</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

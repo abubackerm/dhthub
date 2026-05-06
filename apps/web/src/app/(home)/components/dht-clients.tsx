@@ -9,18 +9,18 @@ const clients = [
 
 export function DHTClients() {
     return (
-        <section className="py-16 bg-white">
+        <section className="py-16 bg-(--dht-navy)">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <h2 className="text-2xl md:text-3xl font-bold text-(--dht-dark) text-center mb-12">
+                <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-12">
                     Our Clients
                 </h2>
 
                 <div className="relative">
                     {/* Left Fade */}
-                    <div className="absolute left-0 top-0 bottom-0 w-20 bg-linear-to-r from-white to-transparent z-10 pointer-events-none" />
+                    <div className="absolute left-0 top-0 bottom-0 w-20 bg-linear-to-r from-(--dht-navy) to-transparent z-10 pointer-events-none" />
 
                     {/* Right Fade */}
-                    <div className="absolute right-0 top-0 bottom-0 w-20 bg-linear-to-l from-white to-transparent z-10 pointer-events-none" />
+                    <div className="absolute right-0 top-0 bottom-0 w-20 bg-linear-to-l from-(--dht-navy) to-transparent z-10 pointer-events-none" />
 
                     {/* Logo Container */}
                     <div className="overflow-hidden">

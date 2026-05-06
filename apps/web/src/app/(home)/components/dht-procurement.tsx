@@ -57,16 +57,16 @@ export function DHTProcurement() {
                     backgroundImage: "url('/images/procurement-containers.jpg')",
                 }}
             >
-                <div className="absolute inset-0 bg-white/95" />
+                <div className="absolute inset-0 bg-(--dht-navy)/95" />
             </div>
 
             {/* Content */}
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-12">
-                    <h5 className="text-[var(--dht-red)] font-semibold uppercase tracking-wider mb-3">
+                    <h5 className="text-(--dht-red) font-semibold uppercase tracking-wider mb-3">
                         PROCUREMENT
                     </h5>
-                    <p className="text-[var(--dht-gray)] max-w-2xl">
+                    <p className="text-gray-300 max-w-2xl">
                         We deliver reliable, end-to-end procurement solutions designed to
                         support operational continuity and project execution across multiple
                         sectors.
@@ -78,15 +78,15 @@ export function DHTProcurement() {
                         <Link
                             key={index}
                             href="#"
-                            className="group bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-all border border-gray-100 hover:border-[var(--dht-red)]"
+                            className="group bg-(--dht-card-bg) p-6 rounded-lg shadow-md hover:shadow-xl transition-all border border-gray-100 hover:border-(--dht-red)"
                         >
-                            <div className="w-12 h-12 bg-[var(--dht-gray-light)] group-hover:bg-[var(--dht-red)] rounded-lg flex items-center justify-center mb-4 transition-colors">
-                                <item.icon className="w-6 h-6 text-[var(--dht-red)] group-hover:text-white transition-colors" />
+                            <div className="w-12 h-12 bg-(--dht-gray-light) group-hover:bg-(--dht-red) rounded-lg flex items-center justify-center mb-4 transition-colors">
+                                <item.icon className="w-6 h-6 text-(--dht-red) group-hover:text-white transition-colors" />
                             </div>
-                            <h3 className="text-lg font-bold text-[var(--dht-dark)] mb-2 group-hover:text-[var(--dht-red)] transition-colors">
+                            <h3 className="text-lg font-bold text-white mb-2 group-hover:text-(--dht-red) transition-colors">
                                 {item.title}
                             </h3>
-                            <p className="text-sm text-[var(--dht-gray)] leading-relaxed">
+                            <p className="text-sm text-gray-300 leading-relaxed">
                                 {item.description}
                             </p>
                         </Link>

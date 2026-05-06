@@ -23,13 +23,13 @@ const features = [
 
 export function DHTFeatureCards() {
     return (
-        <section className="relative -mt-24 z-20 pb-16">
+        <section className="relative -mt-24 z-20 pb-16 bg-(--dht-navy)">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {features.map((feature, index) => (
                         <div
                             key={index}
-                            className="bg-[var(--dht-red)] p-8 rounded-lg shadow-xl hover:shadow-2xl transition-shadow"
+                            className="bg-(--dht-red) p-8 rounded-lg shadow-xl hover:shadow-2xl transition-shadow"
                         >
                             <div className="w-16 h-16 bg-white/10 rounded-lg flex items-center justify-center mb-6">
                                 <feature.icon className="w-8 h-8 text-white" />
