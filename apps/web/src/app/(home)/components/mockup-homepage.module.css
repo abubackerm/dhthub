@@ -757,9 +757,6 @@
   position: relative;
   margin-bottom: 0;
 }
-.productCard:last-child {
-  margin-bottom: 40px;
-}
 .productCard:hover {
   border-color: var(--dht-red);
   transform: translateY(-2px);
@@ -819,12 +816,14 @@
 .productBody { padding: 10px; }
 .productBrand { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--dht-red); margin-bottom: 4px; }
 .productName {
-  font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--dht-pure);
-  margin-bottom: 6px;
-  line-height: 1.2;
+  font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--dht-pure) !important;
+  margin-top: 12px !important;
+  margin-bottom: 12px !important;
+  line-height: 1.4 !important;
+  padding-left: 8px !important;
 }
 .productSpec { font-size: 11px; color: var(--dht-steel); margin-bottom: 10px; line-height: 1.6; }
 
