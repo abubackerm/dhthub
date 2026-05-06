@@ -23,7 +23,14 @@ const features = [
 
 export function DHTFeatureCards() {
     return (
-        <section className="relative -mt-24 z-20 pb-16 bg-(--dht-navy)">
+        <section
+            className="relative z-10 pb-16 overflow-hidden"
+            style={{
+                marginTop: '-600px',
+                paddingTop: '600px',
+                background: 'linear-gradient(to bottom, transparent 0%, transparent 400px, var(--dht-navy) 560px, var(--dht-navy) 100%)',
+            }}
+        >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {features.map((feature, index) => (
