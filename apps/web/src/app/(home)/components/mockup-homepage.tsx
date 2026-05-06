@@ -38,10 +38,12 @@ export default function MockupHomepage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Select first category by default when category tree loads
+  // Select first category alphabetically by default when category tree loads
   useEffect(() => {
     if (categoryTree && categoryTree.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categoryTree[0].id);
+      // Sort categories alphabetically and select the first one
+      const sortedCategories = [...categoryTree].sort((a, b) => a.name.localeCompare(b.name));
+      setSelectedCategoryId(sortedCategories[0].id);
     }
   }, [categoryTree, selectedCategoryId]);
 
