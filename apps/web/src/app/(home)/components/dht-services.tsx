@@ -47,16 +47,16 @@ export function DHTServices() {
 
                         {/* Overlapping White Box - Also moved right with the container */}
                         <div className="lg:absolute lg:right-0 lg:bottom-[-80px] w-full lg:w-[95%] bg-(--dht-card-bg) border border-gray-100 shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
-                            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                            <div className="grid grid-cols-1 md:grid-cols-3">
                                 {services.map((service, index) => (
                                     <div
                                         key={index}
-                                        className="p-10 lg:p-12 min-h-[240px] flex flex-col justify-center"
+                                        className="p-10 lg:p-12 min-h-[240px] flex flex-col justify-center bg-(--dht-red) border-r border-white/20 last:border-r-0"
                                     >
                                         <h3 className="text-white font-bold text-lg mb-4">
                                             {service.title}
                                         </h3>
-                                        <p className="text-gray-400 text-[12px] leading-relaxed">
+                                        <p className="text-white/90 text-[12px] leading-relaxed">
                                             {service.description}
                                         </p>
                                     </div>

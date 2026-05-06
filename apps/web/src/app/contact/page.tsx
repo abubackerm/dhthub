@@ -43,8 +43,8 @@ export default function ContactPage() {
       </section>
 
       {/* Contact Form & Info Section */}
-      <section className="relative py-24 bg-(--dht-dark)">
-        <div className="absolute inset-0 bg-linear-to-b from-(--dht-dark) to-(--dht-darker)" />
+      <section className="relative py-24 bg-(--dht-navy)">
+        <div className="absolute inset-0 bg-linear-to-b from-(--dht-navy) to-(--dht-navy-mid)" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-16">
@@ -58,13 +58,13 @@ export default function ContactPage() {
               <div className="space-y-8">
                 {/* Info Cards */}
                 <div className="space-y-4">
-                  <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
+                  <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
                     <div className="w-12 h-12 bg-(--dht-red)/20 rounded-full flex items-center justify-center shrink-0">
                       <MapPin className="w-6 h-6 text-(--dht-red)" />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">Location</h3>
-                      <p className="text-(--dht-gray) text-sm leading-relaxed">
+                      <p className="text-gray-300 text-sm leading-relaxed">
                         Eastern Province
                         <br />
                         Saudi Arabia
@@ -72,37 +72,37 @@ export default function ContactPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
+                  <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
                     <div className="w-12 h-12 bg-(--dht-red)/20 rounded-full flex items-center justify-center shrink-0">
                       <Mail className="w-6 h-6 text-(--dht-red)" />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">Email</h3>
                       <a
-                        href="mailto:info@dynamichub.sa"
-                        className="text-(--dht-gray) hover:text-(--dht-red) text-sm transition-colors"
+                        href="mailto:info@dht-sa.com"
+                        className="text-gray-300 hover:text-(--dht-red) text-sm transition-colors"
                       >
-                        info@dynamichub.sa
+                        info@dht-sa.com
                       </a>
                     </div>
                   </div>
 
-                  <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
+                  <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
                     <div className="w-12 h-12 bg-(--dht-red)/20 rounded-full flex items-center justify-center shrink-0">
                       <Phone className="w-6 h-6 text-(--dht-red)" />
                     </div>
                     <div>
                       <h3 className="text-white font-semibold mb-1">Phone</h3>
                       <a
-                        href="tel:+966130000000"
-                        className="text-(--dht-gray) hover:text-(--dht-red) text-sm transition-colors"
+                        href="tel:+9660567887123"
+                        className="text-gray-300 hover:text-(--dht-red) text-sm transition-colors"
                       >
-                        +966 13 000 0000
+                        +966 056 788 7123
                       </a>
                     </div>
                   </div>
 
-                  <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
+                  <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-xl p-6 flex items-start gap-4">
                     <div className="w-12 h-12 bg-(--dht-red)/20 rounded-full flex items-center justify-center shrink-0">
                       <Clock className="w-6 h-6 text-(--dht-red)" />
                     </div>
@@ -110,7 +110,7 @@ export default function ContactPage() {
                       <h3 className="text-white font-semibold mb-1">
                         Business Hours
                       </h3>
-                      <p className="text-(--dht-gray) text-sm leading-relaxed">
+                      <p className="text-gray-300 text-sm leading-relaxed">
                         Sun - Thu: 8:00 AM - 5:00 PM
                         <br />
                         Fri - Sat: Closed
@@ -120,7 +120,7 @@ export default function ContactPage() {
                 </div>
 
                 {/* Map Placeholder */}
-                <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+                <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
                   <div className="aspect-4/3 bg-(--dht-darker) flex items-center justify-center">
                     <div className="text-center px-6">
                       <MapPin className="w-10 h-10 text-(--dht-red)/40 mx-auto mb-3" />

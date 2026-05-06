@@ -15,6 +15,9 @@ import { CategoryRepository } from '@modules/catalog/repositories/category.repos
 import { CategoryImageRepository } from '@modules/catalog/repositories/category-image.repository';
 import { CellRepository } from '@modules/cell/repositories/cell.repository';
 import { CellImageRepository } from '@modules/cell/repositories/cell-image.repository';
+import { CacheService } from '@core/cache/cache.service';
+import { CacheKeyService } from '@core/cache/cache-key.service';
+import { NextJsRevalidationService } from '@core/cache/nextjs-revalidation.service';
 import * as crypto from 'crypto';
 
 export type ImageMappingType = 'sku' | 'cell_sku' | 'product' | 'category';
@@ -62,6 +65,9 @@ export class ImageImportService {
     private readonly categoryImageRepository: CategoryImageRepository,
     private readonly cellRepository: CellRepository,
     private readonly cellImageRepository: CellImageRepository,
+    private readonly cacheService: CacheService,
+    private readonly cacheKeyService: CacheKeyService,
+    private readonly nextJsRevalidation: NextJsRevalidationService,
   ) {
     this.ensureUploadDirectory();
   }
@@ -533,15 +539,16 @@ export class ImageImportService {
 
   /**
    * Process category image from ZIP entry stream
+   * Categories only need one image, so we delete all existing images and replace with the new one
    */
   private async processCategoryImageStream(
     entry: unzipper.Entry,
     categorySku: string,
-    position: number,
+    _position: number,
     ext: string,
     categoryMap: Map<string, string>,
     categorySlugMap: Map<string, string>,
-    strategy: ImageUploadStrategy,
+    _strategy: ImageUploadStrategy,
     skipped: Array<{ sku: string; reason: string }>
   ): Promise<ProcessedImage | null> {
     try {
@@ -557,37 +564,49 @@ export class ImageImportService {
         return null;
       }
 
-      if (strategy === ImageUploadStrategy.SKIP) {
-        const existing = await this.categoryImageRepository.findByCategoryId(categoryId);
-        const existingAtPosition = existing.find(img => img.position === position);
-        if (existingAtPosition) {
-          entry.autodrain();
-          this.logger.log(`[ImageImport] Skipping existing category image: categoryId=${categoryId}, position=${position}`);
-          skipped.push({ sku: categorySku, reason: 'Existing image at same position' });
-          return null;
+      // For categories, always replace existing images with the new upload
+      // Delete all existing category images first
+      const existingImages = await this.categoryImageRepository.findByCategoryId(categoryId);
+      if (existingImages.length > 0) {
+        // Delete old images from SeaweedFS
+        for (const img of existingImages) {
+          try {
+            await this.storageService.deleteFile(img.storagePath.startsWith('/') ? img.storagePath.slice(1) : img.storagePath);
+            this.logger.debug(`[ImageImport] Deleted old category image: ${img.storagePath}`);
+          } catch (error) {
+            this.logger.warn(`[ImageImport] Failed to delete old category image: ${img.storagePath}`, error);
+          }
         }
+        
+        // Delete database records
+        await this.categoryImageRepository.deleteByCategoryId(categoryId);
+        this.logger.log(`[ImageImport] Deleted ${existingImages.length} existing category image(s) for categoryId=${categoryId}`);
       }
 
-      const storagePath = this.generateStoragePath(`category-${categorySku}`, position, ext);
+      // Upload new image with timestamp to bust cache (always use position 1 for categories)
+      const timestamp = Date.now();
+      const storagePath = this.generateStoragePath(`category-${categorySku}-${timestamp}`, 1, ext);
       await this.storageService.uploadStream(storagePath, entry, this.getContentType(ext));
 
       const created = await this.categoryImageRepository.upsert(
         categoryId,
-        position,
+        1,
         storagePath,
         categorySku
       );
 
-      if (position === 1) {
-        await this.categoryRepository.updateImage(categoryId, storagePath);
-        this.logger.log(`[ImageImport] Updated Category.imageUrl for categoryId=${categoryId}`);
-      }
+      // Update category's imageUrl to point to the new image
+      await this.categoryRepository.updateImage(categoryId, storagePath);
+      this.logger.log(`[ImageImport] Updated Category.imageUrl for categoryId=${categoryId}`);
 
       this.logger.log(`[ImageImport] Created/updated category image: id=${created.id}, categoryId=${categoryId}, sku=${categorySku}`);
 
+      // Invalidate cache
+      await this.invalidateCategoryCache(categoryId, categorySku);
+
       return {
         sku: categorySku,
-        position,
+        position: 1,
         ext,
         categoryId,
         imageUrl: storagePath,
@@ -603,14 +622,15 @@ export class ImageImportService {
 
   /**
    * Process cell image from ZIP entry stream
+   * Cells only need one image, so we delete all existing images and replace with the new one
    */
   private async processCellImageStream(
     entry: unzipper.Entry,
     cellSku: string,
-    position: number,
+    _position: number,
     ext: string,
     cellSkuMap: Map<string, string>,
-    strategy: ImageUploadStrategy,
+    _strategy: ImageUploadStrategy,
     skipped: Array<{ sku: string; reason: string }>
   ): Promise<ProcessedImage | null> {
     try {
@@ -623,30 +643,44 @@ export class ImageImportService {
         return null;
       }
 
-      if (strategy === ImageUploadStrategy.SKIP) {
-        const existing = await this.cellImageRepository.findBySkuAndPosition(cellSku, position);
-        if (existing) {
-          entry.autodrain();
-          this.logger.log(`[ImageImport] Skipping existing cell image: SKU=${cellSku}, position=${position}`);
-          skipped.push({ sku: cellSku, reason: 'Existing image at same position' });
-          return null;
+      // For cells, always replace existing images with the new upload
+      // Delete all existing cell images first
+      const existingImages = await this.cellImageRepository.findByCellId(cellId);
+      if (existingImages.length > 0) {
+        // Delete old images from SeaweedFS
+        for (const img of existingImages) {
+          try {
+            await this.storageService.deleteFile(img.storagePath.startsWith('/') ? img.storagePath.slice(1) : img.storagePath);
+            this.logger.debug(`[ImageImport] Deleted old cell image: ${img.storagePath}`);
+          } catch (error) {
+            this.logger.warn(`[ImageImport] Failed to delete old cell image: ${img.storagePath}`, error);
+          }
         }
+        
+        // Delete database records
+        await this.cellImageRepository.deleteByCellId(cellId);
+        this.logger.log(`[ImageImport] Deleted ${existingImages.length} existing cell image(s) for cellId=${cellId}`);
       }
 
-      const storagePath = this.generateStoragePath(`cell-${cellSku}`, position, ext);
+      // Upload new image with timestamp to bust cache (always use position 1 for cells)
+      const timestamp = Date.now();
+      const storagePath = this.generateStoragePath(`cell-${cellSku}-${timestamp}`, 1, ext);
       await this.storageService.uploadStream(storagePath, entry, this.getContentType(ext));
 
       const created = await this.cellImageRepository.upsert(
         cellId,
-        position,
+        1,
         storagePath,
         cellSku,
       );
 
       this.logger.log(`[ImageImport] Created/updated cell image: id=${created.id}, cellId=${cellId}, SKU=${cellSku}`);
 
+      // Invalidate cache
+      await this.invalidateCellCache(cellId, cellSku);
+
       return {
-        position,
+        position: 1,
         ext,
         cellId,
         imageUrl: storagePath,
@@ -722,6 +756,59 @@ export class ImageImportService {
       this.logger.error(`[ImageImport] Failed to process product image for identifier ${productIdentifier}: ${errorMessage}`);
       entry.autodrain();
       return null;
+    }
+  }
+
+  /**
+   * Invalidate Redis and Next.js cache for a category
+   */
+  private async invalidateCategoryCache(_categoryId: string, categorySku: string): Promise<void> {
+    try {
+      // Delete cached category tree and leaf page data
+      const keysToDelete = [
+        this.cacheKeyService.catalogTree(),
+        this.cacheKeyService.catalogLeaf(categorySku),
+        this.cacheKeyService.catalogConsolidated(categorySku),
+        this.cacheKeyService.catalogFilter(categorySku),
+      ];
+      
+      await this.cacheService.delMany(keysToDelete);
+      this.logger.log(`[ImageImport] Invalidated Redis cache for category ${categorySku}`);
+      
+      // Trigger Next.js revalidation
+      await this.nextJsRevalidation.revalidateTags([`category-${categorySku}`], 'image-import-category');
+      this.logger.log(`[ImageImport] Triggered Next.js revalidation for category ${categorySku}`);
+    } catch (error) {
+      this.logger.warn(`[ImageImport] Failed to invalidate cache for category ${categorySku}`, error);
+    }
+  }
+
+  /**
+   * Invalidate Redis and Next.js cache for a cell
+   */
+  private async invalidateCellCache(cellId: string, cellSku: string): Promise<void> {
+    try {
+      // Find the parent category slug to invalidate its cache
+      const cell = await this.cellRepository.findById(cellId);
+      if (cell && cell.categoryId) {
+        const category = await this.categoryRepository.findById(cell.categoryId);
+        if (category) {
+          const keysToDelete = [
+            this.cacheKeyService.catalogTree(),
+            this.cacheKeyService.catalogLeaf(category.slug),
+            this.cacheKeyService.catalogConsolidated(category.slug),
+            this.cacheKeyService.catalogFilter(category.slug),
+          ];
+          
+          await this.cacheService.delMany(keysToDelete);
+          this.logger.log(`[ImageImport] Invalidated Redis cache for cell ${cellSku} (category: ${category.slug})`);
+          
+          await this.nextJsRevalidation.revalidateTags([`category-${category.slug}`], 'image-import-cell');
+          this.logger.log(`[ImageImport] Triggered Next.js revalidation for cell ${cellSku}`);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`[ImageImport] Failed to invalidate cache for cell ${cellSku}`, error);
     }
   }
 }

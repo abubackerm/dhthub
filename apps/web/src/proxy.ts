@@ -65,30 +65,58 @@ export default async function proxy(request: NextRequest) {
   // Proxy SeaweedFS images to Next.js frontend
   if (pathname.startsWith("/product-images/")) {
     const storageUrl = process.env.SEAWEDFS_FILER_URL || "http://localhost:8888";
+    const s3Port = process.env.SEAWEDFS_S3_PORT || "8333";
+    const s3Url = `http://localhost:${s3Port}`;
 
     const objectKey = pathname.startsWith("/")
       ? pathname.slice(1)
       : pathname;
 
-    const seaweedfsUrl = `${storageUrl}/buckets/catalog/${objectKey}`;
+    console.log(`[Proxy] Serving image: ${pathname}`);
+    console.log(`[Proxy] Object key: ${objectKey}`);
 
-    const response = await fetch(seaweedfsUrl, {
-      headers: {
-        Accept: request.headers.get("accept") || "image/*",
-      },
-    });
+    // Try multiple URL patterns in order:
+    const urlsToTry = [
+      // 1. Direct FILER path (most common)
+      `${storageUrl}/${objectKey}`,
+      // 2. FILER bucket path
+      `${storageUrl}/buckets/catalog/${objectKey}`,
+      // 3. S3 API path (as fallback)
+      `${s3Url}/catalog/${objectKey}`,
+    ];
 
-    if (!response.ok) {
-      return new Response("Image not found", { status: 404 });
+    console.log(`[Proxy] Trying URLs: ${urlsToTry.join(', ')}`);
+
+    for (const imageUrl of urlsToTry) {
+      try {
+        const response = await fetch(imageUrl, {
+          headers: {
+            Accept: request.headers.get("accept") || "image/*",
+          },
+        });
+
+        if (response.ok) {
+          console.log(`[Proxy] Image found at: ${imageUrl}`);
+          return new Response(response.body, {
+            headers: {
+              "Content-Type":
+                response.headers.get("content-type") || "image/jpeg",
+              "Cache-Control": "public, max-age=31536000, immutable",
+            },
+          });
+        } else {
+          console.log(`[Proxy] Image not found at: ${imageUrl} (status: ${response.status})`);
+        }
+      } catch (error) {
+        console.log(`[Proxy] Error fetching from ${imageUrl}:`, error instanceof Error ? error.message : String(error));
+        // Try next URL
+        continue;
+      }
     }
 
-    return new Response(response.body, {
-      headers: {
-        "Content-Type":
-          response.headers.get("content-type") || "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, immutable",
-      },
-    });
+    // All URLs failed
+    console.error(`[Proxy] All URLs failed for: ${pathname}`);
+    return new Response("Image not found", { status: 404 });
   }
 
   if (

@@ -149,11 +149,11 @@ export function ContactForm() {
   };
 
   return (
-    <div className="bg-white/3 backdrop-blur-sm border border-white/10 rounded-2xl p-8 md:p-10">
+    <div className="bg-(--dht-navy-soft)/50 backdrop-blur-sm border border-white/10 rounded-2xl p-8 md:p-10">
       <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
         Send Us a Message
       </h2>
-      <p className="text-(--dht-gray) mb-8">
+      <p className="text-gray-300 mb-8">
         Fill out the form below and we&apos;ll get back to you within 24
         hours.
       </p>

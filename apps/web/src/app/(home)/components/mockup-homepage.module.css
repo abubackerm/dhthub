@@ -558,7 +558,7 @@
 .catIcon {
   width: 52px;
   height: 52px;
-  background: rgba(220, 0, 0, 0.12);
+  background: transparent;
   border-radius: 8px;
   display: flex;
   align-items: center;
