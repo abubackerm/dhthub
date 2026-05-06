@@ -22,26 +22,27 @@ interface HeaderAuthIslandProps {
 export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuthIslandProps) {
   const { data: session } = authClient.useSession();
   const [isClient, setIsClient] = useState(false);
-  const isAuthenticated = !!session?.user;
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
 
-  // Prevent hydration mismatch by only rendering icons on client
+  // Prevent hydration mismatch by matching server render initially, then updating on client
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    setIsAuthenticated(!!session?.user);
+  }, [session?.user]);
 
   const requireAuth = useCallback(
     (action: () => void) => {
-      if (isAuthenticated) {
+      if (isClient && isAuthenticated) {
         action();
       } else {
         pendingActionRef.current = action;
         setSignInOpen(true);
       }
     },
-    [isAuthenticated],
+    [isClient, isAuthenticated],
   );
 
   const handleLogout = useCallback(async () => {
@@ -76,7 +77,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
   if (variant === "mobile") {
     return (
       <>
-        {isAuthenticated ? (
+        {isClient && isAuthenticated ? (
           <>
             <Link
               href="/account/profile"
@@ -84,7 +85,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
               onClick={onNavigate}
               suppressHydrationWarning
             >
-              {isClient && <CircleUser className="h-5 w-5" />}
+              <CircleUser className="h-5 w-5" />
               <span suppressHydrationWarning>{session?.user?.name || "Profile"}</span>
             </Link>
             <Link
@@ -134,7 +135,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
 
   return (
     <>
-      {isAuthenticated ? (
+      {isClient && isAuthenticated ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -142,9 +143,9 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
               className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors focus:outline-none"
               suppressHydrationWarning
             >
-              {isClient && <CircleUser className="h-5 w-5" />}
+              <CircleUser className="h-5 w-5" />
               <span suppressHydrationWarning>{session?.user?.name || "Profile"}</span>
-              {isClient && <ChevronDown className="h-4 w-4" />}
+              <ChevronDown className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
