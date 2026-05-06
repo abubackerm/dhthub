@@ -38,6 +38,13 @@ export default function MockupHomepage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Select first category by default when category tree loads
+  useEffect(() => {
+    if (categoryTree && categoryTree.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categoryTree[0].id);
+    }
+  }, [categoryTree, selectedCategoryId]);
+
   // Filter categories based on search query
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim() || !categoryTree) return [];
