@@ -15,7 +15,9 @@ import { EmptyLeafPage } from "@/components/public/EmptyLeafPage";
 import type { Cell } from "@/lib/api/catalog";
 import type { ProductDetailView } from "@/lib/api/catalog/types";
 
-export const revalidate = 120;
+// Product detail pages - more frequent revalidation (60s)
+// Category pages - standard revalidation (120s)
+export const revalidate = 60;
 
 interface PageProps {
   params: Promise<{ path: string[] }>;
@@ -113,11 +115,15 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
       );
     }
 
+    // Fetch filter data for branch category page
+    const filterData = await getServerAggregatedFilterData(lastSlug).catch(() => null);
+
     return (
       <BranchCategoryPage
         category={fullCategory ?? categoryData.category}
         pathNames={pathNames}
         pathSlugs={path}
+        serverFilterData={filterData}
       />
     );
   }

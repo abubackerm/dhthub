@@ -38,7 +38,7 @@ export async function getCategoryBySlugLookup(slug: string): Promise<CategorySlu
 
 export async function getServerCategoryBySlugLookup(slug: string): Promise<CategorySlugLookupResult> {
   return serverFetch<CategorySlugLookupResult>(`/v1/catalog/categories/${slug}/lookup`, {
-    tags: [CACHE_TAG_CATALOG],
+    tags: [CACHE_TAG_CATALOG, `category-${slug}`],
   });
 }
 
@@ -50,7 +50,7 @@ export async function getServerCategoryTree(options?: { maxDepth?: number }): Pr
   const qs = params.toString();
   const url = `/v1/catalog/categories/tree${qs ? `?${qs}` : ''}`;
   return serverFetch<CategoryTreeNode[]>(url, {
-    tags: [CACHE_TAG_CATALOG],
+    tags: [CACHE_TAG_CATALOG, 'category-tree'],
   });
 }
 
@@ -72,19 +72,19 @@ export async function getAggregatedFilterData(slug: string): Promise<AggregatedF
 
 export async function getServerLeafPageData(slug: string): Promise<LeafPageView> {
   return serverFetch<LeafPageView>(`/v1/catalog/categories/${slug}/leaf-data`, {
-    tags: [CACHE_TAG_CATALOG],
+    tags: [CACHE_TAG_CATALOG, `category-${slug}`],
   });
 }
 
 export async function getServerConsolidatedLeafData(slug: string): Promise<ConsolidatedLeafPageView> {
   return serverFetch<ConsolidatedLeafPageView>(`/v1/catalog/categories/${slug}/consolidated-leaf-data`, {
-    tags: [CACHE_TAG_CATALOG],
+    tags: [CACHE_TAG_CATALOG, `category-${slug}`],
   });
 }
 
 export async function getServerAggregatedFilterData(slug: string): Promise<AggregatedFilterDataView> {
   return serverFetch<AggregatedFilterDataView>(`/v1/catalog/categories/${slug}/filter-data`, {
-    tags: [CACHE_TAG_CATALOG],
+    tags: [CACHE_TAG_CATALOG, `category-${slug}`],
   });
 }
 
@@ -232,4 +232,17 @@ export async function downloadCategoryImportErrors(jobId: string): Promise<Blob>
   };
 
   return new Blob([content], { type: 'text/csv' });
+}
+
+/**
+ * Revalidate category cache - call after admin mutations
+ * @param slug - Optional category slug to invalidate specific category
+ */
+export async function revalidateCategoryData(slug?: string): Promise<void> {
+  const { revalidateTag } = await import('next/cache');
+  
+  if (slug) {
+    revalidateTag(`category-${slug}`);
+  }
+  revalidateTag(CACHE_TAG_CATALOG);
 }

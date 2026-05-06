@@ -3,7 +3,8 @@ import { getServerCategoryTree } from "@/lib/api/catalog";
 import { ProductsClientContent } from "./products-client-content";
 import type { CategoryTreeNode } from "@/lib/api/catalog/types";
 
-export const revalidate = 120;
+// Products page - more frequent revalidation for fresher data
+export const revalidate = 60;
 
 export default async function ProductsPage() {
   let categories: CategoryTreeNode[] = [];

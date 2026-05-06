@@ -24,6 +24,8 @@ import { createEnquiryFromCart } from "@/lib/api/enquiry";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 
 export default function CartPage() {
   const { data: cart, isLoading, error } = useCart();
@@ -64,51 +66,73 @@ export default function CartPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent" />
-          <p className="mt-4 text-muted-foreground">Loading cart...</p>
+      <>
+        <DHTHeaderShell />
+        <div className="min-h-screen bg-gray-50 py-12">
+          <div className="max-w-7xl mx-auto px-4">
+            <Skeleton className="h-12 w-64 mb-8" />
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Cart Items Skeleton */}
+              <div className="lg:col-span-2 space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-32 w-full" />
+                ))}
+              </div>
+              {/* Cart Summary Skeleton */}
+              <div className="lg:col-span-1">
+                <Skeleton className="h-96 w-full" />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Error loading cart</p>
-          <Link href="/products">
-            <Button variant="outline">Continue Shopping</Button>
-          </Link>
+      <>
+        <DHTHeaderShell />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading cart</p>
+            <Link href="/products">
+              <Button variant="outline">Continue Shopping</Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <ShoppingBag className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
-          <h1 className="text-3xl font-bold mb-4">Your cart is empty</h1>
-          <p className="text-muted-foreground mb-8">
-            Looks like you haven't added any items to your cart yet.
-          </p>
-          <Link href="/products">
-            <Button className="bg-(--dht-red) hover:bg-(--dht-red-hover)">
-              Start Shopping
-            </Button>
-          </Link>
+      <>
+        <DHTHeaderShell />
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="text-center max-w-md">
+            <ShoppingBag className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
+            <h1 className="text-3xl font-bold mb-4">Your cart is empty</h1>
+            <p className="text-muted-foreground mb-8">
+              Looks like you haven't added any items to your cart yet.
+            </p>
+            <Link href="/products">
+              <Button className="bg-(--dht-red) hover:bg-(--dht-red-hover)">
+                Start Shopping
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-bold mb-8">Shopping Cart ({cart.itemCount} items)</h1>
+    <>
+      <DHTHeaderShell />
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h1 className="text-4xl font-bold mb-8">Shopping Cart ({cart.itemCount} items)</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
@@ -120,7 +144,7 @@ export default function CartPage() {
               >
                 {/* Product Image */}
                 {item.image && (
-                  <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
+                  <div className="w-16 h-16 shrink-0 bg-gray-100 rounded-md overflow-hidden">
                     <img
                       src={item.image}
                       alt={item.productName}
@@ -199,7 +223,7 @@ export default function CartPage() {
                     </span>
                   )}
                   {item.availableStock < item.qty && item.isAvailable && (
-                    <span className="text-xs text-orange-600 font-medium whitespace-nowrap">
+                    <span className="text-xs text-red-600 font-medium whitespace-nowrap">
                       Only {item.availableStock} left
                     </span>
                   )}
@@ -294,5 +318,6 @@ export default function CartPage() {
         </DialogContent>
       </Dialog>
     </div>
+  </>
   );
 }

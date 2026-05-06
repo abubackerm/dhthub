@@ -18,6 +18,8 @@ const publicRoutes = [
   "/about",
   "/cart",
   "/errors",
+  "/privacy-policy",
+  "/terms",
 ];
 
 const adminOnlyRoutes = ["/dhthub-admin", "/users", "/dashboard-2"];

@@ -5,7 +5,7 @@ export const CardDecorator = ({ children }: { children: ReactNode }) => (
     {/* Light Mode Dot Pattern */}
     <div
       aria-hidden
-      className='absolute inset-0 bg-[radial-gradient(circle,var(--color-foreground)_1px,transparent_1px)] bg-[length:16px_16px] opacity-30'
+      className='absolute inset-0 bg-[radial-gradient(circle,var(--color-foreground)_1px,transparent_1px)] bg-size-[16px_16px] opacity-30'
     />
     {/* Light Mode Radial Fade */}
     <div aria-hidden className='to-card absolute inset-0 bg-radial from-transparent' />

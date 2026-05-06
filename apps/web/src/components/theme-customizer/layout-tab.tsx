@@ -60,7 +60,7 @@ export function LayoutTab() {
                 <div className={`flex h-12 rounded border ${ variant.value === "inset" ? "bg-muted" : "bg-background" }`}>
                   {/* Sidebar representation - smaller and more proportional */}
                   <div 
-                    className={`w-3 flex-shrink-0 bg-muted flex flex-col gap-0.5 p-1 ${
+                    className={`w-3 shrink-0 bg-muted flex flex-col gap-0.5 p-1 ${
                       variant.value === "floating" ? "border-r m-1 rounded" :
                       variant.value === "inset" ? "m-1 ms-0 rounded bg-muted/80" :
                       "border-r"
@@ -124,7 +124,7 @@ export function LayoutTab() {
                   ) : option.value === "icon" ? (
                     // Icon mode: Show thin icon sidebar with clear icons
                     <>
-                      <div className="w-4 flex-shrink-0 bg-muted flex flex-col gap-1 p-1 border-r items-center">
+                      <div className="w-4 shrink-0 bg-muted flex flex-col gap-1 p-1 border-r items-center">
                         <div className="w-2 h-2 bg-foreground/60 rounded-sm"></div>
                         <div className="w-2 h-2 bg-foreground/40 rounded-sm"></div>
                         <div className="w-2 h-2 bg-foreground/30 rounded-sm"></div>
@@ -181,7 +181,7 @@ export function LayoutTab() {
                   {side.value === "left" ? (
                     // Left sidebar layout - more proportional
                     <>
-                      <div className="w-6 flex-shrink-0 bg-muted flex flex-col gap-0.5 p-1 border-r">
+                      <div className="w-6 shrink-0 bg-muted flex flex-col gap-0.5 p-1 border-r">
                         <div className="h-0.5 w-full bg-foreground/60 rounded"></div>
                         <div className="h-0.5 w-3/4 bg-foreground/50 rounded"></div>
                         <div className="h-0.5 w-2/3 bg-foreground/40 rounded"></div>
@@ -193,7 +193,7 @@ export function LayoutTab() {
                     // Right sidebar layout - more proportional
                     <>
                       <div className="flex-1 bg-background/50 m-1 rounded-sm border-dashed border border-muted-foreground/20"></div>
-                      <div className="w-6 flex-shrink-0 bg-muted flex flex-col gap-0.5 p-1 border-l">
+                      <div className="w-6 shrink-0 bg-muted flex flex-col gap-0.5 p-1 border-l">
                         <div className="h-0.5 w-full bg-foreground/60 rounded"></div>
                         <div className="h-0.5 w-3/4 bg-foreground/50 rounded"></div>
                         <div className="h-0.5 w-2/3 bg-foreground/40 rounded"></div>

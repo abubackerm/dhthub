@@ -27,6 +27,7 @@ import type {
 } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
 import { AddToCartIsland } from "@/components/public/AddToCartIsland";
+import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 
 interface CellProductTableProps {
   products: LeafProductView[];
@@ -240,6 +241,7 @@ export function CellProductTable({
           <TableBody>
             {sortedVariants.map((variant, index) => {
               const productPath = `${basePath}/${variant.productSlug}?variant=${encodeURIComponent(variant.sku)}`;
+              const isHeroImage = index < 3; // First 3 images are considered "above the fold"
 
               return (
                 <TableRow
@@ -257,11 +259,17 @@ export function CellProductTable({
                         if (!imageUrl) {
                           return <Package className="w-5 h-5 text-muted-foreground/40" />;
                         }
+                        const isHeroImage = index < 3;
                         return (
-                          <img
+                          <ImageWithPlaceholder
                             src={imageUrl}
                             alt={variant.name || variant.productName}
+                            width={40}
+                            height={40}
                             className="w-full h-full object-cover"
+                            loading={isHeroImage ? "eager" : "lazy"}
+                            decoding={isHeroImage ? "sync" : "async"}
+                            showBlur={true}
                           />
                         );
                       })()}

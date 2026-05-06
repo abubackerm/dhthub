@@ -19,6 +19,7 @@ import { MobileFilterToggle } from "./MobileFilterToggle";
 
 import { Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
+import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 
 interface ConsolidatedLeafCategoryPageProps {
   categorySlug: string;
@@ -35,14 +36,14 @@ export function ConsolidatedLeafCategoryPage({
   serverData,
   serverFilterData,
 }: ConsolidatedLeafCategoryPageProps) {
-  const { data: clientData, isLoading, error } = useConsolidatedLeafData(serverData ? "" : categorySlug);
-  const { data: clientFilterData } = useAggregatedFilterData(serverFilterData ? "" : categorySlug);
+  const { data: clientData, isLoading, error } = useConsolidatedLeafData(!serverData ? categorySlug : undefined);
+  const { data: clientFilterData } = useAggregatedFilterData(!serverFilterData ? categorySlug : undefined);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
   const { setFilterData: setFilterContext } = useFilterContext();
 
-  const data = serverData ?? clientData;
-  const filterData = serverFilterData ?? clientFilterData;
+  const data = serverData || clientData;
+  const filterData = serverFilterData || clientFilterData;
 
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
@@ -189,6 +190,8 @@ export function ConsolidatedLeafCategoryPage({
                 fill
                 className="object-cover"
                 priority={leafIndex === 0}
+                loading={leafIndex === 0 ? "eager" : "lazy"}
+                decoding={leafIndex === 0 ? "sync" : "async"}
               />
               <div className="relative z-10 px-6 py-4">
                 {leafIndex === 0 ? (
@@ -250,11 +253,27 @@ export function ConsolidatedLeafCategoryPage({
                       const isLocalhost = imageUrl.includes('localhost');
                       if (isLocalhost) {
                         return (
-                          <img src={imageUrl} alt={cell.name} className="object-contain w-full h-full" />
+                          <img 
+                            src={imageUrl} 
+                            alt={cell.name} 
+                            className="object-contain w-full h-full"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         );
                       }
                       return (
-                        <Image src={imageUrl} alt={cell.name} width={128} height={128} className="object-contain w-full h-full" />
+                        <ImageWithPlaceholder
+                          src={imageUrl}
+                          alt={cell.name}
+                          width={128}
+                          height={128}
+                          className="object-contain w-full h-full"
+                          loading="lazy"
+                          decoding="async"
+                          sizes="128px"
+                          showBlur={true}
+                        />
                       );
                     })()}
                   </div>
@@ -368,22 +387,68 @@ function getAttributeValue(
 function ConsolidatedLeafCategoryPageSkeleton() {
   return (
     <div className="catalog-page">
-      <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-4 w-32 ml-2" />
-      </nav>
-      <Skeleton className="h-4 w-48 mt-2 mb-6" />
-      <div>
-        <div>
-          <Skeleton className="h-8 w-64 mb-4" />
-          <Skeleton className="h-6 w-48 mb-2" />
-          <Skeleton className="h-6 w-36 mb-2" />
-          <Skeleton className="h-48 w-full" />
+      {/* First Leaf Category with Hero */}
+      <div className="mb-10">
+        {/* Hero Banner Skeleton */}
+        <div className="relative overflow-hidden rounded-lg mb-6 bg-muted">
+          <div className="px-6 py-4">
+            {/* Breadcrumb */}
+            <nav className="catalog-breadcrumb--hero" aria-label="Breadcrumb">
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-3 ml-2" />
+              <Skeleton className="h-4 w-20 ml-2" />
+              <Skeleton className="h-4 w-3 ml-2" />
+              <Skeleton className="h-4 w-28 ml-2" />
+            </nav>
+            <Skeleton className="h-4 w-40 mt-2 mb-3" />
+            <Skeleton className="h-9 w-72 mb-2" />
+            <Skeleton className="h-4 w-56" />
+          </div>
         </div>
-        <div>
-          <Skeleton className="h-8 w-64 mb-4" />
-          <Skeleton className="h-6 w-48 mb-2" />
-          <Skeleton className="h-48 w-full" />
+
+        {/* Cell Section */}
+        <div className="cell-section">
+          <div className="flex gap-6 mb-4">
+            <Skeleton className="w-32 h-32 rounded-lg shrink-0" />
+            <div className="flex-1">
+              <Skeleton className="h-7 w-56 mb-2" />
+              <Skeleton className="h-4 w-80" />
+            </div>
+          </div>
+          {/* Product Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <Skeleton className="h-10 w-full border-b" />
+            <Skeleton className="h-16 w-full border-b" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Second Leaf Category */}
+      <div>
+        {/* Title Banner */}
+        <div className="relative overflow-hidden rounded-lg mb-6 bg-muted">
+          <div className="px-6 py-4">
+            <Skeleton className="h-9 w-72 mb-2" />
+            <Skeleton className="h-4 w-56" />
+          </div>
+        </div>
+
+        {/* Cell Section */}
+        <div className="cell-section">
+          <div className="flex gap-6 mb-4">
+            <Skeleton className="w-32 h-32 rounded-lg shrink-0" />
+            <div className="flex-1">
+              <Skeleton className="h-7 w-56 mb-2" />
+              <Skeleton className="h-4 w-80" />
+            </div>
+          </div>
+          {/* Product Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <Skeleton className="h-10 w-full border-b" />
+            <Skeleton className="h-16 w-full border-b" />
+            <Skeleton className="h-16 w-full" />
+          </div>
         </div>
       </div>
     </div>

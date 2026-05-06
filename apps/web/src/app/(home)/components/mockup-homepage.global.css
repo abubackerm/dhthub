@@ -4,8 +4,8 @@
   --dht-navy:       #0A1628;
   --dht-navy-mid:   #112240;
   --dht-navy-soft:   #1A3260;
-  --dht-orange:     #F5620F;
-  --dht-orange-lt:  #FF7A2B;
+  --dht-red:        #DC0000;
+  --dht-red-hover:  #B30000;
   --dht-steel:      #8A9BB8;
   --dht-steel-lt:    #C4CDD9;
   --dht-white:      #F4F6FA;
@@ -36,4 +36,4 @@
 .mockup-homepage ::-webkit-scrollbar { width: 6px; }
 .mockup-homepage ::-webkit-scrollbar-track { background: var(--dht-navy); }
 .mockup-homepage ::-webkit-scrollbar-thumb { background: var(--dht-navy-soft); border-radius: 3px; }
-.mockup-homepage ::-webkit-scrollbar-thumb:hover { background: var(--dht-orange); }
+.mockup-homepage ::-webkit-scrollbar-thumb:hover { background: var(--dht-red); }

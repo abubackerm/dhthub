@@ -29,6 +29,7 @@ import {
 import type { ProductDetailView, Category } from "@/lib/api/catalog/types";
 import { useAddToCart } from "@/lib/api/cart";
 import { AddToCartIsland } from "@/components/public/AddToCartIsland";
+import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 
 interface ProductDetailProps {
   product: ProductDetailView;
@@ -46,6 +47,9 @@ export function ProductDetailPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const addToCart = useAddToCart();
+
+  // Server always passes full product data, so no client-side fetch needed
+  // This component relies entirely on server-provided props
 
   const variantSku = searchParams.get("variant");
 
@@ -197,20 +201,28 @@ export function ProductDetailPage({
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Left Column - Image Gallery */}
         <div className="space-y-4">
-          {/* Main Image */}
+          {/* Main Image - Priority load for above-the-fold content */}
           <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border overflow-hidden">
             {currentImage?.url ? (
-              <img
+              <ImageWithPlaceholder
                 src={currentImage.url}
                 alt={currentImage.altText || product.name}
+                width={400}
+                height={400}
                 className="w-full h-full object-contain"
+                loading="eager"
+                decoding="sync"
+                showBlur={true}
+                priority
               />
             ) : (
-              <Package className="w-32 h-32 text-muted-foreground/30" />
+              <div className="w-full h-full flex items-center justify-center">
+                <Package className="w-32 h-32 text-muted-foreground/30" />
+              </div>
             )}
           </div>
 
-          {/* Thumbnail Strip */}
+          {/* Thumbnail Strip - Lazy load with blur effect */}
           {allImages.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-2">
               {allImages.map((img, index) => (
@@ -224,10 +236,15 @@ export function ProductDetailPage({
                   }`}
                 >
                   {img.url ? (
-                    <img
+                    <ImageWithPlaceholder
                       src={img.url}
                       alt={img.altText || `Image ${index + 1}`}
+                      width={64}
+                      height={64}
                       className="w-full h-full object-cover rounded"
+                      loading="lazy"
+                      decoding="async"
+                      showBlur={true}
                     />
                   ) : (
                     <Package className="w-6 h-6 text-muted-foreground/30" />

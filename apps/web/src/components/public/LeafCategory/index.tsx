@@ -13,11 +13,10 @@ import type {
   LeafPageView,
   AggregatedFilterDataView,
 } from "@/lib/api/catalog/types";
-import { CellProductTable } from "./CellProductTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MobileFilterToggle } from "./MobileFilterToggle";
-
-import { ChevronRight } from "lucide-react";
+import { LeafCategoryBreadcrumb } from "./LeafCategoryBreadcrumb";
+import { CellSection } from "./CellSection";
 
 export { ConsolidatedLeafCategoryPage } from "./ConsolidatedLeafCategoryPage";
 
@@ -36,19 +35,14 @@ export function LeafCategoryPage({
   serverData,
   serverFilterData,
 }: LeafCategoryPageProps) {
-  const { data: clientData, isLoading, error } = useLeafPageData(serverData ? "" : categorySlug);
-  const { data: clientFilterData } = useAggregatedFilterData(serverFilterData ? "" : categorySlug);
+  const { data: clientData, isLoading, error } = useLeafPageData(!serverData ? categorySlug : undefined);
+  const { data: clientFilterData } = useAggregatedFilterData(!serverFilterData ? categorySlug : undefined);
   const searchParams = useSearchParams();
   const basePath = `/products/${pathSlugs.join("/")}`;
   const { setFilterData: setFilterContext } = useFilterContext();
 
-  const data = serverData ?? clientData;
-  const filterData = serverFilterData ?? clientFilterData;
-
-  const breadcrumbItems = pathNames.map((name, index) => ({
-    name,
-    path: `/products/${pathSlugs.slice(0, index + 1).join("/")}`,
-  }));
+  const data = serverData || clientData;
+  const filterData = serverFilterData || clientFilterData;
 
   const facets = filterData?.facets ?? {};
   const filterableAttributes = filterData?.filterableAttributes ?? data?.filterableAttributes ?? [];
@@ -127,25 +121,7 @@ export function LeafCategoryPage({
   return (
     <div className="catalog-page">
       {/* Breadcrumb */}
-      <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
-        <Link href="/" className="catalog-breadcrumb__link">Home</Link>
-        <span className="catalog-breadcrumb__sep" aria-hidden="true">
-          <ChevronRight className="w-4 h-4" />
-        </span>
-        <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
-        {breadcrumbItems.map((item, i) => (
-          <span key={i}>
-            <span className="catalog-breadcrumb__sep" aria-hidden="true">
-              <ChevronRight className="w-4 h-4" />
-            </span>
-            {i === breadcrumbItems.length - 1 ? (
-              <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
-            ) : (
-              <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
-            )}
-          </span>
-        ))}
-      </nav>
+      <LeafCategoryBreadcrumb pathNames={pathNames} pathSlugs={pathSlugs} />
 
       {/* h1: Leaf Category Title */}
       <h1 className="catalog-page__title">{data.category.name}</h1>
@@ -191,91 +167,6 @@ export function LeafCategoryPage({
   );
 }
 
-function CellSection({
-  cell,
-  basePath,
-  filterableAttributes,
-}: {
-  cell: LeafCellView;
-  basePath: string;
-  filterableAttributes: LeafFilterableAttributeView[];
-}) {
-  const variantCount = cell.products.reduce((sum, p) => sum + p.variants.length, 0);
-  const hasProducts = cell.products.length > 0;
-  if (variantCount === 0 && !hasProducts) return null;
-
-  return (
-    <div className="cell-section">
-      {/* h2: Cell name */}
-      <h2 className="text-xl font-semibold text-foreground mb-4">{cell.name}</h2>
-      {cell.description && (
-        <p className="text-sm text-muted-foreground mb-4">{cell.description}</p>
-      )}
-
-      {/* Products under this cell */}
-      {cell.products.map((product) => (
-        <ProductSection
-          key={product.id}
-          product={product}
-          filterableAttributes={filterableAttributes}
-          basePath={basePath}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ProductSection({
-  product,
-  filterableAttributes,
-  basePath,
-}: {
-  product: LeafProductView;
-  filterableAttributes: LeafFilterableAttributeView[];
-  basePath: string;
-}) {
-  if (product.variants.length === 0) {
-    return (
-      <div className="mb-6">
-        <h2 className="text-lg font-medium text-foreground mb-2">
-          <Link
-            href={`${basePath}/${product.slug}`}
-            className="hover:text-(--dht-red) transition-colors"
-          >
-            {product.name}
-          </Link>
-        </h2>
-        {product.description && (
-          <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-6">
-      {/* h2: Product name */}
-      <h2 className="text-lg font-medium text-foreground mb-2">
-        <Link
-          href={`${basePath}/${product.slug}`}
-          className="hover:text-(--dht-red) transition-colors"
-        >
-          {product.name}
-        </Link>
-      </h2>
-      {product.description && (
-        <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
-      )}
-
-      <CellProductTable
-        products={[product]}
-        filterableAttributes={filterableAttributes}
-        basePath={basePath}
-      />
-    </div>
-  );
-}
-
 function getAttributeValue(
   attributeValues: LeafAttributeValueView[],
   attributeId: string
@@ -300,21 +191,50 @@ function getAttributeValue(
 function LeafCategoryPageSkeleton() {
   return (
     <div className="catalog-page">
+      {/* Breadcrumb Skeleton */}
       <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-4 ml-2" />
+        <Skeleton className="h-4 w-24 ml-2" />
+        <Skeleton className="h-4 w-4 ml-2" />
         <Skeleton className="h-4 w-32 ml-2" />
       </nav>
-      <Skeleton className="h-8 w-64 mt-4" />
-      <Skeleton className="h-4 w-48 mt-2" />
-      <div className="mt-6">
+
+      {/* Title and Description Skeleton */}
+      <Skeleton className="h-10 w-80 mt-6 mb-3" />
+      <Skeleton className="h-4 w-64 mb-2" />
+      <Skeleton className="h-4 w-48 mb-6" />
+
+      {/* Product Grid Skeleton */}
+      <div className="mt-8 space-y-8">
+        {/* Cell Section */}
         <div>
-          <Skeleton className="h-6 w-48 mb-2" />
-          <Skeleton className="h-6 w-36 mb-2" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-7 w-56 mb-4" />
+          {/* Product */}
+          <div>
+            <Skeleton className="h-6 w-48 mb-3" />
+            {/* Product Table Placeholder */}
+            <div className="border rounded-lg overflow-hidden">
+              <Skeleton className="h-10 w-full border-b" />
+              <Skeleton className="h-16 w-full border-b" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          </div>
         </div>
+
+        {/* Another Cell Section */}
         <div>
-          <Skeleton className="h-6 w-48 mb-2" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-7 w-56 mb-4" />
+          {/* Product */}
+          <div>
+            <Skeleton className="h-6 w-48 mb-3" />
+            {/* Product Table Placeholder */}
+            <div className="border rounded-lg overflow-hidden">
+              <Skeleton className="h-10 w-full border-b" />
+              <Skeleton className="h-16 w-full border-b" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

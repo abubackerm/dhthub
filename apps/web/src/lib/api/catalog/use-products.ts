@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError } from '../client';
+import { revalidateProductData } from './products';
 import {
   getProducts,
   getProductById,
@@ -63,8 +64,9 @@ export function useCreateProduct(): UseMutationResult<
 
   return useMutation({
     mutationFn: createProduct,
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData(data.slug);
       toast.success('Product created successfully');
     },
     onError: (error: Error) => {
@@ -85,8 +87,9 @@ export function useUpdateProduct(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, data }) => updateProduct(id, data),
-    onSuccess: () => {
+    onSuccess: async (updatedProduct) => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData(updatedProduct.slug);
       toast.success('Product updated successfully');
     },
     onError: (error: Error) => {
@@ -103,8 +106,11 @@ export function useDeleteProduct(): UseMutationResult<void, Error, string> {
 
   return useMutation({
     mutationFn: hardDeleteProduct,
-    onSuccess: () => {
+    onSuccess: async (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      // Note: Can't revalidate by slug since we only have the ID
+      // The general product tag invalidation will cover this
+      await revalidateProductData();
       toast.success('Product deleted successfully');
     },
     onError: (error: Error) => {
@@ -125,8 +131,10 @@ export function useBulkUpdateProducts(): UseMutationResult<
 
   return useMutation({
     mutationFn: bulkUpdateProducts,
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      // Revalidate all product pages since bulk update can affect multiple products
+      await revalidateProductData();
       toast.success(`${result.updatedCount} product(s) updated`);
     },
     onError: (error: Error) => {
@@ -143,8 +151,9 @@ export function useRemoveVariant(): UseMutationResult<void, Error, { productId: 
 
   return useMutation({
     mutationFn: ({ productId, variantId }) => removeVariant(productId, variantId),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Variant removed successfully');
     },
     onError: (error: Error) => {
@@ -165,8 +174,9 @@ export function useAddVariant(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ productId, data }) => addVariant(productId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Variant added successfully');
     },
     onError: (error: Error) => {
@@ -187,8 +197,9 @@ export function useUpdateVariant(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ productId, variantId, data }) => updateVariant(productId, variantId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Variant updated successfully');
     },
     onError: (error: Error) => {
@@ -209,8 +220,9 @@ export function useAddVariantImage(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ productId, variantId, data }) => addVariantImage(productId, variantId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Image added successfully');
     },
     onError: (error: Error) => {
@@ -231,8 +243,9 @@ export function useUpdateImage(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ imageId, data }) => updateImage(imageId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Image updated successfully');
     },
     onError: (error: Error) => {
@@ -249,8 +262,9 @@ export function useRemoveImage(): UseMutationResult<void, Error, string> {
 
   return useMutation({
     mutationFn: (imageId) => removeImage(imageId),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Image removed successfully');
     },
     onError: (error: Error) => {
@@ -272,8 +286,9 @@ export function useReorderVariantImages(): UseMutationResult<
   return useMutation({
     mutationFn: ({ productId, variantId, imageIds }) =>
       reorderVariantImages(productId, variantId, imageIds),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
+      await revalidateProductData();
       toast.success('Image order updated');
     },
     onError: (error: Error) => {

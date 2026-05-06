@@ -55,6 +55,32 @@ export class SearchController {
     }
   }
 
+  @Get('stats')
+  @HttpCode(HttpStatus.OK)
+  async stats(): Promise<{
+    indexName: string;
+    documentCount: number;
+    isIndexing: boolean;
+    hasData: boolean;
+  }> {
+    try {
+      const health = await this.indexerService.getIndexHealth();
+      return {
+        indexName: health.indexName,
+        documentCount: health.documentCount,
+        isIndexing: health.isIndexing,
+        hasData: health.documentCount > 0,
+      };
+    } catch (error) {
+      return {
+        indexName: 'variants',
+        documentCount: 0,
+        isIndexing: false,
+        hasData: false,
+      };
+    }
+  }
+
   @Post('reindex')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin', 'super_admin')

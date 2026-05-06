@@ -6,7 +6,7 @@ export function DHTAbout() {
                     {/* Image */}
                     <div className="relative">
                         <div
-                            className="aspect-[4/3] bg-cover bg-center rounded-lg shadow-xl"
+                            className="aspect-4/3 bg-cover bg-center rounded-lg shadow-xl"
                             style={{
                                 backgroundImage: "url('/images/about-building.jpg')",
                             }}

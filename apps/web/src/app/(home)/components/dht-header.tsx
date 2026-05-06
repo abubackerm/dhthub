@@ -20,7 +20,6 @@ const navLinks = [
     { href: "/", label: "Home" },
     { href: "/products", label: "Products" },
     { href: "/about", label: "About Us" },
-    { href: "/divisions", label: "Our Divisions" },
     { href: "/contact", label: "Contact Us" },
 ];
 

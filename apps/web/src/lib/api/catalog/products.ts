@@ -48,7 +48,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailView>
 
 export async function getServerProductBySlug(slug: string): Promise<ProductDetailView> {
   return serverFetch<ProductDetailView>(`/v1/catalog/products/by-slug/${slug}`, {
-    tags: [CACHE_TAG_PRODUCT],
+    tags: [CACHE_TAG_PRODUCT, `product-${slug}`],
   });
 }
 
@@ -155,5 +155,18 @@ export async function exportProducts(options?: {
     categoryIds: options?.categoryIds,
     exportAll: !options?.productIds?.length && !options?.categoryIds?.length,
   });
+}
+
+/**
+ * Revalidate product cache - call after admin mutations
+ * @param slug - Optional product slug to invalidate specific product
+ */
+export async function revalidateProductData(slug?: string): Promise<void> {
+  const { revalidateTag } = await import('next/cache');
+  
+  if (slug) {
+    revalidateTag(`product-${slug}`);
+  }
+  revalidateTag(CACHE_TAG_PRODUCT);
 }
 

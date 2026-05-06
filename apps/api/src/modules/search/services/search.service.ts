@@ -22,27 +22,7 @@ export class SearchService {
       return await this.cacheService.wrap(
         cacheKey,
         async () => {
-          const filters = this.buildFilters(query);
-          const facetFields = query.facets ? query.facets.split(',').map((f) => f.trim()) : ['categoryPath'];
-
-          const searchParams = {
-            filter: filters,
-            facets: facetFields,
-            limit: query.limit ?? 20,
-            offset: ((query.page ?? 1) - 1) * (query.limit ?? 20),
-            sort: this.buildSort(query),
-            matchingStrategy: 'frequency' as const,
-            attributesToRetrieve: [
-              'variantId', 'productId', 'productName', 'sku',
-              'categoryId', 'categoryPath', 'price', 'stock',
-              'image', 'attributes',
-            ],
-            attributesToHighlight: ['productName', 'sku', 'categoryPath'],
-            highlightPreTag: '<em>',
-            highlightPostTag: '</em>',
-          };
-
-          const result = await this.meiliClient.index(this.ALIAS_NAME).search(query.q, searchParams);
+          const result = await this.searchWithFallback(query);
 
           const items: SearchResultItem[] = result.hits.map((hit: any) => {
             const formatted = hit._formatted ?? {};
@@ -77,6 +57,7 @@ export class SearchService {
             facets: facetsResult,
           };
         },
+        // Cache for 60 seconds normally, but we'll handle empty results differently
         60,
       );
     } catch (error) {
@@ -87,6 +68,49 @@ export class SearchService {
       this.logger.error(`Search failed: ${errorMessage}`);
       throw new SearchQueryError(errorMessage);
     }
+  }
+
+  private async searchWithFallback(query: SearchQueryDto): Promise<any> {
+    const searchParams = {
+      filter: this.buildFilters(query),
+      facets: query.facets ? query.facets.split(',').map((f) => f.trim()) : ['categoryPath'],
+      limit: query.limit ?? 20,
+      offset: ((query.page ?? 1) - 1) * (query.limit ?? 20),
+      sort: this.buildSort(query),
+      matchingStrategy: 'last' as const,
+      attributesToRetrieve: [
+        'variantId', 'productId', 'productName', 'sku',
+        'categoryId', 'categoryPath', 'price', 'stock',
+        'image', 'attributes',
+      ],
+      attributesToHighlight: ['productName', 'sku', 'categoryPath'],
+      highlightPreTag: '<em>',
+      highlightPostTag: '</em>',
+    };
+
+    let result = await this.meiliClient.index(this.ALIAS_NAME).search(query.q, searchParams);
+    
+    // If no results with 'last' strategy, try with 'all' words for exact matches
+    if (result.estimatedTotalHits === 0 && query.q && query.q.trim().split(/\s+/).length > 1) {
+      const fallbackParams = {
+        ...searchParams,
+        matchingStrategy: 'all' as const,
+      };
+      result = await this.meiliClient.index(this.ALIAS_NAME).search(query.q, fallbackParams);
+    }
+    
+    // If still no results, try searching individual words (OR logic)
+    if (result.estimatedTotalHits === 0 && query.q && query.q.trim().split(/\s+/).length > 1) {
+      const words = query.q.trim().split(/\s+/);
+      const orQuery = words.join(' | ');
+      const orParams = {
+        ...searchParams,
+        matchingStrategy: undefined,
+      };
+      result = await this.meiliClient.index(this.ALIAS_NAME).search(orQuery, orParams);
+    }
+    
+    return result;
   }
 
   private buildFilters(query: SearchQueryDto): string[] {

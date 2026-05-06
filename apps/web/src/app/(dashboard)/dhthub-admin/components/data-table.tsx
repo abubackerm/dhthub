@@ -86,7 +86,10 @@ const orderSchema = z.object({
   email: z.string(),
   phone: z.string().nullable(),
   status: z.string(),
-  grandTotal: z.number().nullable(),
+  grandTotal: z
+    .union([z.number(), z.string()])
+    .transform((val) => (typeof val === 'string' ? parseFloat(val) : val))
+    .nullable(),
   itemCount: z.number(),
   createdAt: z.string(),
 })

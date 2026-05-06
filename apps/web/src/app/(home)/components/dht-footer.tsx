@@ -6,7 +6,6 @@ const footerLinks = {
     company: [
         { label: "About Us", href: "/about" },
         { label: "Products", href: "/products" },
-        { label: "Our Divisions", href: "/divisions" },
         { label: "Contact Us", href: "/contact" },
         { label: "Dealer Portal", href: "/dealer-portal" },
     ],

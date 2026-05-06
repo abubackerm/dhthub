@@ -17,6 +17,7 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "storage:make-public": "tsx src/scripts/set-bucket-public.ts",
+    "reindex-search": "tsx src/scripts/reindex-search-simple.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

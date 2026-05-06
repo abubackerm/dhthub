@@ -68,29 +68,29 @@ export function useCategory(id: string): UseQueryResult<Category, Error> {
   });
 }
 
-export function useLeafPageData(slug: string): UseQueryResult<LeafPageView, Error> {
+export function useLeafPageData(slug?: string): UseQueryResult<LeafPageView, Error> {
   return useQuery({
     queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, slug],
-    queryFn: () => getLeafPageData(slug),
+    queryFn: () => getLeafPageData(slug!),
     enabled: !!slug,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
-export function useConsolidatedLeafData(slug: string): UseQueryResult<ConsolidatedLeafPageView, Error> {
+export function useConsolidatedLeafData(slug?: string): UseQueryResult<ConsolidatedLeafPageView, Error> {
   return useQuery({
     queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'consolidated', slug],
-    queryFn: () => getConsolidatedLeafData(slug),
+    queryFn: () => getConsolidatedLeafData(slug!),
     enabled: !!slug,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 
-export function useAggregatedFilterData(slug: string): UseQueryResult<AggregatedFilterDataView, Error> {
+export function useAggregatedFilterData(slug?: string): UseQueryResult<AggregatedFilterDataView, Error> {
   return useQuery({
     queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'filter-data', slug],
-    queryFn: () => getAggregatedFilterData(slug),
-    enabled: !!slug,
+    queryFn: () => getAggregatedFilterData(slug!),
+    enabled: !!slug, // Only fetch if slug is provided
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
@@ -104,9 +104,10 @@ export function useCreateCategory(): UseMutationResult<
 
   return useMutation({
     mutationFn: createCategory,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: LEAF_PAGE_DATA_QUERY_KEY });
       toast.success('Category created successfully');
     },
     onError: (error: Error) => {
@@ -134,9 +135,10 @@ export function useUpdateCategory(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, data }) => updateCategory(id, data),
-    onSuccess: () => {
+    onSuccess: (updatedCategory) => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: LEAF_PAGE_DATA_QUERY_KEY });
       toast.success('Category updated successfully');
     },
     onError: (error: Error) => {
@@ -163,6 +165,7 @@ export function useDeleteCategory(): UseMutationResult<void, Error, string> {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_TREE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: CATEGORIES_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: LEAF_PAGE_DATA_QUERY_KEY });
       toast.success('Category deleted successfully');
     },
     onError: (error: Error) => {

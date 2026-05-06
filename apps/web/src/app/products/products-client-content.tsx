@@ -6,6 +6,7 @@ import { CategoryIcon } from "@/components/public/CategoryIcon";
 import { getCategoryIconName } from "@/lib/utils/category-icon-map";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { CategoryTreeNode } from "@/lib/api/catalog/types";
+import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 
 interface ProductsClientContentProps {
   categories: CategoryTreeNode[];
@@ -100,12 +101,16 @@ export function ProductsClientContent({ categories }: ProductsClientContentProps
                 >
                   <div className="catalog-grid__icon">
                     {child.imageUrl ? (
-                      <Image
+                      <ImageWithPlaceholder
                         src={child.imageUrl}
                         alt={child.name}
                         width={80}
                         height={80}
                         className="w-full h-full"
+                        loading="lazy"
+                        decoding="async"
+                        sizes="(max-width: 768px) 50vw, 80px"
+                        showBlur={true}
                       />
                     ) : (
                       <CategoryIcon

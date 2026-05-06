@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCategoryTree } from '@/lib/api/catalog/use-categories';
+import type { CategoryTreeNode } from '@/lib/api/catalog/types';
+import { 
+  CheckCircle, 
+  Building2, 
+  Clock, 
+  Truck, 
+  Handshake
+} from 'lucide-react';
 import s from './mockup-homepage.module.css';
 import './mockup-homepage.global.css';
 
@@ -8,6 +17,80 @@ export default function MockupHomepage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(['Stock Status']));
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const { data: categoryTree, isLoading } = useCategoryTree({ maxDepth: 2 });
+  
+  // Search query state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter categories based on search query
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim() || !categoryTree) return [];
+
+    const query = searchQuery.toLowerCase();
+    const results: CategoryTreeNode[] = [];
+
+    const flattenAndFilter = (categories: CategoryTreeNode[]) => {
+      for (const category of categories) {
+        if (category.name.toLowerCase().includes(query)) {
+          results.push(category);
+        }
+        if (category.children && category.children.length > 0) {
+          flattenAndFilter(category.children);
+        }
+      }
+    };
+
+    flattenAndFilter(categoryTree);
+    return results.slice(0, 8); // Limit to 8 results
+  }, [searchQuery, categoryTree]);
+
+  // Helper function to find a category by ID in the tree
+  const findCategoryById = useCallback((id: string, tree: CategoryTreeNode[]): CategoryTreeNode | null => {
+    for (const category of tree) {
+      if (category.id === id) {
+        return category;
+      }
+      if (category.children && category.children.length > 0) {
+        const found = findCategoryById(id, category.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
+  // Debug: Check if children are populated
+  if (!isLoading && categoryTree && categoryTree.length > 0) {
+    console.log('=== Category Tree Structure ===');
+    console.log('Total root categories:', categoryTree.length);
+    categoryTree.forEach((cat) => {
+      console.log(`- ${cat.name} (depth: ${cat.depth}, children: ${cat.children?.length || 0}, hasChildren: ${cat.hasChildren})`);
+    });
+    if (selectedCategoryId) {
+      const selected = findCategoryById(selectedCategoryId, categoryTree);
+      if (selected) {
+        console.log('=== Selected Category ===');
+        console.log('Name:', selected.name);
+        console.log('Children count:', selected.children?.length || 0);
+        console.log('Children:', selected.children?.map(c => c.name));
+      }
+    }
+  }
 
   const toggleMenu = useCallback(() => {
     setMenuOpen((prev) => !prev);
@@ -36,6 +119,36 @@ export default function MockupHomepage() {
   const closeSidebar = useCallback(() => {
     setSidebarOpen(false);
   }, []);
+
+  const toggleProfileDropdown = useCallback(() => {
+    setProfileDropdownOpen((prev) => !prev);
+  }, []);
+
+  // Get random categories for popular search tags (memoized to stay stable)
+  const randomCategories = useMemo(() => {
+    if (!categoryTree || categoryTree.length === 0) return [];
+    
+    // Flatten the tree to get all categories
+    const flattenCategories = (categories: CategoryTreeNode[]): CategoryTreeNode[] => {
+      let result: CategoryTreeNode[] = [];
+      for (const category of categories) {
+        result.push(category);
+        if (category.children && category.children.length > 0) {
+          result = result.concat(flattenCategories(category.children));
+        }
+      }
+      return result;
+    };
+
+    const allCategories = flattenCategories(categoryTree);
+    
+    // Shuffle and pick 3-5 random categories (to fit on one line)
+    const shuffled = allCategories.sort(() => Math.random() - 0.5);
+    const numTags = Math.min(Math.floor(Math.random() * 3) + 3, allCategories.length);
+    
+    return shuffled.slice(0, numTags);
+  }, [categoryTree]);
+
 
   return (
     <div className="mockup-homepage">
@@ -66,8 +179,7 @@ export default function MockupHomepage() {
           <a href="/" className={s.active}>Home</a>
           <a href="/products">Products</a>
           <a href="/about">About Us</a>
-          <a href="#">Our Divisions</a>
-          <a href="#">Contact Us</a>
+          <a href="/contact">Contact Us</a>
         </div>
         <div className={s.navActions}>
           <button
@@ -79,15 +191,24 @@ export default function MockupHomepage() {
             <span></span>
             <span></span>
           </button>
-          <div className={s.cartIcon} title="Cart">
+          <a href="/cart" className={s.cartIcon} title="Cart">
             🛒
             <div className={s.cartBadge}>0</div>
-          </div>
+          </a>
           <div className={s.profileDropdown}>
-            <button className={s.profileBtn}>
+            <button className={s.profileBtn} onClick={toggleProfileDropdown}>
               👤 Super Admin
               <span className={s.dropdownChevron}>▼</span>
             </button>
+            {profileDropdownOpen && (
+              <div className={s.profileDropdownMenu}>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/profile">Profile</a>
+                <a href="/settings">Settings</a>
+                <div className={s.dropdownDivider}></div>
+                <a href="/sign-out" className={s.signOut}>Sign Out</a>
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -104,7 +225,6 @@ export default function MockupHomepage() {
         <a href="/" className={s.active} onClick={closeMenu}>Home</a>
         <a href="/products" onClick={closeMenu}>Products</a>
         <a href="/about" onClick={closeMenu}>About Us</a>
-        <a href="#" onClick={closeMenu}>Our Divisions</a>
         <a href="#" onClick={closeMenu}>Contact Us</a>
         <div className={s.mobileMenuDivider}></div>
         <a
@@ -115,7 +235,7 @@ export default function MockupHomepage() {
           🛒 Cart{' '}
           <span
             style={{
-              background: 'var(--dht-orange)',
+              background: 'var(--dht-red)',
               color: '#fff',
               fontSize: '10px',
               fontWeight: 700,
@@ -130,8 +250,27 @@ export default function MockupHomepage() {
             0
           </span>
         </a>
-        <a href="#" onClick={closeMenu} style={{ color: 'var(--dht-orange)' }}>
-          👤 Super Admin
+        <a href="/cart" onClick={closeMenu}>
+          🛒 Cart{' '}
+          <span
+            style={{
+              background: 'var(--dht-red)',
+              color: '#fff',
+              fontSize: '10px',
+              fontWeight: 700,
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            0
+          </span>
+        </a>
+        <a href="/dashboard" onClick={closeMenu} style={{ color: 'var(--dht-red)' }}>
+          👤 Dashboard
         </a>
       </div>
 
@@ -145,33 +284,139 @@ export default function MockupHomepage() {
             <span>Get a Quote. Done.</span>
           </h1>
           <p>Trusted by Aramco contractors, EPC companies, and drilling teams across the Eastern Province.</p>
-          <div className={s.searchBar}>
-            <select className={s.searchSelect}>
-              <option>All Categories</option>
-              <option>General Consumables</option>
-              <option>Painting &amp; Coatings</option>
-              <option>Rotating Equipment</option>
-              <option>Instrumentation</option>
-              <option>PPE &amp; Safety</option>
-              <option>Valves &amp; Fittings</option>
-              <option>Office Stationery</option>
-            </select>
+          <div 
+            ref={searchContainerRef}
+            className={s.searchBar} 
+            style={{ position: 'relative', maxWidth: '570px', margin: '0 auto' }}
+          >
             <input
               className={s.searchInput}
               type="text"
-              placeholder="Search by part number, description, or Aramco spec…"
+              placeholder="Search by name..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSearchDropdown(true);
+              }}
+              onFocus={() => setShowSearchDropdown(true)}
+              style={{ width: '100%' }}
             />
-            <button className={s.searchBtn}>🔍 SEARCH</button>
+            
+            {/* Search Results Dropdown */}
+            {showSearchDropdown && filteredCategories.length > 0 && (
+              <div 
+                className={s.searchDropdown}
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  backgroundColor: '#fff',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+                  marginTop: '4px',
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  zIndex: 9999,
+                }}
+              >
+                {filteredCategories.map((category) => (
+                  <a
+                    key={category.id}
+                    href={`/products/${category.slug}`}
+                    className={s.searchResultItem}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 16px',
+                      textDecoration: 'none',
+                      color: '#1A3260',
+                      borderBottom: '1px solid #f0f0f0',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9f9f9';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <div 
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--dht-light)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '20px',
+                      }}
+                    >
+                      {category.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={category.imageUrl}
+                          alt={category.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+                        />
+                      ) : (
+                        '📦'
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: '14px', color: '#1A3260' }}>{category.name}</div>
+                      <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                        {category.productCount || 0} products
+                      </div>
+                    </div>
+                    <svg 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2"
+                      style={{ color: 'var(--dht-gray)' }}
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </a>
+                ))}
+              </div>
+            )}
+            
+            {/* No Results Message */}
+            {showSearchDropdown && searchQuery.trim() && filteredCategories.length === 0 && (
+              <div 
+                className={s.searchNoResults}
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  backgroundColor: '#fff',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+                  marginTop: '4px',
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  zIndex: 9999,
+                }}
+              >
+                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔍</div>
+                <div style={{ color: '#6B7280', fontSize: '14px' }}>No categories found for "{searchQuery}"</div>
+              </div>
+            )}
           </div>
           <div className={s.searchTags}>
             <span>Popular:</span>
-            <a href="#">Butterfly Valves</a>
-            <a href="#">High-Pressure Hose</a>
-            <a href="#">Lubrication Systems</a>
-            <a href="#">Tarpaulin</a>
-            <a href="#">Protective Coatings</a>
-            <a href="#">Welding Consumables</a>
-            <a href="#">PPE</a>
+            {randomCategories.map((category) => (
+              <a key={category.id} href={`/products/${category.slug}`}>
+                {category.name}
+              </a>
+            ))}
           </div>
         </div>
       </section>
@@ -179,7 +424,9 @@ export default function MockupHomepage() {
       {/* TRUST BAR */}
       <div className={s.trustBar}>
         <div className={s.trustItem}>
-          <div className={s.tIcon}>✅</div>
+          <div className={s.tIcon}>
+            <CheckCircle className="w-5 h-5" />
+          </div>
           <div className={s.tText}>
             <strong>Aramco Approved</strong>
             <span>Vendor #10117241</span>
@@ -187,7 +434,9 @@ export default function MockupHomepage() {
         </div>
         <div className={s.trustSep}></div>
         <div className={s.trustItem}>
-          <div className={s.tIcon}>🏭</div>
+          <div className={s.tIcon}>
+            <Building2 className="w-5 h-5" />
+          </div>
           <div className={s.tText}>
             <strong>15+ Years</strong>
             <span>Eastern Province Operations</span>
@@ -195,7 +444,9 @@ export default function MockupHomepage() {
         </div>
         <div className={s.trustSep}></div>
         <div className={s.trustItem}>
-          <div className={s.tIcon}>📋</div>
+          <div className={s.tIcon}>
+            <Clock className="w-5 h-5" />
+          </div>
           <div className={s.tText}>
             <strong>RFQ in 24 Hours</strong>
             <span>Fast Quote Turnaround</span>
@@ -203,7 +454,9 @@ export default function MockupHomepage() {
         </div>
         <div className={s.trustSep}></div>
         <div className={s.trustItem}>
-          <div className={s.tIcon}>🚚</div>
+          <div className={s.tIcon}>
+            <Truck className="w-5 h-5" />
+          </div>
           <div className={s.tText}>
             <strong>Local Stock</strong>
             <span>Dammam Warehouse</span>
@@ -211,7 +464,9 @@ export default function MockupHomepage() {
         </div>
         <div className={s.trustSep}></div>
         <div className={s.trustItem}>
-          <div className={s.tIcon}>🤝</div>
+          <div className={s.tIcon}>
+            <Handshake className="w-5 h-5" />
+          </div>
           <div className={s.tText}>
             <strong>EPC &amp; Contractor Accounts</strong>
             <span>Credit Terms Available</span>
@@ -222,98 +477,48 @@ export default function MockupHomepage() {
       {/* CATEGORIES */}
       <section className={s.categories}>
         <div className={s.sectionLabel}>Browse by Category</div>
-        <div className={s.catGrid}>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🔧</div>
-            <h4>General Consumables</h4>
-            <span>420+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🎨</div>
-            <h4>Painting &amp; Coatings</h4>
-            <span>150+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>⚙️</div>
-            <h4>Rotating Equipment</h4>
-            <span>230+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🔩</div>
-            <h4>Valves &amp; Fittings</h4>
-            <span>340+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🛡️</div>
-            <h4>PPE &amp; Safety</h4>
-            <span>180+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🩺</div>
-            <h4>Instrumentation</h4>
-            <span>90+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🪣</div>
-            <h4>Spill Control</h4>
-            <span>60+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🏗️</div>
-            <h4>Rigging &amp; Lifting</h4>
-            <span>120+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🪛</div>
-            <h4>Welding Consumables</h4>
-            <span>200+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>🏭</div>
-            <h4>Aluminium Foundry</h4>
-            <span>80+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>📦</div>
-            <h4>Hessian &amp; Tarpaulin</h4>
-            <span>45+ items</span>
-          </a>
-          <a className={s.catCard} href="/products">
-            <div className={s.catIcon}>📎</div>
-            <h4>Office Stationery</h4>
-            <span>300+ items</span>
-          </a>
-        </div>
-      </section>
-
-      {/* QUICK ACCESS CARDS */}
-      <section className={s.quickSection}>
-        <div className={s.sectionLabel}>Quick Access</div>
-        <div className={s.quickCards}>
-          <div className={s.quickCard}>
-            <div className={s.qcIcon}>📤</div>
-            <div className={s.qcText}>
-              <h4>Upload Excel BOM</h4>
-              <p>Upload your bill of materials and get an instant quote for all items at once.</p>
+        <div className={s.catGrid} style={{ padding: '16px' }}>
+          {isLoading ? (
+            // Loading skeleton
+            Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={s.catCard} style={{ pointerEvents: 'none' }}>
+                <div className={s.catIcon} style={{ opacity: 0.3 }}>⚙️</div>
+                <h4 style={{ opacity: 0.3 }}>Loading...</h4>
+                <span style={{ opacity: 0.3 }}>-- items</span>
+              </div>
+            ))
+          ) : categoryTree && categoryTree.length > 0 ? (
+            categoryTree
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((category) => (
+                <a
+                  key={category.id}
+                  className={s.catCard}
+                  href={`/products/${category.slug}`}
+                >
+                  <div className={s.catIcon}>
+                    {category.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={category.imageUrl}
+                        alt={category.name}
+                        className="w-full h-full object-cover"
+                        style={{ borderRadius: '8px' }}
+                      />
+                    ) : (
+                      '📦'
+                    )}
+                  </div>
+                  <h4>{category.name}</h4>
+                </a>
+              ))
+          ) : (
+            // Empty state
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+              <p>No categories available</p>
             </div>
-            <div className={s.qcArrow}>→</div>
-          </div>
-          <div className={s.quickCard}>
-            <div className={s.qcIcon}>⭐</div>
-            <div className={s.qcText}>
-              <h4>My Approved Items</h4>
-              <p>Your company&apos;s saved and pre-approved product list for repeat orders.</p>
-            </div>
-            <div className={s.qcArrow}>→</div>
-          </div>
-          <div className={s.quickCard}>
-            <div className={s.qcIcon}>🛢️</div>
-            <div className={s.qcText}>
-              <h4>Aramco-Approved Items</h4>
-              <p>Browse only items on the Aramco Approved Vendor List (AVL).</p>
-            </div>
-            <div className={s.qcArrow}>→</div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -344,44 +549,27 @@ export default function MockupHomepage() {
             collapsed={collapsedGroups.has('Category')}
             onToggle={() => toggleFilterGroup('Category')}
           >
-            <FilterItem id="fc1" label="General Consumables" count={420} defaultChecked />
-            <FilterItem id="fc2" label="Painting &amp; Coatings" count={150} />
-            <FilterItem id="fc3" label="Rotating Equipment" count={230} />
-            <FilterItem id="fc4" label="Valves &amp; Fittings" count={340} />
+            {isLoading ? (
+              <div style={{ padding: '8px 0', color: 'var(--dht-gray)' }}>Loading...</div>
+            ) : categoryTree && categoryTree.length > 0 ? (
+              categoryTree
+                .filter((category) => category.depth === 0)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((category) => (
+                  <FilterItem
+                    key={category.id}
+                    id={`fc-${category.id}`}
+                    label={category.name}
+                    count={category.productCount}
+                    checked={selectedCategoryId === category.id}
+                    onChange={() => setSelectedCategoryId(selectedCategoryId === category.id ? null : category.id)}
+                    type="radio"
+                  />
+                ))
+            ) : (
+              <div style={{ padding: '8px 0', color: 'var(--dht-gray)' }}>No categories</div>
+            )}
           </FilterGroup>
-
-          <FilterGroup
-            name="Brand"
-            collapsed={collapsedGroups.has('Brand')}
-            onToggle={() => toggleFilterGroup('Brand')}
-          >
-            <FilterItem id="fb1" label="Wouter Witzel" defaultChecked />
-            <FilterItem id="fb2" label="SPIR STAR" />
-            <FilterItem id="fb3" label="Danfoss" />
-            <FilterItem id="fb4" label="Lincoln Industrial" />
-            <FilterItem id="fb5" label="Sari Coat" />
-          </FilterGroup>
-
-          <FilterGroup
-            name="Aramco Compliance"
-            collapsed={collapsedGroups.has('Aramco Compliance')}
-            onToggle={() => toggleFilterGroup('Aramco Compliance')}
-          >
-            <FilterItem id="fa1" label="Aramco AVL Only" />
-            <FilterItem id="fa2" label="SAES Compliant" />
-            <FilterItem id="fa3" label="9COM Listed" />
-          </FilterGroup>
-
-          <FilterGroup
-            name="Stock Status"
-            collapsed={collapsedGroups.has('Stock Status')}
-            onToggle={() => toggleFilterGroup('Stock Status')}
-          >
-            <FilterItem id="fs1" label="In Stock" />
-            <FilterItem id="fs2" label="Available to Order" />
-          </FilterGroup>
-
-          <button className={s.btnClear}>Clear All Filters</button>
         </div>
 
         {/* PRODUCT AREA */}
@@ -391,185 +579,158 @@ export default function MockupHomepage() {
           </button>
           <div className={s.catalogueToolbar}>
             <p className={s.results}>
-              Showing <strong>24</strong> of <strong>420</strong> products
+              {isLoading ? (
+                'Loading categories...'
+              ) : categoryTree && categoryTree.length > 0 ? (
+                (() => {
+                  const selectedMainCategory = selectedCategoryId
+                    ? findCategoryById(selectedCategoryId, categoryTree)
+                    : null;
+
+                  let categoriesToShow = categoryTree;
+                  if (selectedMainCategory && selectedMainCategory.children && selectedMainCategory.children.length > 0) {
+                    categoriesToShow = selectedMainCategory.children;
+                  } else if (selectedMainCategory) {
+                    categoriesToShow = [selectedMainCategory];
+                  } else {
+                    categoriesToShow = categoryTree.filter((cat) => cat.depth === 0);
+                  }
+
+                  const count = categoriesToShow.length;
+                  return selectedMainCategory
+                    ? `Showing ${count} subcategor${count === 1 ? 'y' : 'ies'} under ${selectedMainCategory.name}`
+                    : `Showing all ${count} main categor${count === 1 ? 'y' : 'ies'}`;
+                })()
+              ) : (
+                'No categories'
+              )}
             </p>
             <div className={s.toolbarRight}>
-              <select className={s.sortSelect}>
-                <option>Sort: Relevance</option>
-                <option>Sort: Newest</option>
-                <option>Sort: A–Z</option>
-              </select>
             </div>
           </div>
 
-          <div className={s.productGrid}>
-            {/* Card 1 */}
-            <div className={s.productCard}>
-              <div className={s.aramcoBadge}>Aramco AVL</div>
-              <div className={`${s.approvedTick} ${s.active}`} title="Saved to My Approved Items">
-                ✓
-              </div>
-              <div className={`${s.productImg} ${s.color1}`}>🔩</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>Wouter Witzel</div>
-                <div className={s.productName}>Butterfly Valve — Triple Offset</div>
-                <div className={s.productSpec}>
-                  Sizes: 2&quot; – 48&quot; | Body: Carbon Steel | Rating: ANSI 150–600
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>ASME B16.34</span>
-                  <span className={s.specTag}>API 609</span>
-                  <span className={s.specTag}>Fire Safe</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={s.stockDot}></div>
-                    <span>In Stock</span>
+          <div className={s.productGrid} style={{ padding: '16px' }}>
+            {isLoading ? (
+              // Loading skeleton
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className={s.productCard} style={{ pointerEvents: 'none' }}>
+                  <div className={s.productImg} style={{ opacity: 0.3 }}>⚙️</div>
+                  <div className={s.productBody}>
+                    <div className={s.productName} style={{ opacity: 0.3 }}>Loading...</div>
                   </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
                 </div>
-              </div>
-            </div>
+              ))
+            ) : categoryTree && categoryTree.length > 0 ? (
+              // Get categories to display based on selection
+              (() => {
+                // Find selected main category using recursive search
+                const selectedMainCategory = selectedCategoryId
+                  ? findCategoryById(selectedCategoryId, categoryTree)
+                  : null;
 
-            {/* Card 2 */}
-            <div className={s.productCard}>
-              <div className={s.aramcoBadge}>Aramco AVL</div>
-              <div className={s.approvedTick} title="Save to My Approved Items">
-                ☆
-              </div>
-              <div className={`${s.productImg} ${s.color2}`}>🛢️</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>SPIR STAR</div>
-                <div className={s.productName}>High-Pressure Hose Assembly</div>
-                <div className={s.productSpec}>
-                  Pressure: up to 3,000 bar | Temp: -40°C to +200°C | Multiple end fittings
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>SAE 100R15</span>
-                  <span className={s.specTag}>Oil &amp; Gas</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={s.stockDot}></div>
-                    <span>In Stock</span>
-                  </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
-                </div>
-              </div>
-            </div>
+                // If a category is selected and has children, show children
+                let categoriesToShow: typeof categoryTree = [];
 
-            {/* Card 3 */}
-            <div className={s.productCard}>
-              <div className={s.approvedTick} title="Save to My Approved Items">
-                ☆
-              </div>
-              <div className={`${s.productImg} ${s.color3}`}>🌡️</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>Danfoss</div>
-                <div className={s.productName}>Pressure Transmitter</div>
-                <div className={s.productSpec}>
-                  Range: 0–600 bar | Output: 4–20mA HART | IP67 Protection
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>ATEX</span>
-                  <span className={s.specTag}>IECEx</span>
-                  <span className={s.specTag}>4–20mA</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={`${s.stockDot} ${s.low}`}></div>
-                    <span>Low Stock (4 pcs)</span>
-                  </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
-                </div>
-              </div>
-            </div>
+                if (selectedMainCategory) {
+                  // Check if it has children
+                  if (selectedMainCategory.children && selectedMainCategory.children.length > 0) {
+                    categoriesToShow = selectedMainCategory.children;
+                  } else {
+                    // No children, show just this category
+                    categoriesToShow = [selectedMainCategory];
+                  }
+                } else {
+                  // No selection - show all main categories (depth 0)
+                  categoriesToShow = categoryTree.filter((cat) => cat.depth === 0);
+                }
 
-            {/* Card 4 */}
-            <div className={s.productCard}>
-              <div className={s.aramcoBadge}>9COM</div>
-              <div className={`${s.approvedTick} ${s.active}`} title="Saved to My Approved Items">
-                ✓
-              </div>
-              <div className={`${s.productImg} ${s.color1}`}>🔧</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>Lincoln Industrial</div>
-                <div className={s.productName}>Automatic Lubrication System</div>
-                <div className={s.productSpec}>
-                  Single-point &amp; multi-point | Pump capacity: 0.5L–5L | 24VDC
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>ISO 6743</span>
-                  <span className={s.specTag}>Grease &amp; Oil</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={s.stockDot}></div>
-                    <span>In Stock</span>
-                  </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
-                </div>
-              </div>
-            </div>
+                // Sort alphabetically
+                categoriesToShow = categoriesToShow
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name));
 
-            {/* Card 5 */}
-            <div className={s.productCard}>
-              <div className={s.approvedTick} title="Save to My Approved Items">
-                ☆
-              </div>
-              <div className={`${s.productImg} ${s.color2}`}>🎨</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>Sari Coat</div>
-                <div className={s.productName}>Epoxy Protective Coating</div>
-                <div className={s.productSpec}>
-                  2-part epoxy | DFT: 100–300 microns | Offshore &amp; Onshore grade
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>NACE SP0169</span>
-                  <span className={s.specTag}>Offshore</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={s.stockDot}></div>
-                    <span>In Stock</span>
-                  </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
-                </div>
-              </div>
-            </div>
+                if (categoriesToShow.length === 0) {
+                  return (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                      <p>No categories found</p>
+                    </div>
+                  );
+                }
 
-            {/* Card 6 */}
-            <div className={s.productCard}>
-              <div className={s.approvedTick} title="Save to My Approved Items">
-                ☆
+                return categoriesToShow.map((category) => (
+                  <a
+                    key={category.id}
+                    className={s.productCard}
+                    href={`/products/${category.slug}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <div className={s.productImg}>
+                      {category.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={category.imageUrl}
+                          alt={category.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        '📦'
+                      )}
+                    </div>
+                    <div className={s.productBody}>
+                      <div className={s.productName}>{category.name}</div>
+                    </div>
+                  </a>
+                ));
+              })()
+            ) : (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
+                <p>No categories available</p>
               </div>
-              <div className={`${s.productImg} ${s.color3}`}>🏗️</div>
-              <div className={s.productBody}>
-                <div className={s.productBrand}>Dynamic Hub</div>
-                <div className={s.productName}>Heavy-Duty Tarpaulin</div>
-                <div className={s.productSpec}>
-                  GSM: 180–400 | Sizes: 3×4m to 10×15m | UV stabilised, PE/PP
-                </div>
-                <div className={s.specTags}>
-                  <span className={s.specTag}>UV Resistant</span>
-                  <span className={s.specTag}>Waterproof</span>
-                </div>
-                <div className={s.productFooter}>
-                  <div className={s.stockStatus}>
-                    <div className={s.stockDot}></div>
-                    <span>In Stock</span>
-                  </div>
-                  <button className={s.btnQuote}>+ Add to Quote</button>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* WHATSAPP */}
-      <a className={s.waBtn} href="https://wa.me/966XXXXXXXXX" title="Chat on WhatsApp">
-        💬
+      {/* WHATSAPP FLOATING BUTTON */}
+      <a
+        className={s.waBtn}
+        href="https://wa.me/966XXXXXXXXX"
+        title="Chat on WhatsApp"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '60px',
+          height: '60px',
+          backgroundColor: '#25D366',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          zIndex: 1000,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.1)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="36"
+          height="36"
+          fill="white"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413" />
+        </svg>
       </a>
 
       {/* FOOTER */}
@@ -592,11 +753,17 @@ export default function MockupHomepage() {
           </div>
           <div className={s.footerCol}>
             <h5>Catalogue</h5>
-            <a href="#">General Consumables</a>
-            <a href="#">Painting &amp; Coatings</a>
-            <a href="#">Rotating Equipment</a>
-            <a href="#">Valves &amp; Fittings</a>
-            <a href="#">Instrumentation</a>
+            {isLoading ? (
+              <a href="#">Loading...</a>
+            ) : categoryTree && categoryTree.length > 0 ? (
+              categoryTree.slice(0, 5).map((category) => (
+                <a key={category.id} href={`/products/${category.slug}`}>
+                  {category.name}
+                </a>
+              ))
+            ) : (
+              <a href="/products">All Products</a>
+            )}
           </div>
           <div className={s.footerCol}>
             <h5>Services</h5>
@@ -656,19 +823,28 @@ function FilterItem({
   id,
   label,
   count,
-  defaultChecked,
+  checked,
+  onChange,
+  type = 'checkbox',
 }: {
   id: string;
   label: string;
   count?: number;
-  defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: () => void;
+  type?: 'checkbox' | 'radio';
 }) {
   return (
     <div className={s.filterItem}>
-      <input type="checkbox" defaultChecked={defaultChecked} id={id} />
+      <input
+        type={type}
+        checked={checked}
+        onChange={onChange}
+        id={id}
+      />
       <label htmlFor={id}>
         {label}
-        {count !== undefined && <span className={s.filterCount}>{count}</span>}
+        {count !== undefined && count > 0 && <span className={s.filterCount}>{count}</span>}
       </label>
     </div>
   );

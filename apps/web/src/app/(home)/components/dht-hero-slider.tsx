@@ -45,7 +45,7 @@ export function HeroSlider() {
                 ))}
 
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-transparent z-[2]" />
+                <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-transparent z-2" />
             </div>
 
             {/* Slide Indicators */}

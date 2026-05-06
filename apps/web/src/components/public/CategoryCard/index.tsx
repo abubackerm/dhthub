@@ -28,7 +28,7 @@ export function CategoryCard({ category, basePath = "/products" }: CategoryCardP
       <Card className="h-full transition-all duration-200 hover:shadow-lg hover:ring-2 hover:ring-[--dht-red] hover:border-transparent overflow-hidden">
         <CardContent className="p-0">
           {/* Image/Icon Area */}
-          <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+          <div className="aspect-4/3 bg-muted relative overflow-hidden">
             {category.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -37,7 +37,7 @@ export function CategoryCard({ category, basePath = "/products" }: CategoryCardP
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+              <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-muted to-muted/50">
                 {category.type === "LEAF" ? (
                   <Package className="w-16 h-16 text-muted-foreground/40" />
                 ) : (

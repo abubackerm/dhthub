@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { CircleUser, ChevronDown, LogOut, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,10 +21,16 @@ interface HeaderAuthIslandProps {
 
 export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuthIslandProps) {
   const { data: session } = authClient.useSession();
+  const [isClient, setIsClient] = useState(false);
   const isAuthenticated = !!session?.user;
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
+
+  // Prevent hydration mismatch by only rendering icons on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const requireAuth = useCallback(
     (action: () => void) => {
@@ -76,8 +82,9 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
               href="/account/profile"
               className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors"
               onClick={onNavigate}
+              suppressHydrationWarning
             >
-              <CircleUser className="h-5 w-5" />
+              {isClient && <CircleUser className="h-5 w-5" />}
               <span>{session?.user?.name || "Profile"}</span>
             </Link>
             <Link
@@ -133,10 +140,11 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
             <button
               type="button"
               className="flex items-center gap-2 text-white hover:text-(--dht-red) font-medium transition-colors focus:outline-none"
+              suppressHydrationWarning
             >
-              <CircleUser className="h-5 w-5" />
+              {isClient && <CircleUser className="h-5 w-5" />}
               <span>{session?.user?.name || "Profile"}</span>
-              <ChevronDown className="h-4 w-4" />
+              {isClient && <ChevronDown className="h-4 w-4" />}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">

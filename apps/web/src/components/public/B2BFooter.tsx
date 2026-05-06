@@ -27,12 +27,12 @@ const companyLinks = [
 
 export function B2BFooter() {
   return (
-    <footer className="bg-[rgba(7,15,30,0.8)] backdrop-blur-[12px] border-t border-(--b2b-border) px-5 md:px-10 pt-10 pb-6">
+    <footer className="bg-[rgba(7,15,30,0.8)] backdrop-blur-sm border-t border-(--b2b-border) px-5 md:px-10 pt-10 pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr] gap-9 mb-7">
         {/* Brand Column */}
         <div>
           <Link href="/" className="flex items-center gap-3 mb-3 group">
-            <div className="w-11 h-11 bg-gradient-to-br from-(--b2b-orange) to-(--b2b-orange-lt) rounded-lg flex items-center justify-center font-extrabold text-[22px] text-white shadow-[0_2px_12px_rgba(245,98,15,0.3)]">
+            <div className="w-11 h-11 bg-linear-to-br from-(--b2b-orange) to-(--b2b-orange-lt) rounded-lg flex items-center justify-center font-extrabold text-[22px] text-white shadow-[0_2px_12px_rgba(245,98,15,0.3)]">
               DH
             </div>
             <div className="text-white font-bold text-[22px] leading-none">
@@ -107,7 +107,7 @@ export function B2BFooter() {
           {["Aramco AVL", "ISO 9001:2015", "IKTVA Participant"].map((badge) => (
             <span
               key={badge}
-              className="bg-white/[0.05] border border-[rgba(31,53,88,0.5)] text-(--b2b-steel-lt) px-3 py-1.5 rounded text-[10px] font-semibold hover:border-(--b2b-orange) hover:text-(--b2b-orange) transition-all"
+              className="bg-white/5 border border-[rgba(31,53,88,0.5)] text-(--b2b-steel-lt) px-3 py-1.5 rounded text-[10px] font-semibold hover:border-(--b2b-orange) hover:text-(--b2b-orange) transition-all"
             >
               {badge}
             </span>

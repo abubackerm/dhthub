@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import {
   Send,
   Loader2,
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useRecaptcha } from "@/hooks/use-recaptcha";
+import {
+  validateForm as validateFormUtil,
+  hasErrors,
+  clearError,
+} from "@/lib/form-validation";
 
 const services = [
   "General Maintenance",
@@ -33,48 +40,13 @@ interface FormErrors {
   general?: string;
 }
 
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validatePhone(phone: string): boolean {
-  if (!phone) return true;
-  return /^[+]?[\d\s()-]{7,20}$/.test(phone);
-}
-
-function loadReCAPTCHA(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (
-      typeof window !== "undefined" &&
-      (window as unknown as Record<string, unknown>).grecaptcha
-    ) {
-      resolve();
-      return;
-    }
-
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    if (!siteKey) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://www.google.com/recaptcha/api.js?render=explicit&onload=reCAPTCHALoaded`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => reject(new Error("Failed to load reCAPTCHA"));
-    document.head.appendChild(script);
-
-    (window as unknown as Record<string, () => void>).reCAPTCHALoaded = () =>
-      resolve();
-  });
-}
-
 export function ContactForm() {
-  const recaptchaRef = useRef<HTMLDivElement>(null);
-  const [recaptchaWidgetId, setRecaptchaWidgetId] = useState<number | null>(
-    null
-  );
+  const {
+    recaptchaRef,
+    recaptchaToken,
+    isRecaptchaLoaded,
+    resetRecaptcha,
+  } = useRecaptcha({ theme: "dark" });
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -90,42 +62,6 @@ export function ContactForm() {
     "idle" | "loading" | "success" | "error"
   >("idle");
 
-  useEffect(() => {
-    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-    if (!siteKey || !recaptchaRef.current) return;
-
-    loadReCAPTCHA().then(() => {
-      const grecaptcha = (window as unknown as Record<string, unknown>)
-        .grecaptcha as {
-        render: (
-          el: HTMLElement,
-          opts: {
-            sitekey: string;
-            callback: (token: string) => void;
-            "expired-callback": () => void;
-            theme: string;
-          }
-        ) => number;
-        reset: (id: number) => void;
-      };
-
-      if (grecaptcha && recaptchaRef.current) {
-        const widgetId = grecaptcha.render(recaptchaRef.current, {
-          sitekey: siteKey,
-          callback: (token: string) => {
-            setFormData((prev) => ({ ...prev, recaptchaToken: token }));
-            setErrors((prev) => ({ ...prev, general: undefined }));
-          },
-          "expired-callback": () => {
-            setFormData((prev) => ({ ...prev, recaptchaToken: "" }));
-          },
-          theme: "dark",
-        });
-        setRecaptchaWidgetId(widgetId);
-      }
-    });
-  }, []);
-
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -138,37 +74,26 @@ export function ContactForm() {
     }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+  const handleValidateForm = (): boolean => {
+    const validationErrors = validateFormUtil({
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      message: formData.message,
+    });
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
+    const newErrors: FormErrors = validationErrors;
+    if (hasErrors(newErrors)) {
+      setErrors(newErrors);
+      return false;
     }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-
-    if (!validatePhone(formData.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
-    }
-
-    if (!formData.message.trim()) {
-      newErrors.message = "Message is required";
-    } else if (formData.message.trim().length < 10) {
-      newErrors.message = "Message must be at least 10 characters";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    if (!handleValidateForm()) return;
 
     setStatus("loading");
 
@@ -185,8 +110,8 @@ export function ContactForm() {
       if (formData.service) {
         body.service = formData.service;
       }
-      if (formData.recaptchaToken) {
-        body.recaptchaToken = formData.recaptchaToken;
+      if (recaptchaToken) {
+        body.recaptchaToken = recaptchaToken;
       }
 
       const res = await fetch("/api/v1/contact", {
@@ -211,12 +136,7 @@ export function ContactForm() {
         message: "",
         recaptchaToken: "",
       });
-
-      const grecaptcha = (window as unknown as Record<string, unknown>)
-        .grecaptcha as { reset?: (id: number) => void } | undefined;
-      if (grecaptcha?.reset && recaptchaWidgetId !== null) {
-        grecaptcha.reset(recaptchaWidgetId);
-      }
+      resetRecaptcha();
     } catch (err) {
       setStatus("error");
       setErrors({
@@ -238,7 +158,16 @@ export function ContactForm() {
         hours.
       </p>
 
-      {status === "success" ? (
+      {!isRecaptchaLoaded ? (
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-16 w-40" />
+        </div>
+      ) : status === "success" ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="w-16 h-16 bg-(--dht-green)/20 rounded-full flex items-center justify-center mb-6">
             <CheckCircle2 className="w-8 h-8 text-(--dht-green)" />
@@ -429,7 +358,7 @@ export function ContactForm() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === "loading" || !isRecaptchaLoaded}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-(--dht-red) text-white px-8 py-4 rounded-lg font-semibold hover:bg-(--dht-red-hover) transition-all duration-300 hover:shadow-2xl hover:shadow-(--dht-red)/30 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-none"
           >
             {status === "loading" ? (
