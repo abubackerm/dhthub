@@ -13,7 +13,7 @@ export default function CookiePolicyLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-(--dht-darker)">
             <DHTHeaderShell />
             <main className="flex-1">{children}</main>
             <DHTFooter />

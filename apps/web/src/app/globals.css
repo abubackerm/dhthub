@@ -40,6 +40,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-dht-red: var(--dht-red);
+  --color-dht-red-hover: var(--dht-red-hover);
+  --color-dht-red-light: var(--dht-red-light);
+  --color-dht-navy: var(--dht-navy);
+  --color-dht-navy-mid: var(--dht-navy-mid);
+  --color-dht-navy-soft: var(--dht-navy-soft);
+  --color-dht-dark: var(--dht-dark);
+  --color-dht-darker: var(--dht-darker);
+  --color-dht-gray: var(--dht-gray);
+  --color-dht-gray-light: var(--dht-gray-light);
+  --color-dht-white: var(--dht-white);
 }
 
 :root {
@@ -51,7 +62,7 @@
   --dht-red-light: #FF0000;
   --dht-navy: #0A1628;
   --dht-navy-mid: #112240;
-  --dht-navy-soft: #1A3260;
+  --dht-navy-soft: #17305e;
   --dht-dark: #1a1a1a;
   --dht-darker: #070F1E;
   --dht-gray: #666666;
