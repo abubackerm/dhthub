@@ -11,7 +11,6 @@ export function DHTAbout() {
                                 backgroundImage: "url('/images/about-building.jpg')",
                             }}
                         />
-                        <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-(--dht-red) rounded-lg hidden lg:block" />
                     </div>
 
                     {/* Content */}

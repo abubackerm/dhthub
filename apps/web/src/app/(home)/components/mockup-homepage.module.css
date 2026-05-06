@@ -353,21 +353,20 @@
 .heroBadge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: rgba(220, 0, 0, 0.12);
   border: 1px solid rgba(220, 0, 0, 0.3);
   color: var(--dht-red-hover);
-  padding: 5px 14px;
+  padding: 5px 24px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: 18px;
-}
-.heroBadge::before {
-  content: '\2022';
-  font-size: 7px;
+  text-align: center;
+  min-width: 330px;
 }
 .hero h1 {
   font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
@@ -395,7 +394,7 @@
   border: 2px solid transparent;
   transition: 0.3s;
   position: relative;
-  z-index: 1000;
+  z-index: 10;
 }
 .searchBar:focus-within { border-color: var(--dht-red); }
 .searchSelect {
@@ -421,6 +420,8 @@
   font-size: 15px;
   color: #1A3260;
   background: transparent;
+  margin-left: 4px !important;
+  margin-right: 4px !important;
 }
 .searchInput::placeholder { color: #8A9BB8; }
 
@@ -447,7 +448,10 @@
 .searchBtn:hover { background: var(--dht-red-hover); }
 
 .searchTags {
-  margin-top: 14px;
+  margin-top: 9px !important;
+  margin-bottom: 9px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -493,7 +497,10 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--dht-red);
-  margin-bottom: 14px;
+  margin-bottom: -9px !important;
+  margin-top: -9px !important;
+  padding-left: 17px !important;
+  padding-right: 17px !important;
 }
 .sectionLabel::after {
   content: '';
@@ -574,6 +581,8 @@
   border-top: 1px solid var(--dht-border);
   border-bottom: 1px solid var(--dht-border);
   padding: 16px 40px;
+  margin-top: 14px !important;
+  margin-bottom: 14px !important;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -611,6 +620,15 @@
   align-self: start;
   position: sticky;
   top: 80px;
+  margin-top: 32px !important;
+  margin-bottom: 32px !important;
+  margin-left: 11px !important;
+  margin-right: 11px !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  height: 420px !important;
 }
 .sidebar h3 {
   font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
@@ -708,8 +726,12 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
+  margin-top: -3px !important;
+  margin-bottom: -3px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
 }
-.catalogueToolbar .results { color: var(--dht-steel); font-size: 13px; }
+.catalogueToolbar .results { color: var(--dht-steel); font-size: 13px; margin-top: 8px; }
 .catalogueToolbar .results strong { color: var(--dht-pure); }
 .toolbarRight { display: flex; align-items: center; gap: 10px; }
 .sortSelect {
@@ -723,7 +745,7 @@
   font-family: var(--font-barlow), 'Barlow', sans-serif;
 }
 
-.productGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-bottom: 40px; }
+.productGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; padding-bottom: 40px; padding-top: 11px !important; padding-bottom: 11px !important; padding-left: 16px !important; padding-right: 16px !important; margin-left: -16px !important; margin-right: -16px !important; width: 100%; }
 
 .productCard {
   background: var(--dht-card-bg);
@@ -961,8 +983,10 @@
   font-family: var(--font-barlow-condensed), 'Barlow Condensed', sans-serif;
   font-size: 32px;
   font-weight: 800;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
 }
-.pageHeader .breadcrumb { font-size: 12px; color: var(--dht-steel); margin-top: 4px; }
+.pageHeader .breadcrumb { font-size: 12px; color: var(--dht-steel); margin-top: 4px; margin-bottom: 4px !important; padding-left: 15px !important; padding-right: 15px !important; }
 .pageHeader .breadcrumb a { color: var(--dht-red); text-decoration: none; }
 
 /* ─── RESPONSIVE ────────────────────────────────────── */

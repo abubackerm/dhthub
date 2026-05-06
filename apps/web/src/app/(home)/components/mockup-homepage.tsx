@@ -482,7 +482,7 @@ export default function MockupHomepage() {
             </div>
           </div>
 
-          <div className={s.productGrid} style={{ padding: '16px' }}>
+          <div className={s.productGrid}>
             {isLoading ? (
               // Loading skeleton
               Array.from({ length: 8 }).map((_, i) => (

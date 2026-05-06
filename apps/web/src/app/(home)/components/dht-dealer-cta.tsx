@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function DHTDealerCTA() {
     return (
-        <section className="bg-[var(--dht-dark)] py-20">
+        <section className="bg-[var(--dht-dark)] py-20" style={{ backgroundColor: '#070F1E' }}>
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                 <p className="text-[var(--dht-red)] font-semibold uppercase tracking-wider mb-4">
                     Partnership Opportunity

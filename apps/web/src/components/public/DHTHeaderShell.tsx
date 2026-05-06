@@ -18,7 +18,7 @@ export function DHTHeaderShell() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-(--dht-darker) shadow-sm border-b-2 border-(--dht-red)">
+    <header className="sticky top-0 z-50 bg-(--dht-darker) shadow-sm border-b-2 border-(--dht-red)" style={{ backgroundColor: '#070F1E' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center h-16 md:h-20">
           {/* Logo - Left Column */}

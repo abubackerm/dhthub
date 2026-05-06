@@ -49,8 +49,11 @@
   --dht-red: #DC0000;
   --dht-red-hover: #B30000;
   --dht-red-light: #FF0000;
+  --dht-navy: #0A1628;
+  --dht-navy-mid: #112240;
+  --dht-navy-soft: #1A3260;
   --dht-dark: #1a1a1a;
-  --dht-darker: #222222;
+  --dht-darker: #070F1E;
   --dht-gray: #666666;
   --dht-gray-light: #f5f5f5;
   --dht-white: #ffffff;
@@ -199,6 +202,24 @@ html {
 }
 
 .animate-logo-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Clients carousel animation */
+@keyframes clients-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-clients-scroll {
+  animation: clients-scroll 20s linear infinite;
+}
+
+.animate-clients-scroll:hover {
   animation-play-state: paused;
 }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
 
 const footerLinks = {
@@ -24,7 +25,7 @@ const socialLinks = [
 
 export function DHTFooter() {
     return (
-        <footer className="bg-(--dht-darker)">
+        <footer className="bg-(--dht-darker)" style={{ backgroundColor: '#070F1E' }}>
             {/* Supplying Infrastructure Banner */}
             <div className="relative py-16">
                 <div
@@ -47,16 +48,17 @@ export function DHTFooter() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         {/* Logo & Description */}
-                        <div className="lg:col-span-1">
-                            <Link href="/" className="flex items-center gap-2 mb-6">
-                                <div className="w-10 h-10 bg-(--dht-red) rounded flex items-center justify-center">
-                                    <span className="text-white font-bold text-lg">DH</span>
-                                </div>
-                                <span className="text-white font-bold text-xl tracking-tight">
-                                    DYNAMIC HUB
-                                </span>
-                            </Link>
-                            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                    <div className="lg:col-span-1">
+                        <Link href="/" className="flex items-center gap-2 mb-6">
+                            <Image
+                                src="/images/dynamic_hub_Logo.png"
+                                alt="Dynamic Hub"
+                                width={150}
+                                height={50}
+                                className="h-12 w-auto"
+                            />
+                        </Link>
+                        <p className="text-gray-400 text-sm leading-relaxed mb-6">
                                 From Infrastructure to Offshore — We Deliver What Projects
                                 Demand.
                             </p>
@@ -115,18 +117,18 @@ export function DHTFooter() {
                                 <li>Eastern Province, Saudi Arabia</li>
                                 <li>
                                     <a
-                                        href="mailto:info@dynamichub.com"
+                                        href="mailto:info@dht-sa.com"
                                         className="hover:text-(--dht-red) transition-colors"
                                     >
-                                        info@dynamichub.com
+                                        info@dht-sa.com
                                     </a>
                                 </li>
                                 <li>
                                     <a
-                                        href="tel:+966123456789"
+                                        href="tel:+9660567887123"
                                         className="hover:text-(--dht-red) transition-colors"
                                     >
-                                        +966 12 345 6789
+                                        +966 056 788 7123
                                     </a>
                                 </li>
                             </ul>
