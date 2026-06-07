@@ -38,12 +38,13 @@ function isAdminOnlyRoute(pathname: string): boolean {
 }
 
 async function getSession(request: NextRequest) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  // Use direct internal URL for server-side session check (avoid Nginx loop)
+  const sessionApiUrl = process.env.INTERNAL_API_URL || "http://localhost:3010";
   const cookie = request.headers.get("cookie");
   if (!cookie) return null;
 
   try {
-    const res = await fetch(`${apiUrl}/api/auth/get-session`, {
+    const res = await fetch(`${sessionApiUrl}/api/auth/get-session`, {
       method: "GET",
       headers: { cookie },
     });

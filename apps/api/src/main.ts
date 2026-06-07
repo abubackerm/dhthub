@@ -58,6 +58,15 @@ async function bootstrap() {
 
         const response = await auth.handler(req);
 
+        const textBody = await response.text();
+
+        if (request.url.includes('admin/list-users')) {
+          console.log(`[AUTH DEBUG] list-users: status=${response.status} bodyLen=${textBody.length} host=${request.headers.host} method=${request.method}`);
+          if (textBody.length > 0) {
+            console.log(`[AUTH DEBUG] list-users body preview: ${textBody.substring(0, 100)}`);
+          }
+        }
+
         reply.status(response.status);
         response.headers.forEach((value, key) => reply.header(key, value));
 

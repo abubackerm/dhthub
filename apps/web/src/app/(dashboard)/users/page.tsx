@@ -48,9 +48,16 @@ export default function UsersPage() {
     setLoading(true)
     setError(null)
     try {
+      // Debug: also try direct fetch
+      fetch('/api/auth/admin/list-users?limit=100', { credentials: 'include' })
+        .then(r => r.text().then(t => console.log('[Debug] Direct fetch:', r.status, t.substring(0,200))))
+        .catch(e => console.log('[Debug] Direct fetch error:', e))
+
       const { data, error: fetchError } = await authClient.admin.listUsers({
         query: { limit: 100 },
       })
+
+      console.log('[Debug] authClient.listUsers result:', { data, fetchError })
 
       if (fetchError) {
         setError(fetchError.message ?? "Failed to fetch users")
