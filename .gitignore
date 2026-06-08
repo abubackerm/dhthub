@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+.next
+build
+out
+
+# Environment files
+.env
+.env.local
+.env.production.local
+.env.development.local
+.env.test.local
+.env*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+install_log*.txt
+build_output*.log
+
+# Testing
+coverage
+plan update.md
+# Prisma
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Cache
+.turbo
+.cache
+_example

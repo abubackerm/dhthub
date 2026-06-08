@@ -1,0 +1,3 @@
+# SeaweedFS Filer Configuration
+# Using default LevelDB storage (embedded, no config needed)
+# This file is not used by the filer service

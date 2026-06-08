@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Contact Form Submission</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, Helvetica, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 30px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #1a1a2e; padding: 30px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: 1px;">DHT</h1>
+              <p style="margin: 6px 0 0 0; color: #c0392b; font-size: 13px; text-transform: uppercase; letter-spacing: 2px;">New Contact Message</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 35px 40px;">
+              <p style="margin: 0 0 20px 0; font-size: 16px; color: #333333;">You have received a new message from the contact form on the DHT website.</p>
+
+              <!-- Details Table -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9f9f9; border-radius: 6px; border: 1px solid #e8e8e8;">
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8; width: 140px;">
+                    <span style="font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Name</span>
+                  </td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 15px; color: #333333; font-weight: 600;">{{name}}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Email</span>
+                  </td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <a href="mailto:{{email}}" style="font-size: 15px; color: #c0392b; text-decoration: none;">{{email}}</a>
+                  </td>
+                </tr>
+                {{#if phone}}
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Phone</span>
+                  </td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 15px; color: #333333;">{{phone}}</span>
+                  </td>
+                </tr>
+                {{/if}}
+                {{#if service}}
+                <tr>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Service</span>
+                  </td>
+                  <td style="padding: 14px 18px; border-bottom: 1px solid #e8e8e8;">
+                    <span style="font-size: 15px; color: #333333;">{{service}}</span>
+                  </td>
+                </tr>
+                {{/if}}
+                <tr>
+                  <td style="padding: 14px 18px;">
+                    <span style="font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Submitted</span>
+                  </td>
+                  <td style="padding: 14px 18px;">
+                    <span style="font-size: 14px; color: #666666;">{{formatDate createdAt}}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Message -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Message</p>
+                    <div style="background-color: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 6px; padding: 18px;">
+                      <p style="margin: 0; font-size: 15px; color: #333333; line-height: 1.6; white-space: pre-wrap;">{{message}}</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #1a1a2e; padding: 20px 40px; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #999999;">&copy; {{formatDate createdAt "year"}} DHT. All rights reserved.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

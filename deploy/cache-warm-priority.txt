@@ -1,0 +1,25 @@
+# cache-warm-priority.txt — Static priority URLs for post-deploy cache warming
+#
+# One URL per line. Lines starting with # are comments.
+# These URLs are warmed after every deploy in addition to the category tree
+# and /products page.
+#
+# Add your highest-traffic or most important category/product URLs here.
+# The script caps to WARM_MAX_URLS (default 10) to keep deploy fast.
+#
+# API URLs warm Redis read-through + Nginx proxy cache.
+# Web URLs warm Next.js ISR.
+#
+# Examples (uncomment and customize for your catalog):
+#
+# API — category endpoints (Redis + Nginx)
+# http://localhost:3001/v1/catalog/categories/fasteners/leaf-data
+# http://localhost:3001/v1/catalog/categories/fasteners/filter-data
+# http://localhost:3001/v1/catalog/categories/hardware/consolidated-leaf-data
+#
+# API — product endpoints (Redis + Nginx)
+# http://localhost:3001/v1/catalog/products/by-slug/hex-bolt-m8x30
+#
+# Web — Next.js ISR pages
+# http://localhost:3005/products/fasteners
+# http://localhost:3005/products/hex-bolt-m8x30

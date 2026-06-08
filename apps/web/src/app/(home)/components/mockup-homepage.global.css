@@ -1,0 +1,39 @@
+/* Global styles for MockupHomepage — cannot live in CSS Module (impure selectors) */
+
+:root {
+  --dht-navy:       #0A1628;
+  --dht-navy-mid:   #112240;
+  --dht-navy-soft:   #1A3260;
+  --dht-red:        #DC0000;
+  --dht-red-hover:  #B30000;
+  --dht-steel:      #8A9BB8;
+  --dht-steel-lt:    #C4CDD9;
+  --dht-white:      #F4F6FA;
+  --dht-pure:       #FFFFFF;
+  --dht-card-bg:    #0E1E38;
+  --dht-border:     #1F3558;
+  --dht-green:      #2ECC71;
+  --dht-yellow:     #F1C40F;
+}
+
+.mockup-homepage,
+.mockup-homepage *,
+.mockup-homepage *::before,
+.mockup-homepage *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.mockup-homepage {
+  font-family: var(--font-barlow), 'Barlow', sans-serif;
+  background: var(--dht-navy);
+  color: var(--dht-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mockup-homepage ::-webkit-scrollbar { width: 6px; }
+.mockup-homepage ::-webkit-scrollbar-track { background: var(--dht-navy); }
+.mockup-homepage ::-webkit-scrollbar-thumb { background: var(--dht-navy-soft); border-radius: 3px; }
+.mockup-homepage ::-webkit-scrollbar-thumb:hover { background: var(--dht-red); }

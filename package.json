@@ -1,0 +1,39 @@
+{
+  "name": "dynamic-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dynamic Hub - Monorepo with NestJS Backend and Next.js Frontend",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "start": "turbo run start",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "build:web": "pnpm --filter web build",
+    "build:api": "pnpm --filter api build",
+    "start:web": "pnpm --filter web start",
+    "start:api": "pnpm --filter api start",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:studio": "pnpm --filter api db:studio",
+    "clean": "pnpm -r exec rm -rf node_modules dist .next",
+    "stress:test": "node scripts/stress-test.js",
+    "stress:test:heavy": "node scripts/stress-test.js --users 100 --requests 20",
+    "stress:test:extreme": "node scripts/stress-test.js --users 200 --requests 30",
+    "stress:test:prod": "node scripts/stress-test.js --api-url \"https://api.yourdomain.com/v1\""
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "@types/pg": "^8.18.0",
+    "turbo": "^2.8.12"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.2",
+    "pg": "^8.19.0"
+  }
+}
