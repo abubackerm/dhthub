@@ -6,6 +6,7 @@ import {
   CartNotFoundError,
   CartItemNotFoundError,
   CartNotActiveError,
+  InsufficientStockError,
 } from '../domain/errors';
 import { CartRepository, CartItemRepository, CartWithItems } from '../repositories';
 import { ProductVariantRepository, ProductRepository } from '../../catalog/repositories';
@@ -65,6 +66,16 @@ export class CartService extends BaseService {
     this.ensureCartEditable(cartWithItems);
 
     const existingItem = await this.cartItemRepo.findByCartAndVariant(cart.id, variantId);
+    const totalRequestedQty = existingItem ? existingItem.qty + qty : qty;
+
+    // Stock validation
+    if (totalRequestedQty > variant.quantity) {
+      throw new InsufficientStockError(
+        variant.sku || variant.id,
+        totalRequestedQty,
+        variant.quantity,
+      );
+    }
 
     if (existingItem) {
       const newQty = existingItem.qty + qty;
@@ -117,6 +128,15 @@ export class CartService extends BaseService {
     const variant = await this.variantRepo.findById(cartItem.variantId);
     if (!variant) {
       throw new CartItemNotFoundError(cartItem.variantId);
+    }
+
+    // Stock validation before update
+    if (dto.qty > variant.quantity) {
+      throw new InsufficientStockError(
+        variant.sku || variant.id,
+        dto.qty,
+        variant.quantity,
+      );
     }
 
     await this.cartItemRepo.updateQty(itemId, dto.qty);

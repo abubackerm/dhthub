@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { ChevronRight } from "lucide-react";
 import { CategoryIcon } from "@/components/public/CategoryIcon";
 import { getCategoryIconName } from "@/lib/utils/category-icon-map";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ export function ProductsClientContent({ categories }: ProductsClientContentProps
       <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Link href="/" className="catalog-breadcrumb__link">Home</Link>
         <span className="catalog-breadcrumb__sep" aria-hidden="true">
-          &gt;
+          <ChevronRight className="w-4 h-4" />
         </span>
         {selectedCategory ? (
           <>
@@ -53,7 +53,7 @@ export function ProductsClientContent({ categories }: ProductsClientContentProps
               All Categories
             </button>
             <span className="catalog-breadcrumb__sep" aria-hidden="true">
-              &gt;
+              <ChevronRight className="w-4 h-4" />
             </span>
             <span className="catalog-breadcrumb__current" aria-current="page">{selectedCategory.name}</span>
           </>

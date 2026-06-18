@@ -1,93 +1,54 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { SpecTable } from "./SpecTable";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, Package, ShoppingCart, Minus, Plus, ImageIcon } from "lucide-react";
+import type { SimpleProductView } from "@/lib/api/catalog/types";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Package,
-  ShoppingCart,
-  Download,
-  Clock,
-  ChevronRight,
-  Minus,
-  Plus,
-} from "lucide-react";
-import type { ProductDetailView, Category } from "@/lib/api/catalog/types";
+import { SpecTable } from "@/components/public/ProductDetail/SpecTable";
+import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 import { useAddToCart, useCart } from "@/lib/api/cart";
 import { AddToCartIsland } from "@/components/public/AddToCartIsland";
-import { ImageWithPlaceholder } from "@/components/ui/image-with-placeholder";
 
-interface ProductDetailProps {
-  product: ProductDetailView;
-  category: Category | null;
+interface SimpleProductDetailProps {
+  product: SimpleProductView;
   pathNames: string[];
   pathSlugs: string[];
 }
 
-export function ProductDetailPage({
+function formatPrice(price: number | null | undefined): string {
+  if (price == null) return "";
+  return (price / 100).toFixed(2);
+}
+
+export function SimpleProductDetailPage({
   product,
-  category,
   pathNames,
   pathSlugs,
-}: ProductDetailProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+}: SimpleProductDetailProps) {
   const addToCart = useAddToCart();
   const { data: cartData } = useCart();
-
-  // Server always passes full product data, so no client-side fetch needed
-  // This component relies entirely on server-provided props
-
-  const variantSku = searchParams.get("variant");
-
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const basePath = `/products/${pathSlugs.join("/")}`;
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
-  // Resolve initial variant from URL param, default, or first variant
-  useEffect(() => {
-    const variants = product.variants || [];
-    if (variants.length === 0) return;
+  const minOrderQty = 1;
 
-    const match = variantSku
-      ? variants.find((v) => v.sku === variantSku)
-      : null;
-
-    setSelectedVariantId(
-      match?.id || variants.find((v) => v.isDefault)?.id || variants[0]?.id || null,
-    );
-  }, [product.variants, variantSku]);
-
-  // Get selected variant
-  const selectedVariant = useMemo(() => {
-    const variants = product.variants || [];
-    return variants.find((v) => v.id === selectedVariantId) || variants[0];
-  }, [product.variants, selectedVariantId]);
-
-  // Build breadcrumb items
+  // Build breadcrumb items from path
   const breadcrumbItems = pathNames.map((name, index) => ({
     name,
     slug: pathSlugs[index],
     path: pathSlugs.slice(0, index + 1).join("/"),
   }));
 
-  // Build spec rows from variant attribute values
+  // Build specs from product attribute values using SpecTable format
   const specs = useMemo(() => {
-    if (!selectedVariant) return [];
+    if (!product.attributeValues || product.attributeValues.length === 0) return [];
 
-    return selectedVariant.attributeValues
+    return product.attributeValues
       .sort((a, b) => a.attribute.name.localeCompare(b.attribute.name))
       .map((av) => {
         let value = "";
@@ -99,78 +60,49 @@ export function ProductDetailPage({
           value = av.booleanValue ? "Yes" : "No";
         } else if (av.option) {
           value = av.option.label;
+        } else if (av.rawValue) {
+          value = av.rawValue;
         }
 
         return {
           name: av.attribute.name,
           value: value || "—",
-          unit: av.attribute.unit?.name || null,
+          unit: null,
         };
       });
-  }, [selectedVariant]);
+  }, [product.attributeValues]);
 
-  // Get all images from all variants
+  // Build all images for thumbnail gallery
   const allImages = useMemo(() => {
-    const images: { url: string; altText: string | null; isPrimary: boolean; variantId: string }[] = [];
+    const images: { url: string; altText: string | null; isPrimary: boolean }[] = [];
 
-    // Start with product-level images
     if (product.images) {
-      product.images.forEach((img) => {
-        images.push({ ...img, variantId: "product" });
-      });
+      images.push(...product.images);
     }
 
-    // Add variant images
-    if (product.variants) {
-      product.variants.forEach((variant) => {
-        if (variant.images) {
-          variant.images.forEach((img) => {
-            images.push({ ...img, variantId: variant.id });
-          });
-        }
-      });
-    }
-
-    // If no images, return placeholder
     if (images.length === 0) {
-      return [{ url: "", altText: "No image", isPrimary: true, variantId: "placeholder" }];
+      return [{ url: "", altText: "No image", isPrimary: true }];
     }
 
     return images;
-  }, [product.images, product.variants]);
+  }, [product.images]);
 
-  // Current image
   const currentImage = allImages[selectedImageIndex] || allImages[0];
-
-  // Check stock
-  const minOrderQty = 1;
-  const rawMaxQty = selectedVariant ? Math.max(0, selectedVariant.quantity) : 0;
+  const variantId = product.defaultVariantId;
+  const rawMaxQty = Math.max(0, product.quantity);
 
   // Account for items already in cart
   const existingCartQty = useMemo(() => {
-    if (!cartData?.items || !selectedVariantId) return 0;
-    const item = cartData.items.find((i) => i.variantId === selectedVariantId);
+    if (!cartData?.items || !variantId) return 0;
+    const item = cartData.items.find((i) => i.variantId === variantId);
     return item?.qty || 0;
-  }, [cartData, selectedVariantId]);
+  }, [cartData, variantId]);
 
   const effectiveMaxQty = Math.max(0, rawMaxQty - existingCartQty);
 
   const inStock = effectiveMaxQty > 0;
   const maxQty = effectiveMaxQty;
 
-  // Calculate price
-  const price = selectedVariant?.price ?? product.price ?? 0;
-  const compareAtPrice = selectedVariant?.compareAtPrice ?? product.compareAtPrice;
-
-  const basePath = `/products/${pathSlugs.join("/")}`;
-  const productPath = `${basePath}/${product.slug}`;
-
-  // Reset quantity when variant changes
-  useEffect(() => {
-    setQuantity(minOrderQty);
-  }, [selectedVariantId]);
-
-  // Quantity handlers
   const incrementQuantity = () => setQuantity((q) => Math.min(maxQty, q + 1));
   const decrementQuantity = () => setQuantity((q) => Math.max(minOrderQty, q - 1));
 
@@ -201,7 +133,7 @@ export function ProductDetailPage({
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
         {/* Left Column - Image Gallery */}
         <div className="space-y-4">
-          {/* Main Image - Priority load for above-the-fold content */}
+          {/* Main Image */}
           <div className="aspect-square bg-muted rounded-lg flex items-center justify-center border overflow-hidden">
             {currentImage?.url ? (
               <ImageWithPlaceholder
@@ -217,12 +149,12 @@ export function ProductDetailPage({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Package className="w-32 h-32 text-muted-foreground/30" />
+                <ImageIcon className="w-32 h-32 text-muted-foreground/30" />
               </div>
             )}
           </div>
 
-          {/* Thumbnail Strip - Lazy load with blur effect */}
+          {/* Thumbnail Strip */}
           {allImages.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-2">
               {allImages.map((img, index) => (
@@ -259,9 +191,9 @@ export function ProductDetailPage({
         <div className="space-y-6">
           {/* Product Name & SKU */}
           <div>
-            {selectedVariant && (
+            {product.sku && (
               <Badge variant="outline" className="mb-2 font-mono text-xs">
-                {selectedVariant.sku}
+                {product.sku}
               </Badge>
             )}
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">{product.name}</h1>
@@ -270,49 +202,10 @@ export function ProductDetailPage({
             )}
           </div>
 
-          {/* Variant Selector */}
-          {(product.variants || []).length > 1 && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Select Variant</Label>
-              <Select
-                value={selectedVariantId || undefined}
-                onValueChange={setSelectedVariantId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a variant" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(product.variants || []).map((variant) => (
-                    <SelectItem key={variant.id} value={variant.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{variant.name || variant.sku}</span>
-                        {variant.price != null && (
-                          <span className="text-muted-foreground">
-                            - SAR {variant.price.toFixed(2)}
-                          </span>
-                        )}
-                        {variant.quantity <= 0 && (
-                          <Badge variant="destructive" className="ml-2 text-xs">
-                            Out of Stock
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           {/* Price */}
           <div className="border-t border-b py-4">
             <div className="flex items-baseline gap-3">
-              <p className="text-3xl font-bold text-foreground">SAR {price.toFixed(2)}</p>
-              {compareAtPrice && compareAtPrice > price && (
-                <p className="text-lg text-muted-foreground line-through">
-                  SAR {compareAtPrice.toFixed(2)}
-                </p>
-              )}
+              <p className="text-3xl font-bold text-foreground">SAR {formatPrice(product.price)}</p>
             </div>
             <p className="text-sm text-muted-foreground">per unit</p>
           </div>
@@ -320,13 +213,13 @@ export function ProductDetailPage({
           {/* Stock Status */}
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              {selectedVariant && selectedVariant.quantity > 0 ? (
+              {product.quantity > 0 ? (
                 <>
                   <Badge className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
                     In Stock
                   </Badge>
                   <span className="text-sm text-muted-foreground">
-                    {selectedVariant.quantity} available
+                    {product.quantity} available
                   </span>
                 </>
               ) : (
@@ -389,15 +282,15 @@ export function ProductDetailPage({
 
               <AddToCartIsland
                 onAuthenticated={() => {
-                  if (selectedVariantId && quantity <= maxQty) {
-                    addToCart.mutate({ variantId: selectedVariantId, qty: quantity });
+                  if (variantId && quantity <= maxQty) {
+                    addToCart.mutate({ variantId, qty: quantity });
                   }
                 }}
               >
                 {({ trigger }) => (
                   <Button
                     className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white h-12 text-lg"
-                    disabled={!selectedVariantId || quantity > maxQty}
+                    disabled={!variantId || quantity > maxQty}
                     onClick={trigger}
                   >
                     <ShoppingCart className="w-5 h-5 mr-2" />
@@ -412,7 +305,7 @@ export function ProductDetailPage({
               disabled
             >
               <ShoppingCart className="w-5 h-5 mr-2" />
-              {existingCartQty > 0 && selectedVariant && selectedVariant.quantity > 0
+              {existingCartQty > 0 && product.quantity > 0
                 ? "All in Cart"
                 : "Out of Stock"}
             </Button>
@@ -425,23 +318,6 @@ export function ProductDetailPage({
         <div className="mt-12">
           <h2 className="text-xl font-semibold text-foreground mb-4">Specifications</h2>
           <SpecTable specs={specs} />
-        </div>
-      )}
-
-      {/* Cell Info */}
-      {product.cell && (
-        <div className="mt-8 p-4 bg-muted/30 rounded-lg">
-          <p className="text-sm text-muted-foreground">
-            Part of{" "}
-            <Link
-              href={basePath}
-              className="text-(--dht-red) hover:underline font-medium"
-            >
-              {product.cell.name}
-            </Link>
-            {" "}in{" "}
-            <span className="font-medium">{product.cell.category.name}</span>
-          </p>
         </div>
       )}
     </div>

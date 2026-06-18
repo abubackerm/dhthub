@@ -1,4 +1,6 @@
+import React from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { Category } from "@/lib/mock-data";
 import { CategoryIcon } from "@/components/public/CategoryIcon";
 
@@ -20,21 +22,25 @@ export function BranchCategory({ category, pathNames, pathSlugs }: BranchCategor
   return (
     <div className="catalog-page">
       {/* Breadcrumb */}
-      <div className="catalog-breadcrumb">
+      <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
         <Link href="/" className="catalog-breadcrumb__link">Home</Link>
-        <span className="catalog-breadcrumb__sep">&gt;</span>
+        <span className="catalog-breadcrumb__sep" aria-hidden="true">
+          <ChevronRight className="w-4 h-4" />
+        </span>
         <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
         {breadcrumbItems.map((item, i) => (
-          <span key={i}>
-            <span className="catalog-breadcrumb__sep">&gt;</span>
+          <React.Fragment key={i}>
+            <span className="catalog-breadcrumb__sep" aria-hidden="true">
+              <ChevronRight className="w-4 h-4" />
+            </span>
             {i === breadcrumbItems.length - 1 ? (
-              <span className="catalog-breadcrumb__current">{item.name}</span>
+              <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
             ) : (
-              <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
+              <Link href={i === 0 ? "/products" : item.path} className="catalog-breadcrumb__link">{item.name}</Link>
             )}
-          </span>
+          </React.Fragment>
         ))}
-      </div>
+      </nav>
 
       {/* Category Title */}
       <h1 className="catalog-page__title">{category.name}</h1>

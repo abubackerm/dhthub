@@ -71,6 +71,7 @@ export class UserRepository {
     return this.getClient().user.count({
       where: {
         createdAt: { gte: start, lt: end },
+        role: { notIn: ['admin', 'super_admin'] },
       },
     });
   }

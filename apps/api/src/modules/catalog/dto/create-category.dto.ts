@@ -45,6 +45,10 @@ export class CreateCategoryDto {
   @IsOptional()
   sortOrder?: number;
 
+  @IsString()
+  @IsOptional()
+  displayMode?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

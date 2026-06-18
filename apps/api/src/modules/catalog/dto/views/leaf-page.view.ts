@@ -75,6 +75,7 @@ export class LeafPageView {
     path: string;
     sku: string | null;
     imageUrl: string | null;
+    displayMode: string;
   };
   cells: LeafCellView[];
   filterableAttributes: LeafFilterableAttributeView[];
@@ -88,6 +89,7 @@ export class LeafPageView {
       path: string;
       imageUrl: string | null;
       sku?: string | null;
+      displayMode?: string;
     };
     cells: any[];
     filterableAttributes: any[];
@@ -101,6 +103,7 @@ export class LeafPageView {
       path: data.category.path,
       sku: data.category.sku ?? null,
       imageUrl: LeafPageView.normalizeImageUrl(data.category.imageUrl),
+      displayMode: data.category.displayMode ?? 'VARIANT_TABLE',
     };
     view.cells = data.cells.map((cell: any) => LeafPageView.mapCell(cell));
     view.filterableAttributes = data.filterableAttributes.map((attr: any) =>
@@ -341,6 +344,7 @@ export class ConsolidatedLeafPageView {
     path: string;
     sku: string | null;
     imageUrl: string | null;
+    displayMode: string;
   };
   leafCategories: LeafCategoryView[];
   filterableAttributes: LeafFilterableAttributeView[];
@@ -356,6 +360,7 @@ export class ConsolidatedLeafPageView {
       path: string;
       imageUrl: string | null;
       sku?: string | null;
+      displayMode?: string;
     };
     leafCategories: any[];
     filterableAttributes: any[];
@@ -371,6 +376,7 @@ export class ConsolidatedLeafPageView {
       path: data.category.path,
       sku: data.category.sku ?? null,
       imageUrl: LeafPageView.normalizeImageUrl(data.category.imageUrl),
+      displayMode: data.category.displayMode ?? 'VARIANT_TABLE',
     };
     view.leafCategories = data.leafCategories.map((lc: any) => ({
       id: lc.id,

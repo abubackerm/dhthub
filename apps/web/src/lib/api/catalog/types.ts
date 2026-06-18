@@ -9,6 +9,7 @@ export interface Category {
   imageUrl: string | null;
   sortOrder: number;
   isActive: boolean;
+  displayMode: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +31,7 @@ export interface CreateCategoryInput {
   imageUrl?: string;
   sortOrder?: number;
   isActive?: boolean;
+  displayMode?: string;
 }
 
 export interface UpdateCategoryInput {
@@ -41,6 +43,7 @@ export interface UpdateCategoryInput {
   imageUrl?: string;
   sortOrder?: number;
   isActive?: boolean;
+  displayMode?: string;
 }
 
 export type AttributeDataType = 'number' | 'text' | 'enum' | 'boolean';
@@ -374,6 +377,7 @@ export interface LeafPageView {
     description: string | null;
     path: string;
     imageUrl: string | null;
+    displayMode: string;
   };
   cells: LeafCellView[];
   filterableAttributes: LeafFilterableAttributeView[];
@@ -396,6 +400,7 @@ export interface ConsolidatedLeafPageView {
     description: string | null;
     path: string;
     imageUrl: string | null;
+    displayMode: string;
   };
   leafCategories: LeafCategoryView[];
   filterableAttributes: LeafFilterableAttributeView[];
@@ -476,4 +481,96 @@ export interface ProductDetailView {
   } | null;
   variants: ProductDetailVariantView[];
   images: { url: string; altText: string | null; isPrimary: boolean }[];
+}
+
+// ============================================
+// Simple Product Types
+// ============================================
+
+export interface SimpleProductView {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string | null;
+  description: string | null;
+  price: number | null;
+  quantity: number;
+  isFeatured: boolean;
+  status: string;
+  images: { url: string; altText: string | null; isPrimary: boolean }[];
+  attributeValues: SimpleProductAttributeValueView[];
+  defaultVariantId: string | null;
+  cellId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SimpleProductImage {
+  id: string;
+  url: string;
+  altText: string | null;
+  isPrimary: boolean;
+  sortOrder: number;
+}
+
+export interface CreateSimpleProductImageInput {
+  url: string;
+  altText?: string;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateSimpleProductImageInput {
+  altText?: string;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
+export interface CreateSimpleProductInput {
+  name: string;
+  slug?: string;
+  sku?: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+  thumbnailUrl?: string;
+}
+
+export interface UpdateSimpleProductInput {
+  name?: string;
+  slug?: string;
+  sku?: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+  status?: string;
+  thumbnailUrl?: string;
+}
+
+// ============================================
+// Simple Product Attribute Types
+// ============================================
+
+export interface SimpleProductAttributeValueView {
+  id: string;
+  productId: string;
+  attributeId: string;
+  rawValue: string | null;
+  numberValue: number | null;
+  textValue: string | null;
+  optionId: string | null;
+  booleanValue: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+  attribute: AttributeView;
+  option: AttributeOptionView | null;
+}
+
+export interface SetSimpleProductAttributeInput {
+  attributeId: string;
+  rawValue?: string;
+  numberValue?: number;
+  textValue?: string;
+  optionId?: string;
+  booleanValue?: boolean;
 }

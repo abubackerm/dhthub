@@ -10,6 +10,7 @@ export class CategoryView {
   path: string;
   imageUrl: string | null;
   sortOrder: number;
+  displayMode: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ export class CategoryView {
     view.parentId = entity.parentId;
     view.path = entity.path;
     view.sortOrder = entity.sortOrder;
+    view.displayMode = entity.displayMode ?? 'VARIANT_TABLE';
     view.isActive = entity.isActive;
     
     // Normalize imageUrl if present

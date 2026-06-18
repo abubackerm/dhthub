@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
-import { CircleUser, ChevronDown, LogOut, Loader2 } from "lucide-react";
+import { CircleUser, ChevronDown, LogOut, Loader2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { SignInDialog } from "@/components/sign-in-dialog";
@@ -24,6 +24,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
   const [isClient, setIsClient] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [signInOpen, setSignInOpen] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
 
@@ -31,6 +32,7 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
   useEffect(() => {
     setIsClient(true);
     setIsAuthenticated(!!session?.user);
+    setUserRole((session?.user as { role?: string } | undefined)?.role);
   }, [session?.user]);
 
   const requireAuth = useCallback(
@@ -159,6 +161,14 @@ export function HeaderAuthIsland({ variant = "desktop", onNavigate }: HeaderAuth
                 Orders
               </Link>
             </DropdownMenuItem>
+            {(userRole === 'admin' || userRole === 'super_admin') && (
+              <DropdownMenuItem asChild>
+                <Link href="/dhthub-admin" className="w-full cursor-pointer">
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="cursor-pointer">
               {isLoggingOut ? (

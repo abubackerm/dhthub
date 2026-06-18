@@ -29,6 +29,7 @@ import {
   getLeafPageData,
   getConsolidatedLeafData,
   getAggregatedFilterData,
+  getSimpleProductsBySlug,
   type Category,
   type CategoryTreeNode,
   type CreateCategoryInput,
@@ -36,6 +37,7 @@ import {
   type LeafPageView,
   type ConsolidatedLeafPageView,
   type AggregatedFilterDataView,
+  type SimpleProductView,
 } from './';
 
 export const CATEGORIES_QUERY_KEY = ['categories'];
@@ -154,6 +156,17 @@ export function useUpdateCategory(): UseMutationResult<
 
       toast.error(errorMessage);
     },
+  });
+}
+
+export function useSimpleProductsBySlug(
+  slug?: string,
+): UseQueryResult<SimpleProductView[], Error> {
+  return useQuery({
+    queryKey: [...LEAF_PAGE_DATA_QUERY_KEY, 'simple-products', slug],
+    queryFn: () => getSimpleProductsBySlug(slug!),
+    enabled: !!slug,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }
 

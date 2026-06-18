@@ -6,3 +6,5 @@ export * from './cells';
 export * from './use-categories';
 export * from './use-products';
 export * from './use-cells';
+export * from './simple-products';
+export * from './use-simple-products';

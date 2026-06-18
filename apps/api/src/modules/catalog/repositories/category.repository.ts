@@ -190,6 +190,7 @@ export class CategoryRepository {
     path: string;
     imageUrl?: string | null;
     sortOrder?: number;
+    displayMode?: string;
     isActive?: boolean;
     createdBy?: string;
     sku?: string | null;
@@ -203,6 +204,7 @@ export class CategoryRepository {
         path: data.path,
         imageUrl: data.imageUrl ?? null,
         sortOrder: data.sortOrder ?? 0,
+        displayMode: data.displayMode ?? 'VARIANT_TABLE',
         isActive: data.isActive ?? true,
         createdBy: data.createdBy,
         sku: data.sku ?? null,
@@ -279,6 +281,7 @@ export class CategoryRepository {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     cells: any[];
     filterableAttributes: any[];
@@ -294,6 +297,7 @@ export class CategoryRepository {
         description: true,
         path: true,
         imageUrl: true,
+        displayMode: true,
       },
     });
 
@@ -395,6 +399,7 @@ export class CategoryRepository {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     leafCategories: Array<{
       id: string;
@@ -420,6 +425,7 @@ export class CategoryRepository {
         description: true,
         path: true,
         imageUrl: true,
+        displayMode: true,
       },
     });
 

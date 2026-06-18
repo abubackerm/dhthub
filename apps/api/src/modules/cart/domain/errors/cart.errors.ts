@@ -22,6 +22,15 @@ export class InvalidQuantityError extends InvalidOperationError {
   }
 }
 
+export class InsufficientStockError extends InvalidOperationError {
+  constructor(variantSku: string, requested: number, available: number) {
+    super(
+      `Insufficient stock for variant ${variantSku}. Requested ${requested}, available ${available}.`,
+      'INSUFFICIENT_STOCK',
+    );
+  }
+}
+
 export class CartAlreadySubmittedError extends InvalidOperationError {
   constructor(cartId: string) {
     super(

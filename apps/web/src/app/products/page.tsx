@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { getServerCategoryTree } from "@/lib/api/catalog";
 import { ProductsClientContent } from "./products-client-content";
 import type { CategoryTreeNode } from "@/lib/api/catalog/types";

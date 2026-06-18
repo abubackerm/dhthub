@@ -13,6 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
+import { SimpleProductService } from '../services/simple-product.service';
 import { CategoryEntity } from '../entities/category.entity';
 import {
   CreateCategoryDto,
@@ -25,11 +26,15 @@ import {
   ConsolidatedLeafPageView,
   AggregatedFilterDataView,
 } from '../dto';
+import { SimpleProductView } from '../dto/views/simple-product.view';
 import { Cell } from '../../cell/dto/views/cell.view';
 
 @Controller('catalog/categories')
 export class CategoriesController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(
+    private readonly categoryService: CategoryService,
+    private readonly simpleProductService: SimpleProductService,
+  ) {}
 
   @Get()
   async findAll(@Query() query: CategoryQueryDto): Promise<CategoryView[]> {
@@ -145,7 +150,9 @@ export class CategoriesController {
       dto.imageUrl,
       dto.sortOrder,
       dto.isActive,
+      undefined,
       dto.sku,
+      dto.displayMode,
     );
     return CategoryView.fromEntity(category);
   }
@@ -161,6 +168,7 @@ export class CategoriesController {
       description: dto.description,
       imageUrl: dto.imageUrl,
       sortOrder: dto.sortOrder,
+      displayMode: dto.displayMode,
       isActive: dto.isActive,
       sku: dto.sku,
     });
@@ -171,6 +179,23 @@ export class CategoriesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id') id: string): Promise<void> {
     await this.categoryService.delete(id);
+  }
+
+  @Get(':slug/simple-products')
+  async getSimpleProductsBySlug(
+    @Param('slug') slug: string,
+  ): Promise<SimpleProductView[]> {
+    const products = await this.simpleProductService.findByCategorySlug(slug);
+    return SimpleProductView.fromEntities(products);
+  }
+
+  @Get('simple-product-by-slug/:productSlug')
+  async getSimpleProductBySlug(
+    @Param('productSlug') productSlug: string,
+  ): Promise<SimpleProductView> {
+    const product =
+      await this.simpleProductService.findPublicBySlug(productSlug);
+    return SimpleProductView.fromEntity(product);
   }
 
   @Get(':slug/cells')

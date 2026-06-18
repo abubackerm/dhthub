@@ -90,6 +90,10 @@ export class DatabaseProvider {
     return this.prisma.variantAttributeValue;
   }
 
+  get productAttributeValue(): PrismaDelegate<any> {
+    return this.prisma.productAttributeValue;
+  }
+
   get cell(): PrismaDelegate<any> {
     return this.prisma.cell;
   }

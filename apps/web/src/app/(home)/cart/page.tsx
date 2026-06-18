@@ -25,7 +25,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DHTHeaderShell } from "@/components/public/DHTHeaderShell";
 
 export default function CartPage() {
   const { data: cart, isLoading, error } = useCart();
@@ -67,7 +66,6 @@ export default function CartPage() {
   if (isLoading) {
     return (
       <>
-        <DHTHeaderShell />
         <div className="min-h-screen bg-gray-50 py-12">
           <div className="max-w-7xl mx-auto px-4">
             <Skeleton className="h-12 w-64 mb-8" />
@@ -92,7 +90,6 @@ export default function CartPage() {
   if (error) {
     return (
       <>
-        <DHTHeaderShell />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-600 mb-4">Error loading cart</p>
@@ -108,7 +105,6 @@ export default function CartPage() {
   if (!cart || cart.items.length === 0) {
     return (
       <>
-        <DHTHeaderShell />
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="text-center max-w-md">
             <ShoppingBag className="w-24 h-24 mx-auto text-muted-foreground mb-6" />
@@ -129,7 +125,6 @@ export default function CartPage() {
 
   return (
     <>
-      <DHTHeaderShell />
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold mb-8">Shopping Cart ({cart.itemCount} items)</h1>

@@ -11,6 +11,7 @@ import {
   History,
   Image as ImageIcon,
   ShoppingCart,
+  LayoutGrid,
 } from "lucide-react"
 import Link from "next/link"
 import { Logo } from "@/components/logo"
@@ -89,6 +90,11 @@ const allNavGroups = [
         title: "All Products",
         url: "/dhthub-admin/products",
         icon: Package,
+      },
+      {
+        title: "Simple Products",
+        url: "/dhthub-admin/simple-products",
+        icon: LayoutGrid,
       },
       {
         title: "Upload",

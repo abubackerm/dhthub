@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
@@ -30,16 +31,16 @@ export function LeafCategoryBreadcrumb({
       </span>
       <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
       {breadcrumbItems.map((item, i) => (
-        <span key={i}>
+        <React.Fragment key={i}>
           <span className="catalog-breadcrumb__sep" aria-hidden="true">
             <ChevronRight className="w-4 h-4" />
           </span>
           {i === breadcrumbItems.length - 1 ? (
             <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
           ) : (
-            <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
+            <Link href={i === 0 ? "/products" : item.path} className="catalog-breadcrumb__link">{item.name}</Link>
           )}
-        </span>
+        </React.Fragment>
       ))}
     </nav>
   );

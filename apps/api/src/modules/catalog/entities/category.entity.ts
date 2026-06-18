@@ -9,5 +9,6 @@ export class CategoryEntity extends BaseEntity {
   sku: string | null;
   imageUrl: string | null;
   sortOrder: number;
+  displayMode: string;
   isActive: boolean;
 }

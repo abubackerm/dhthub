@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { useAggregatedFilterData } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
 import type { Category } from "@/lib/api/catalog/types";
@@ -44,14 +45,20 @@ export function EmptyLeafPage({
           Products
         </Link>
         {pathSlugs.map((slug, index) => (
-          <span key={slug}>
+          <React.Fragment key={slug}>
             <span className="catalog-breadcrumb__sep" aria-hidden="true">
-              &gt;
+              <ChevronRight className="w-4 h-4" />
             </span>
-            <span className="catalog-breadcrumb__current" aria-current="page">
-              {pathNames[index] || slug}
-            </span>
-          </span>
+            {index === pathSlugs.length - 1 ? (
+              <span className="catalog-breadcrumb__current" aria-current="page">
+                {pathNames[index] || slug}
+              </span>
+            ) : (
+              <Link href={index === 0 ? "/products" : `/products/${pathSlugs.slice(0, index + 1).join("/")}`} className="catalog-breadcrumb__link">
+                {pathNames[index] || slug}
+              </Link>
+            )}
+          </React.Fragment>
         ))}
       </nav>
 

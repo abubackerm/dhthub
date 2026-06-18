@@ -356,11 +356,11 @@ html {
   font-size: 0.75rem;
   color: #666;
   margin-bottom: 0.75rem;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.375rem;
   line-height: 1.4;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   white-space: nowrap;
   overflow-x: visible;
 }

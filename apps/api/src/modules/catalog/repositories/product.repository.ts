@@ -277,6 +277,7 @@ export class ProductRepository {
     quantity?: number;
     cellId?: string | null;
     isFeatured?: boolean;
+    thumbnailUrl?: string | null;
     metadata?: Record<string, unknown> | null;
     createdBy?: string;
   }): Promise<ProductEntity> {
@@ -295,6 +296,7 @@ export class ProductRepository {
         quantity: data.quantity ?? 0,
         cellId: data.cellId ?? null,
         isFeatured: data.isFeatured ?? false,
+        thumbnailUrl: data.thumbnailUrl ?? null,
         metadata: data.metadata ?? null,
         createdBy: data.createdBy,
       },
@@ -317,6 +319,7 @@ export class ProductRepository {
       quantity: number;
       cellId: string | null;
       isFeatured: boolean;
+      thumbnailUrl: string | null;
       metadata: Record<string, unknown> | null;
       updatedBy: string;
     }>,

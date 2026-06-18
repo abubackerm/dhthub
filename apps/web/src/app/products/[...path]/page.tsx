@@ -7,11 +7,14 @@ import {
   getServerConsolidatedLeafData,
   getServerAggregatedFilterData,
 } from "@/lib/api/catalog/categories";
+import { getServerSimpleProductsBySlug, getServerSimpleProductBySlug } from "@/lib/api/catalog/simple-products";
 import { LeafCategoryPage } from "@/components/public/LeafCategory";
 import { ProductDetailPage } from "@/components/public/ProductDetail";
 import { ConsolidatedLeafCategoryPage } from "@/components/public/LeafCategory/ConsolidatedLeafCategoryPage";
 import { BranchCategoryPage } from "@/components/public/BranchCategoryPage";
 import { EmptyLeafPage } from "@/components/public/EmptyLeafPage";
+import { SimpleProductGridPage } from "@/components/public/SimpleProduct/SimpleProductGridPage";
+import { SimpleProductDetailPage } from "@/components/public/SimpleProduct/SimpleProductDetailPage";
 import type { Cell } from "@/lib/api/catalog";
 import type { ProductDetailView } from "@/lib/api/catalog/types";
 
@@ -44,10 +47,43 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     try {
       product = await getServerProductBySlug(lastSlug);
     } catch {
-      // Product not found, will fall through to 404
+      // Product not found, will try simple product below
     }
 
     if (product) {
+      // If the product type is "simple", render the simple product detail page instead
+      if (product.type === 'simple') {
+        // Fetch attribute values via the simple product API
+        try {
+          const simpleProduct = await getServerSimpleProductBySlug(lastSlug);
+          const categoryPath = path.slice(0, -1);
+          const categorySlug = categoryPath[categoryPath.length - 1];
+
+          let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
+          if (categorySlug) {
+            try {
+              parentCategory = await getServerCategoryBySlugLookup(categorySlug);
+            } catch {
+              // Parent category not found
+            }
+          }
+
+          const categoryPathNames = parentCategory
+            ? [...parentCategory.ancestors.map((a) => a.name), parentCategory.category.name]
+            : categoryPath;
+
+          return (
+            <SimpleProductDetailPage
+              product={simpleProduct}
+              pathNames={categoryPathNames}
+              pathSlugs={categoryPath}
+            />
+          );
+        } catch {
+          // Fall through to variant ProductDetailPage if simple product fetch fails
+        }
+      }
+
       const categoryPath = path.slice(0, -1);
       const categorySlug = categoryPath[categoryPath.length - 1];
 
@@ -72,6 +108,38 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
           pathSlugs={categoryPath}
         />
       );
+    }
+
+    // Try simple product by slug before 404
+    try {
+      const simpleProduct = await getServerSimpleProductBySlug(lastSlug);
+
+      // Build path info from the remaining path segments
+      const categoryPath = path.slice(0, -1);
+      const categorySlug = categoryPath[categoryPath.length - 1];
+
+      let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
+      if (categorySlug) {
+        try {
+          parentCategory = await getServerCategoryBySlugLookup(categorySlug);
+        } catch {
+          // Parent category not found
+        }
+      }
+
+      const categoryPathNames = parentCategory
+        ? [...parentCategory.ancestors.map((a) => a.name), parentCategory.category.name]
+        : categoryPath;
+
+      return (
+        <SimpleProductDetailPage
+          product={simpleProduct}
+          pathNames={categoryPathNames}
+          pathSlugs={categoryPath}
+        />
+      );
+    } catch {
+      // Simple product not found either
     }
 
     notFound();
@@ -124,6 +192,19 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
         pathNames={pathNames}
         pathSlugs={path}
         serverFilterData={filterData}
+      />
+    );
+  }
+
+  // SIMPLE_GRID mode: render simple products grid instead of cell-based leaf page
+  if (categoryData.category.displayMode === 'SIMPLE_GRID') {
+    const products = await getServerSimpleProductsBySlug(lastSlug).catch(() => []);
+    return (
+      <SimpleProductGridPage
+        categorySlug={lastSlug}
+        pathNames={pathNames}
+        pathSlugs={path}
+        serverData={products}
       />
     );
   }

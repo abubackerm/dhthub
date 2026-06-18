@@ -82,6 +82,7 @@ interface CategoryFormData {
   description: string
   sortOrder: number
   imageUrl?: string
+  displayMode: string
 }
 
 const initialFormData: CategoryFormData = {
@@ -91,6 +92,7 @@ const initialFormData: CategoryFormData = {
   parentId: "none",
   description: "",
   sortOrder: 0,
+  displayMode: "VARIANT_TABLE",
 }
 
 function generateSlug(name: string): string {
@@ -538,6 +540,7 @@ export default function CategoriesPage() {
       description: category.description || "",
       sortOrder: category.sortOrder,
       imageUrl: category.imageUrl || "",
+      displayMode: category.displayMode || "VARIANT_TABLE",
     })
     setIsAddingChild(false)
     setSheetOpen(true)
@@ -639,6 +642,7 @@ export default function CategoriesPage() {
       slug: formData.slug,
       sortOrder: formData.sortOrder,
       isActive: true,
+      displayMode: formData.displayMode,
       ...(formData.sku.trim() ? { sku: formData.sku.toUpperCase() } : {}),
       ...(imageRemoved ? { imageUrl: null } : {}),
       ...(imageUrl && !imageRemoved ? { imageUrl } : {}),
@@ -1005,6 +1009,28 @@ export default function CategoriesPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Lower numbers appear first
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="displayMode">Product Display Mode</Label>
+              <Select
+                value={formData.displayMode}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, displayMode: value }))
+                }
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select display mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="VARIANT_TABLE">Variant Table</SelectItem>
+                  <SelectItem value="SIMPLE_GRID">Simple Product Grid</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Controls how products appear on the public category page.
               </p>
             </div>
             </div>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 import { QueryProvider } from "@/providers/query-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { inter, barlow, barlowCondensed } from "@/lib/fonts";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <QueryProvider>
           {children}
+          <Toaster />
         </QueryProvider>
       </body>
     </html>

@@ -47,6 +47,7 @@ export class CategoryService extends BaseService {
     isActive?: boolean,
     createdBy?: string,
     sku?: string,
+    displayMode?: string,
   ): Promise<CategoryEntity> {
     const existingSlug = await this.categoryRepo.findBySlug(slug);
     if (existingSlug) {
@@ -70,6 +71,7 @@ export class CategoryService extends BaseService {
       path,
       imageUrl: imageUrl ?? null,
       sortOrder: sortOrder ?? 0,
+      displayMode: displayMode ?? 'VARIANT_TABLE',
       isActive: isActive ?? true,
       createdBy,
       sku: sku ?? this.generateSKU(),
@@ -142,6 +144,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     cells: any[];
     filterableAttributes: any[];
@@ -162,6 +165,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     cells: any[];
     filterableAttributes: any[];
@@ -181,6 +185,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     leafCategories: Array<{
       id: string;
@@ -210,6 +215,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       path: string;
       imageUrl: string | null;
+      displayMode: string;
     };
     leafCategories: Array<{
       id: string;
@@ -285,6 +291,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       imageUrl: string | null;
       sortOrder: number;
+      displayMode: string;
       isActive: boolean;
       updatedBy: string;
       sku: string;
@@ -472,6 +479,7 @@ export class CategoryService extends BaseService {
       description: string | null;
       imageUrl: string | null;
       sortOrder: number;
+      displayMode: string;
       isActive: boolean;
       updatedBy: string;
       sku: string;

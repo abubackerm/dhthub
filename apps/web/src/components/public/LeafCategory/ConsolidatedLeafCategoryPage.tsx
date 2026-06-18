@@ -2,6 +2,7 @@
 
 import React, { useMemo, useEffect } from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useConsolidatedLeafData, useAggregatedFilterData, isCategoryTooManyLeavesError, getCategoryTooManyLeavesMessage } from "@/lib/api/catalog/use-categories";
 import { useFilterContext } from "@/contexts/filter-context";
@@ -199,15 +200,19 @@ export function ConsolidatedLeafCategoryPage({
                     {/* First leaf: include breadcrumb and item count */}
                     <nav className="catalog-breadcrumb--hero" aria-label="Breadcrumb">
                       <Link href="/" className="catalog-breadcrumb__link">Home</Link>
-                      <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
+                      <span className="catalog-breadcrumb__sep" aria-hidden="true">
+                        <ChevronRight className="w-4 h-4" />
+                      </span>
                       <Link href="/products" className="catalog-breadcrumb__link">All Categories</Link>
                       {breadcrumbItems.map((item, i) => (
                         <React.Fragment key={i}>
-                          <span className="catalog-breadcrumb__sep" aria-hidden="true">&gt;</span>
+                          <span className="catalog-breadcrumb__sep" aria-hidden="true">
+                            <ChevronRight className="w-4 h-4" />
+                          </span>
                           {i === breadcrumbItems.length - 1 ? (
                             <span className="catalog-breadcrumb__current" aria-current="page">{item.name}</span>
                           ) : (
-                            <Link href={item.path} className="catalog-breadcrumb__link">{item.name}</Link>
+                            <Link href={i === 0 ? "/products" : item.path} className="catalog-breadcrumb__link">{item.name}</Link>
                           )}
                         </React.Fragment>
                       ))}
