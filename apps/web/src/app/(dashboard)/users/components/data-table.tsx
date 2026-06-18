@@ -17,6 +17,7 @@ import {
 import {
   ChevronDown,
   EllipsisVertical,
+  Mail,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -69,6 +70,7 @@ interface DataTableProps {
     email: string
     role: Exclude<UserRole, "super_admin">
   }) => Promise<void>
+  onResendEmail: (userId: string) => Promise<void>
 }
 
 export function DataTable({
@@ -78,6 +80,7 @@ export function DataTable({
   onBanUser,
   onUnbanUser,
   onCreateUser,
+  onResendEmail,
 }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -275,6 +278,14 @@ export function DataTable({
                     Ban User
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => onResendEmail(user.id)}
+                >
+                  <Mail className="mr-2 size-4" />
+                  Resend Email
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

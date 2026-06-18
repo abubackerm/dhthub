@@ -120,6 +120,14 @@ export class UserService extends BaseService {
     return user === null;
   }
 
+  async delete(id: string): Promise<void> {
+    const user = await this.userRepo.findById(id);
+    if (!user) {
+      throw new UserNotFoundError(id);
+    }
+    await this.userRepo.delete(id);
+  }
+
   async assertActive(userId: string): Promise<void> {
     const user = await this.userRepo.findById(userId);
 

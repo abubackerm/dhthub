@@ -7,9 +7,11 @@ import {
   Param,
   Req,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
+import { PrismaService } from '@core/database/prisma.service';
 import { UserService } from '../services';
 import { CreateUserDto, CreateUserAdminDto, UpdateUserDto, UserView } from '../dto';
 import { AuthGuard } from '../auth.guard';
@@ -26,6 +28,7 @@ export class UsersController {
   constructor(
     private readonly userService: UserService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -120,6 +123,70 @@ export class UsersController {
   async deactivate(@Param('id') id: string): Promise<UserView> {
     const user = await this.userService.deactivate(id);
     return UserView.fromEntity(user);
+  }
+
+  @Post(':id/resend-credentials')
+  @HttpCode(200)
+  async resendCredentials(
+    @Param('id') id: string,
+  ): Promise<{ message: string }> {
+    const user = await this.userService.getById(id);
+
+    // Fetch full user with role from database
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id },
+      select: { role: true },
+    });
+
+    const password = this.generateSecurePassword();
+    const hashedPassword = await this.hashPassword(password);
+
+    // Update password hash in Account table (Better Auth email provider)
+    await this.prisma.account.updateMany({
+      where: { userId: id, providerId: 'email' },
+      data: { password: hashedPassword },
+    });
+
+    // Update password hash in User table for consistency
+    await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash: hashedPassword },
+    });
+
+    const webUrl = process.env.WEB_URL || 'http://localhost:3005';
+
+    try {
+      await this.eventEmitter.emitAsync(AUTH_EVENTS.USER_CREDENTIALS_RESENT, {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: dbUser?.role ?? 'user',
+        },
+        password,
+        loginUrl: `${webUrl}/sign-in`,
+        createdAt: new Date(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to send credentials email: ${message}`);
+    }
+
+    return { message: 'New credentials sent to user email' };
+  }
+
+  @Post(':id/remove')
+  @HttpCode(200)
+  async remove(
+    @Param('id') id: string,
+    @Req() request: FastifyRequest,
+  ): Promise<{ message: string }> {
+    await auth.api.removeUser({
+      body: { userId: id },
+      headers: request.headers as Record<string, string>,
+    });
+
+    return { message: 'User deleted successfully' };
   }
 
   private generateSecurePassword(length = 12): string {

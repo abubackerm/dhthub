@@ -6,7 +6,6 @@ import {
 } from '@nestjs/platform-fastify';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import multipart from '@fastify/multipart';
-import fastifyCompress from '@fastify/compress';
 import { AppModule } from './app.module';
 import { DomainExceptionFilter, LoggingInterceptor } from '@shared/infrastructure';
 import { auth, setAuthEventEmitter } from './modules/auth/auth';
@@ -28,11 +27,6 @@ async function bootstrap() {
     },
   });
 
-  await fastify.register(fastifyCompress, {
-    global: true,
-    threshold: 1024,
-  });
-
   fastify.route({
     method: ['GET', 'POST'],
     url: '/api/auth/*',
@@ -50,7 +44,7 @@ async function bootstrap() {
           }
         });
 
-        const req = new Request(url.toString(), {
+        const req = new Request(url, {
           method: request.method,
           headers,
           body: request.body ? JSON.stringify(request.body) : undefined,

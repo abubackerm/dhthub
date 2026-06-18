@@ -36,15 +36,6 @@ export default function MockupHomepage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Select first category alphabetically by default when category tree loads
-  useEffect(() => {
-    if (categoryTree && categoryTree.length > 0 && !selectedCategoryId) {
-      // Sort categories alphabetically and select the first one
-      const sortedCategories = [...categoryTree].sort((a, b) => a.name.localeCompare(b.name));
-      setSelectedCategoryId(sortedCategories[0].id);
-    }
-  }, [categoryTree, selectedCategoryId]);
-
   // Filter categories based on search query
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim() || !categoryTree) return [];
@@ -438,20 +429,29 @@ export default function MockupHomepage() {
             {isLoading ? (
               <div style={{ padding: '8px 0', color: 'var(--dht-gray)' }}>Loading...</div>
             ) : categoryTree && categoryTree.length > 0 ? (
-              categoryTree
-                .filter((category) => category.depth === 0)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((category) => (
-                  <FilterItem
-                    key={category.id}
-                    id={`fc-${category.id}`}
-                    label={category.name}
-                    count={category.productCount}
-                    checked={selectedCategoryId === category.id}
-                    onChange={() => setSelectedCategoryId(selectedCategoryId === category.id ? null : category.id)}
-                    type="radio"
-                  />
-                ))
+              <>
+                <FilterItem
+                  id="fc-all"
+                  label="All"
+                  checked={selectedCategoryId === null}
+                  onChange={() => setSelectedCategoryId(null)}
+                  type="radio"
+                />
+                {categoryTree
+                  .filter((category) => category.depth === 0)
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((category) => (
+                    <FilterItem
+                      key={category.id}
+                      id={`fc-${category.id}`}
+                      label={category.name}
+                      count={category.productCount}
+                      checked={selectedCategoryId === category.id}
+                      onChange={() => setSelectedCategoryId(selectedCategoryId === category.id ? null : category.id)}
+                      type="radio"
+                    />
+                  ))}
+              </>
             ) : (
               <div style={{ padding: '8px 0', color: 'var(--dht-gray)' }}>No categories</div>
             )}

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
+import { Loader2 } from "lucide-react"
 
 export function ForgotPasswordForm1({
   className,
@@ -49,21 +50,21 @@ export function ForgotPasswordForm1({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="border-(--dht-red)/20 bg-(--dht-gray-light)">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Forgot your password?</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl text-(--dht-dark)">Forgot your password?</CardTitle>
+          <CardDescription className="text-(--dht-gray)">
             Enter your email address and we&apos;ll send you a link to reset your password
           </CardDescription>
         </CardHeader>
         <CardContent>
           {success ? (
             <div className="grid gap-4 text-center">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-(--dht-gray)">
                 If an account exists with that email, we&apos;ve sent a password reset link.
                 Please check your inbox.
               </p>
-              <a href="/sign-in" className="text-sm underline underline-offset-4">
+              <a href="/sign-in" className="text-(--dht-red) hover:text-(--dht-red-hover) text-sm underline underline-offset-4">
                 Back to sign in
               </a>
             </div>
@@ -72,7 +73,7 @@ export function ForgotPasswordForm1({
               <div className="grid gap-6">
                 <div className="grid gap-6">
                   <div className="grid gap-3">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-(--dht-dark)">Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -85,13 +86,24 @@ export function ForgotPasswordForm1({
                   {error && (
                     <p className="text-sm text-destructive">{error}</p>
                   )}
-                  <Button type="submit" className="w-full cursor-pointer" disabled={isSubmitting}>
-                    {isSubmitting ? "Sending..." : "Send Reset Link"}
+                  <Button
+                    type="submit"
+                    className="w-full cursor-pointer bg-(--dht-red) text-white hover:bg-(--dht-red-hover)"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Reset Link"
+                    )}
                   </Button>
                 </div>
                 <div className="text-center text-sm">
                   Remember your password?{" "}
-                  <a href="/sign-in" className="underline underline-offset-4">
+                  <a href="/sign-in" className="text-(--dht-red) hover:text-(--dht-red-hover) underline underline-offset-4">
                     Back to sign in
                   </a>
                 </div>

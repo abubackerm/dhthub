@@ -9,6 +9,7 @@ export const AUTH_EVENTS = {
   ROLE_CREATED: 'auth.role.created',
   PASSWORD_RESET_REQUESTED: 'auth.password_reset.requested',
   USER_CREATED_BY_ADMIN: 'auth.user.created_by_admin',
+  USER_CREDENTIALS_RESENT: 'auth.user.credentials_resent',
 } as const;
 
 export const CATALOG_EVENTS = {

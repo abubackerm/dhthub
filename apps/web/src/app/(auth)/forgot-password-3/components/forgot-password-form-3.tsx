@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Logo } from "@/components/logo"
-import Link from "next/link"
 import Image from "next/image"
+import Link from "next/link"
 
 export function ForgotPasswordForm3({
   className,
@@ -20,17 +19,18 @@ export function ForgotPasswordForm3({
           <form className="p-6 md:p-8">
             <div className="flex flex-col gap-6">
               <div className="flex justify-center mb-2">
-                <Link href="/" className="flex items-center gap-2 font-medium">
-                  <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
-                    <Logo size={24} />
-                  </div>
-                  <span className="text-xl">ShadcnStore</span>
-                </Link>
+                <Image
+                  src="/images/dynamic_hub_Logo.png"
+                  alt="Dynamic Hub"
+                  width={140}
+                  height={47}
+                  className="h-8 w-auto"
+                />
               </div>
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">Forgot your password?</h1>
                 <p className="text-muted-foreground text-balance">
-                  Enter your email to reset your ShadcnStore account password
+                  Enter your email to reset your Dynamic Hub account password
                 </p>
               </div>
               <div className="grid gap-3">

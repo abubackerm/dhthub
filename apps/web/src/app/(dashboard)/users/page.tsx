@@ -21,6 +21,8 @@ export interface User {
 
 export type UserRole = "admin" | "super_admin" | "user" | "dealer"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+
 function normalizeDate(value: string | Date | null | undefined): string {
   if (!value) {
     return new Date(0).toISOString()
@@ -132,9 +134,8 @@ export default function UsersPage() {
     email: string
     role: Exclude<UserRole, "super_admin">
   }) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
     try {
-      const res = await fetch(`${apiUrl}/v1/auth/users/create-with-password`, {
+      const res = await fetch(`${API_URL}/v1/auth/users/create-with-password`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -150,6 +151,27 @@ export default function UsersPage() {
       await fetchUsers()
     } catch (e) {
       throw e
+    }
+  }
+
+  const handleResendEmail = async (userId: string) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/v1/auth/users/${userId}/resend-credentials`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      )
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null)
+        throw new Error(errData?.message ?? "Failed to resend credentials")
+      }
+
+      toast.success("New credentials sent to user email.")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to resend credentials")
     }
   }
 
@@ -170,6 +192,7 @@ export default function UsersPage() {
           onBanUser={handleBanUser}
           onUnbanUser={handleUnbanUser}
           onCreateUser={handleCreateUser}
+          onResendEmail={handleResendEmail}
         />
       </div>
     </div>

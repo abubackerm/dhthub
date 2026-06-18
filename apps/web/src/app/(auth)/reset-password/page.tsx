@@ -1,22 +1,23 @@
 import { Suspense } from "react"
 import { ResetPasswordForm } from "./components/reset-password-form"
-import { Logo } from "@/components/logo"
-import Link from "next/link"
+import Image from "next/image"
 
 export default function ResetPasswordPage() {
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link href="/" className="flex items-center gap-2 self-center font-medium">
-          <div className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-md">
-            <Logo size={24} />
-          </div>
-          Dynamic Hub
-        </Link>
-        <Suspense>
-          <ResetPasswordForm />
-        </Suspense>
+      <div className="flex w-full max-w-sm flex-col items-center gap-4">
+        <Image
+          src="/images/dynamic_hub_Logo.png"
+          alt="Dynamic Hub"
+          width={140}
+          height={47}
+          className="h-10 w-auto"
+        />
+        <p className="text-sm text-muted-foreground">Set a new password</p>
       </div>
+      <Suspense>
+        <ResetPasswordForm />
+      </Suspense>
     </div>
   )
 }

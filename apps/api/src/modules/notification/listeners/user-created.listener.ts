@@ -10,6 +10,13 @@ export interface UserCreatedByAdminEvent {
   createdAt: Date;
 }
 
+export interface UserCredentialsResentEvent {
+  user: { id: string; name?: string | null; email: string; role?: string };
+  password: string;
+  loginUrl: string;
+  createdAt: Date;
+}
+
 @Injectable()
 export class UserCreatedListener {
   private readonly logger = new Logger(UserCreatedListener.name);
@@ -39,5 +46,25 @@ export class UserCreatedListener {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to send welcome email to ${event.user.email}: ${message}`);
     }
+  }
+
+  @OnEvent(AUTH_EVENTS.USER_CREDENTIALS_RESENT)
+  async handleUserCredentialsResent(event: UserCredentialsResentEvent) {
+    this.logger.log(`Processing credentials resent for ${event.user.email}`);
+
+    await this.emailService.sendEmail({
+      to: event.user.email,
+      subject: 'Your Credentials Have Been Reset - DHT',
+      templateName: 'credentials-resent',
+      templateData: {
+        name: event.user.name || 'User',
+        email: event.user.email,
+        password: event.password,
+        loginUrl: event.loginUrl,
+        createdAt: event.createdAt,
+      },
+    });
+
+    this.logger.log(`Credentials resent email sent to ${event.user.email}`);
   }
 }

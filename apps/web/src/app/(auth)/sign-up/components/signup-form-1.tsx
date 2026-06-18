@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form"
 import { Checkbox } from "@/components/ui/checkbox"
 import { authClient } from "@/lib/auth-client"
+import { Loader2 } from "lucide-react"
 
 const signupFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -85,10 +86,10 @@ export function SignupForm1({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="border-(--dht-red)/20 bg-(--dht-gray-light)">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Create Account</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl text-(--dht-dark)">Create Account</CardTitle>
+          <CardDescription className="text-(--dht-gray)">
             Enter your information to create a new account
           </CardDescription>
         </CardHeader>
@@ -103,7 +104,7 @@ export function SignupForm1({
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First Name</FormLabel>
+                          <FormLabel className="text-(--dht-dark)">First Name</FormLabel>
                           <FormControl>
                             <Input placeholder="John" {...field} />
                           </FormControl>
@@ -116,7 +117,7 @@ export function SignupForm1({
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Last Name</FormLabel>
+                          <FormLabel className="text-(--dht-dark)">Last Name</FormLabel>
                           <FormControl>
                             <Input placeholder="Doe" {...field} />
                           </FormControl>
@@ -130,7 +131,7 @@ export function SignupForm1({
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel className="text-(--dht-dark)">Email</FormLabel>
                         <FormControl>
                           <Input
                             type="email"
@@ -147,7 +148,7 @@ export function SignupForm1({
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-(--dht-dark)">Password</FormLabel>
                         <FormControl>
                           <Input type="password" {...field} />
                         </FormControl>
@@ -160,7 +161,7 @@ export function SignupForm1({
                     name="confirmPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
+                        <FormLabel className="text-(--dht-dark)">Confirm Password</FormLabel>
                         <FormControl>
                           <Input type="password" {...field} />
                         </FormControl>
@@ -180,7 +181,7 @@ export function SignupForm1({
                             className="mt-0.5"
                           />
                         </FormControl>
-                        <FormLabel className="text-sm">
+                        <FormLabel className="text-sm text-(--dht-dark)">
                           I agree to the terms of service and privacy policy
                         </FormLabel>
                       </FormItem>
@@ -191,10 +192,17 @@ export function SignupForm1({
                   )}
                   <Button
                     type="submit"
-                    className="w-full cursor-pointer"
+                    className="w-full cursor-pointer bg-(--dht-red) text-white hover:bg-(--dht-red-hover)"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Creating account..." : "Create Account"}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                        Creating account...
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
                   </Button>
 
                   <Button variant="outline" className="w-full cursor-pointer" type="button">
@@ -209,7 +217,7 @@ export function SignupForm1({
                 </div>
                 <div className="text-center text-sm">
                   Already have an account?{" "}
-                  <a href="/sign-in" className="underline underline-offset-4">
+                  <a href="/sign-in" className="text-(--dht-red) hover:text-(--dht-red-hover) underline underline-offset-4">
                     Sign in
                   </a>
                 </div>
@@ -218,7 +226,7 @@ export function SignupForm1({
           </Form>
         </CardContent>
       </Card>
-      <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
+      <div className="text-(--dht-gray) *:[a]:text-(--dht-red) *:[a]:hover:text-(--dht-red-hover) text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
         By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
         and <a href="#">Privacy Policy</a>.
       </div>

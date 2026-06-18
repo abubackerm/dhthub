@@ -1,6 +1,4 @@
 import { ForgotPasswordForm2 } from "./components/forgot-password-form-2"
-import { Logo } from "@/components/logo"
-import Link from "next/link"
 import Image from "next/image"
 
 export default function ForgotPassword2Page() {
@@ -8,12 +6,13 @@ export default function ForgotPassword2Page() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-medium">
-            <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
-              <Logo size={24} />
-            </div>
-            ShadcnStore
-          </Link>
+          <Image
+            src="/images/dynamic_hub_Logo.png"
+            alt="Dynamic Hub"
+            width={140}
+            height={47}
+            className="h-8 w-auto"
+          />
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-md">
