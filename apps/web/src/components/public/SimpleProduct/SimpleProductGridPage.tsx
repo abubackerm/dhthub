@@ -123,7 +123,7 @@ export function SimpleProductGridPage({
             <p className="text-sm text-gray-500 mb-4">
               {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} available
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -169,7 +169,7 @@ function SimpleProductGridPageSkeleton({
       </div>
 
       {/* Product Grid Skeleton */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="rounded-lg border border-gray-200 overflow-hidden">
             <Skeleton className="aspect-square w-full" />

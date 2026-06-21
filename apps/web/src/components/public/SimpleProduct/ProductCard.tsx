@@ -47,7 +47,7 @@ export function ProductCard({ product, basePath }: ProductCardProps) {
               src={primaryImage}
               alt={product.name}
               fill
-              className={`object-contain p-4 transition-all duration-300 ${
+              className={`object-contain p-2 transition-all duration-300 ${
                 isImageLoaded
                   ? "opacity-100 scale-100"
                   : "opacity-0 scale-95"
@@ -65,15 +65,15 @@ export function ProductCard({ product, basePath }: ProductCardProps) {
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-snug group-hover:text-(--dht-red) transition-colors">
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <h3 className="text-xs font-medium text-gray-900 line-clamp-2 leading-snug group-hover:text-(--dht-red) transition-colors">
           {product.name}
         </h3>
         {product.sku && (
-          <p className="text-xs text-gray-400 font-mono">SKU: {product.sku}</p>
+          <p className="text-[10px] text-gray-400 font-mono">SKU: {product.sku}</p>
         )}
         {product.price != null && (
-          <p className="text-base font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-gray-900">
             {formatPrice(product.price)}
           </p>
         )}

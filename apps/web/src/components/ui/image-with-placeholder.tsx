@@ -40,11 +40,11 @@ export function ImageWithPlaceholder({
         />
       )}
 
-      {/* Actual image */}
+      {/* Actual image - apply className for sizing and object-fit */}
       <Image
         src={src}
         alt={alt}
-        className={`${isLoaded ? "opacity-100" : "opacity-0"} transition-opacity duration-300`}
+        className={`${className} ${isLoaded ? "opacity-100" : "opacity-0"} transition-opacity duration-300`}
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(true)} // Stop showing placeholder on error
         {...props}
