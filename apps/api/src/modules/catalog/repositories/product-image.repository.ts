@@ -38,6 +38,14 @@ export class ProductImageRepository {
     });
   }
 
+  async findMaxSortOrder(productId: string): Promise<number> {
+    const max = await this.getClient().productImage.aggregate({
+      where: { productId },
+      _max: { sortOrder: true },
+    });
+    return max._max.sortOrder ?? 0;
+  }
+
   async create(data: {
     productId: string;
     variantId?: string | null;

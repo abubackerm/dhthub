@@ -57,8 +57,9 @@ export function ProductCard({ product, variant, basePath }: ProductCardProps) {
 function formatPrice(price: number | string | null | undefined): string {
   if (!price) return "N/A";
   const numPrice = typeof price === "string" ? parseFloat(price) : price;
+  const sarPrice = numPrice / 100;
   return new Intl.NumberFormat("en-SA", {
     style: "currency",
     currency: "SAR",
-  }).format(numPrice);
+  }).format(sarPrice);
 }

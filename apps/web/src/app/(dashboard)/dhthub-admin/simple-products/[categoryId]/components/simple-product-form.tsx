@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -13,14 +13,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, X, Package } from "lucide-react"
+import { Loader2, X, Package, Trash2, Upload, ImageIcon, Star } from "lucide-react"
 import { toast } from "sonner"
 
 import {
   useCreateSimpleProduct,
   useUpdateSimpleProduct,
   useAddSimpleProductImage,
+  useSimpleProductImages,
+  useDeleteSimpleProductImage,
+  useUpdateSimpleProductImage,
   type SimpleProductView,
+  type SimpleProductImage,
   type CreateSimpleProductInput,
   type UpdateSimpleProductInput,
 } from "@/lib/api/catalog"
@@ -63,15 +67,38 @@ export function SimpleProductFormDialog({
 }: SimpleProductFormDialogProps) {
   const createMutation = useCreateSimpleProduct(categoryId)
   const updateMutation = useUpdateSimpleProduct(categoryId)
-  const addImageMutation = useAddSimpleProductImage(categoryId, product?.id || "")
 
   const isEditing = !!product
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string>("")
+
+  // ── Existing images (edit mode) ──
+  const {
+    data: existingImages = [],
+    isLoading: imagesLoading,
+  } = useSimpleProductImages(
+    isEditing ? categoryId : "",
+    isEditing ? product!.id : "",
+  )
+
+  const addImageMutation = useAddSimpleProductImage(
+    isEditing ? categoryId : "",
+    isEditing ? product?.id || "" : "",
+  )
+  const deleteImageMutation = useDeleteSimpleProductImage(
+    isEditing ? categoryId : "",
+    isEditing ? product?.id || "" : "",
+  )
+  const updateImageMutation = useUpdateSimpleProductImage(
+    isEditing ? categoryId : "",
+    isEditing ? product?.id || "" : "",
+  )
+
+  // ── New image files pending upload ──
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null)
 
+  // ── Form state ──
   const [formData, setFormData] = useState<FormData>({
     name: "",
     slug: "",
@@ -93,9 +120,6 @@ export function SimpleProductFormDialog({
         quantity: product.quantity != null ? String(product.quantity) : "",
         status: (product.status || "ACTIVE").toUpperCase(),
       })
-      setImageFile(null)
-      setImagePreview("")
-      setUploadedImageUrl(null)
     } else {
       setFormData({
         name: "",
@@ -106,10 +130,10 @@ export function SimpleProductFormDialog({
         quantity: "",
         status: "ACTIVE",
       })
-      setImageFile(null)
-      setImagePreview("")
-      setUploadedImageUrl(null)
     }
+    // Reset image selection when dialog opens
+    setNewImageFiles([])
+    setImagePreviews([])
   }, [product, open])
 
   const handleNameChange = (name: string) => {
@@ -123,77 +147,127 @@ export function SimpleProductFormDialog({
     }))
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  // ── Image file selection ──
+  const handleImageFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB")
-      return
+    // Validate each file
+    const validFiles: File[] = []
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`"${file.name}" exceeds 5MB limit`)
+        continue
+      }
+      if (!file.type.startsWith("image/")) {
+        toast.error(`"${file.name}" is not a valid image`)
+        continue
+      }
+      validFiles.push(file)
     }
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("File must be an image")
-      return
-    }
+    if (validFiles.length === 0) return
 
-    setImageFile(file)
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+    setNewImageFiles((prev) => [...prev, ...validFiles])
+
+    // Generate previews
+    const newPreviews: string[] = []
+    validFiles.forEach((file) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreviews((prev) => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+      newPreviews.push("") // placeholder
+    })
+
+    // Reset input so same file can be selected again
+    if (imageInputRef.current) imageInputRef.current.value = ""
   }
 
-  const uploadImage = async (): Promise<string | null> => {
-    if (!imageFile) return null
+  const removeNewImage = (index: number) => {
+    setNewImageFiles((prev) => prev.filter((_, i) => i !== index))
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // ── Upload selected images to storage + create ProductImage records ──
+  const uploadNewImages = async (): Promise<boolean> => {
+    if (newImageFiles.length === 0) return true
 
     setIsUploading(true)
-    try {
-      const uploadData = new FormData()
-      uploadData.append("file", imageFile)
-      uploadData.append("entityType", "product")
-      uploadData.append("sku", formData.sku.trim() || product?.sku || "")
-      uploadData.append("position", "1")
+    let allSuccess = true
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-      const response = await fetch(`${apiUrl}/v1/storage/upload`, {
-        method: "POST",
-        body: uploadData,
-        credentials: "include",
-        signal: AbortSignal.timeout(60_000),
-      })
+    for (let i = 0; i < newImageFiles.length; i++) {
+      const file = newImageFiles[i]
+      const productSku = formData.sku.trim() || product?.sku || ""
+      const nextPosition = existingImages.length + i + 1
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `Upload failed (${response.status})`)
+      try {
+        const uploadData = new FormData()
+        uploadData.append("file", file)
+        uploadData.append("entityType", "product")
+        uploadData.append("sku", productSku)
+        uploadData.append("position", String(nextPosition))
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+        const response = await fetch(`${apiUrl}/v1/storage/upload`, {
+          method: "POST",
+          body: uploadData,
+          credentials: "include",
+          signal: AbortSignal.timeout(60_000),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Upload failed (${response.status})`)
+        }
+
+        const result = await response.json()
+        const imageUrl = result.url
+
+        if (isEditing && product) {
+          // Create ProductImage record (sortOrder is computed by the backend)
+          addImageMutation.mutate({
+            url: imageUrl,
+            altText: formData.name || product.name,
+            isPrimary: existingImages.length === 0 && i === 0,
+          })
+        }
+      } catch (error) {
+        allSuccess = false
+        if (error instanceof Error) {
+          toast.error(`Failed to upload "${file.name}": ${error.message}`)
+        } else {
+          toast.error(`Failed to upload "${file.name}"`)
+        }
       }
-
-      const result = await response.json()
-      return result.url
-    } catch (error) {
-      if (error instanceof TypeError && error.message === "Failed to fetch") {
-        toast.error("Upload timed out. The file may be too large.")
-      } else if (error instanceof Error) {
-        toast.error(error.message)
-      } else {
-        toast.error("Failed to upload image")
-      }
-      return null
-    } finally {
-      setIsUploading(false)
     }
+
+    setIsUploading(false)
+    setNewImageFiles([])
+    setImagePreviews([])
+    return allSuccess
   }
 
+  // ── Handle delete existing image ──
+  const handleDeleteImage = (image: SimpleProductImage) => {
+    deleteImageMutation.mutate(image.id)
+  }
+
+  // ── Handle set image as primary ──
+  const handleSetPrimary = (image: SimpleProductImage) => {
+    updateImageMutation.mutate({
+      imageId: image.id,
+      data: { isPrimary: true },
+    })
+  }
+
+  // ── Save ──
   const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error("Product name is required")
       return
     }
-
-    // Upload image if selected
-    const imageUrl = await uploadImage()
-    if (imageFile && !imageUrl) return // Upload failed
 
     const price = formData.price.trim()
       ? Math.round(parseFloat(formData.price) * 100)
@@ -212,39 +286,49 @@ export function SimpleProductFormDialog({
         ...(price !== product.price ? { price } : {}),
         ...(quantity !== product.quantity ? { quantity } : {}),
         ...(formData.status !== (product.status || "DRAFT") ? { status: formData.status.toLowerCase() } : {}),
-        ...(imageUrl ? { thumbnailUrl: imageUrl } : {}),
       }
 
       updateMutation.mutate(
         { productId: product.id, data: updateData },
         {
-          onSuccess: () => {
-            // If a new image was uploaded, also create a ProductImage record
-            if (imageUrl && product.id) {
-              addImageMutation.mutate(
-                {
-                  url: imageUrl,
-                  altText: formData.name,
-                  isPrimary: true,
-                },
-                {
-                  onSuccess: () => {
-                    onClose()
-                  },
-                  onError: () => {
-                    // Image record creation failed but product update succeeded
-                    // Close anyway since the image URL is stored on the product
-                    onClose()
-                  },
-                },
-              )
-            } else {
-              onClose()
-            }
+          onSuccess: async () => {
+            // Upload any new images
+            await uploadNewImages()
+            onClose()
           },
         },
       )
     } else {
+      // Create mode — upload first image as thumbnail
+      let thumbnailUrl: string | undefined
+
+      if (newImageFiles.length > 0) {
+        const file = newImageFiles[0]
+        try {
+          const uploadData = new FormData()
+          uploadData.append("file", file)
+          uploadData.append("entityType", "product")
+          uploadData.append("sku", formData.sku.trim() || "")
+          uploadData.append("position", "1")
+
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+          const response = await fetch(`${apiUrl}/v1/storage/upload`, {
+            method: "POST",
+            body: uploadData,
+            credentials: "include",
+            signal: AbortSignal.timeout(60_000),
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            thumbnailUrl = result.url
+          }
+        } catch (error) {
+          // Non-fatal — product will be created without an image
+          console.error("Failed to upload thumbnail image:", error)
+        }
+      }
+
       const createData: CreateSimpleProductInput = {
         name: formData.name,
         ...(formData.slug ? { slug: formData.slug } : {}),
@@ -252,20 +336,66 @@ export function SimpleProductFormDialog({
         ...(formData.description.trim() ? { description: formData.description } : {}),
         ...(price !== undefined ? { price } : {}),
         ...(quantity !== undefined ? { quantity } : {}),
-        ...(imageUrl ? { thumbnailUrl: imageUrl } : {}),
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
       }
 
       createMutation.mutate(createData, {
         onSuccess: () => {
+          setNewImageFiles([])
+          setImagePreviews([])
           onClose()
         },
       })
     }
   }
 
-  const isPending = createMutation.isPending || updateMutation.isPending || addImageMutation.isPending || isUploading
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    addImageMutation.isPending ||
+    deleteImageMutation.isPending ||
+    updateImageMutation.isPending ||
+    isUploading
 
-  const currentImageUrl = imagePreview || product?.images?.[0]?.url || ""
+  // ── Combined image list for display ──
+  const allDisplayImages = useMemo(() => {
+    const items: Array<{
+      id: string
+      url: string
+      altText: string
+      isExisting: boolean
+      sortOrder: number
+    }> = []
+
+    // Existing images
+    existingImages.forEach((img, idx) => {
+      items.push({
+        id: img.id,
+        url: img.url,
+        altText: img.altText || product?.name || "",
+        isExisting: true,
+        sortOrder: img.sortOrder ?? idx,
+      })
+    })
+
+    // New image previews
+    imagePreviews.forEach((preview, idx) => {
+      if (preview) {
+        items.push({
+          id: `new-${idx}`,
+          url: preview,
+          altText: newImageFiles[idx]?.name || "New image",
+          isExisting: false,
+          sortOrder: existingImages.length + idx,
+        })
+      }
+    })
+
+    return items.sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [existingImages, imagePreviews, newImageFiles, product])
+
+  // ── Total pending image operations ──
+  const hasPendingUploads = newImageFiles.length > 0
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
@@ -284,11 +414,11 @@ export function SimpleProductFormDialog({
         <div className="grid gap-4 py-4 max-h-[65vh] overflow-y-auto pr-2">
           {/* Name */}
           <div className="grid gap-2">
-            <Label htmlFor="name">
+            <Label htmlFor="form-name">
               Name <span className="text-destructive">*</span>
             </Label>
             <Input
-              id="name"
+              id="form-name"
               value={formData.name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g., Premium Widget"
@@ -298,9 +428,9 @@ export function SimpleProductFormDialog({
 
           {/* Slug */}
           <div className="grid gap-2">
-            <Label htmlFor="slug">Slug</Label>
+            <Label htmlFor="form-slug">Slug</Label>
             <Input
-              id="slug"
+              id="form-slug"
               value={formData.slug}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, slug: e.target.value }))
@@ -316,9 +446,9 @@ export function SimpleProductFormDialog({
 
           {/* SKU */}
           <div className="grid gap-2">
-            <Label htmlFor="sku">SKU</Label>
+            <Label htmlFor="form-sku">SKU</Label>
             <Input
-              id="sku"
+              id="form-sku"
               value={formData.sku}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -337,9 +467,9 @@ export function SimpleProductFormDialog({
 
           {/* Price */}
           <div className="grid gap-2">
-            <Label htmlFor="price">Price (SAR)</Label>
+            <Label htmlFor="form-price">Price (SAR)</Label>
             <Input
-              id="price"
+              id="form-price"
               type="number"
               step="0.01"
               min="0"
@@ -354,9 +484,9 @@ export function SimpleProductFormDialog({
 
           {/* Stock Quantity */}
           <div className="grid gap-2">
-            <Label htmlFor="quantity">Stock Quantity</Label>
+            <Label htmlFor="form-quantity">Stock Quantity</Label>
             <Input
-              id="quantity"
+              id="form-quantity"
               type="number"
               step="1"
               min="0"
@@ -371,9 +501,9 @@ export function SimpleProductFormDialog({
 
           {/* Description */}
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="form-description">Description</Label>
             <Textarea
-              id="description"
+              id="form-description"
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -389,9 +519,9 @@ export function SimpleProductFormDialog({
 
           {/* Status */}
           <div className="grid gap-2">
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="form-status">Status</Label>
             <select
-              id="status"
+              id="form-status"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={formData.status}
               onChange={(e) =>
@@ -404,55 +534,122 @@ export function SimpleProductFormDialog({
             </select>
           </div>
 
-          {/* Image */}
-          <div className="grid gap-2">
-            <Label htmlFor="image">Product Image</Label>
-            <div className="flex items-start gap-4">
-              <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                {currentImageUrl ? (
-                  <img
-                    src={currentImageUrl}
-                    alt="Product image preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none"
-                    }}
-                  />
-                ) : (
-                  <Package className="h-8 w-8 text-muted-foreground" />
-                )}
+          {/* ── Images Section ── */}
+          <div className="grid gap-3 border-t pt-4">
+            <Label>Product Images</Label>
+
+            {/* Existing images (edit mode) */}
+            {isEditing && imagesLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading images...
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    id="image"
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="cursor-pointer flex-1"
-                    disabled={isPending}
-                  />
-                  {(imagePreview || product?.images?.[0]?.url) && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setImageFile(null)
-                        setImagePreview("")
-                        if (imageInputRef.current) imageInputRef.current.value = ""
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
+            )}
+
+            {allDisplayImages.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {allDisplayImages.map((img) => (
+                  <div
+                    key={img.id}
+                    className="relative aspect-square rounded-md border border-border bg-muted overflow-hidden group"
+                  >
+                    {img.url ? (
+                      <img
+                        src={img.url}
+                        alt={img.altText}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none"
+                          e.currentTarget.nextElementSibling?.classList.remove("hidden")
+                        }}
+                      />
+                    ) : null}
+                    <div className={`absolute inset-0 flex items-center justify-center ${img.url ? "hidden" : ""}`}>
+                      <Package className="h-6 w-6 text-muted-foreground/40" />
+                    </div>
+
+                    {/* Delete button (existing images only) */}
+                    {img.isExisting && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existing = existingImages.find((e) => e.id === img.id)
+                          if (existing) handleDeleteImage(existing)
+                        }}
+                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        disabled={deleteImageMutation.isPending}
+                      >
+                        <Trash2 className="h-3 w-3 text-white" />
+                      </button>
+                    )}
+
+                    {/* Remove button (new/preview images) */}
+                    {!img.isExisting && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const idx = imagePreviews.indexOf(img.url)
+                          if (idx >= 0) removeNewImage(idx)
+                        }}
+                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </button>
+                    )}
+
+                    {/* Primary badge / Set as Primary button */}
+                    {img.isExisting && (() => {
+                      const existingImg = existingImages.find((e) => e.id === img.id)
+                      return existingImg?.isPrimary ? (
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-blue-600/80 text-[10px] font-medium text-white leading-tight flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5 fill-white" />
+                          Primary
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const existing = existingImages.find((e) => e.id === img.id)
+                            if (existing) handleSetPrimary(existing)
+                          }}
+                          className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/50 text-[10px] font-medium text-white leading-tight opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-600 flex items-center gap-1"
+                          disabled={updateImageMutation.isPending}
+                        >
+                          <Star className="w-2.5 h-2.5" />
+                          Set Primary
+                        </button>
+                      )
+                    })()}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-2">
+                {isEditing ? "No images yet." : "You can add images after creating the product."}
+              </p>
+            )}
+
+            {/* Upload new images */}
+            {isEditing && (
+              <div className="flex items-start gap-3">
+                <div className="flex-1 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageFilesChange}
+                      className="cursor-pointer flex-1"
+                      disabled={isPending}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Accepts JPG, PNG, GIF, WEBP. Max size: 5MB each. Select multiple files at once.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Accepts JPG, PNG, GIF, WEBP. Max size: 5MB.
-                </p>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -464,7 +661,11 @@ export function SimpleProductFormDialog({
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {isUploading ? "Uploading..." : isEditing ? "Saving..." : "Creating..."}
+                {isUploading
+                  ? "Uploading images..."
+                  : updateMutation.isPending
+                    ? "Saving..."
+                    : "Saving..."}
               </>
             ) : isEditing ? (
               "Save Changes"

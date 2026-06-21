@@ -70,14 +70,17 @@ export class StorageController {
 
   private async processUpload(req: FastifyRequest) {
     const parts = req.parts();
-    let fileData: { filename: string; toBuffer: () => Promise<Buffer> } | undefined;
+    let buffer: Buffer | undefined;
     let entityType: string | undefined;
     let sku: string | undefined;
     let position = 1;
+    let filename: string | undefined;
 
     for await (const part of parts) {
       if ((part as any).type === 'file') {
-        fileData = part as any;
+        const filePart = part as any;
+        buffer = await filePart.toBuffer();
+        filename = filePart.filename;
       } else if (part.fieldname === 'entityType') {
         entityType = (part as any).value as string;
       } else if (part.fieldname === 'sku') {
@@ -88,13 +91,11 @@ export class StorageController {
       }
     }
 
-    if (!fileData) {
+    if (!buffer) {
       throw new BadRequestException(
         'No file provided. Send a multipart/form-data request with a "file" field.',
       );
     }
-
-    const buffer = await fileData.toBuffer();
 
     // 1. File size enforcement (early reject)
     if (buffer.length > MAX_FILE_SIZE) {
@@ -112,7 +113,7 @@ export class StorageController {
     }
 
     // 3. Sanitize filename
-    const cleanName = sanitize(fileData.filename).replace(/\s+/g, '-') || 'image';
+    const cleanName = sanitize(filename ?? 'image').replace(/\s+/g, '-') || 'image';
 
     // 4. Image compression via sharp (with 8s fallback to original)
     let optimized: Buffer;
@@ -190,7 +191,7 @@ export class StorageController {
     return {
       path: storageKey,
       url: `/${storageKey}`,
-      originalName: fileData.filename,
+      originalName: filename ?? 'image',
     };
   }
 

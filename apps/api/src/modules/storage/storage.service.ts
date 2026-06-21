@@ -32,6 +32,7 @@ export class StorageService implements IStorageService {
       },
       forcePathStyle: true, // Required for SeaweedFS
       region: 'us-east-1',
+      maxAttempts: 1,
     });
 
     this.logger.log(`SeaweedFS S3 client initialized with endpoint: ${this.endpoint}`);

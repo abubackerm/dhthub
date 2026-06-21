@@ -272,16 +272,37 @@ export class SimpleProductService extends BaseService {
     }
 
     const existingImages = await this.imageRepo.findByProductId(productId);
-    const nextSortOrder = dto.sortOrder ?? existingImages.length + 1;
 
-    const image = await this.imageRepo.create({
-      productId,
-      url: dto.url,
-      altText: dto.altText ?? null,
-      sortOrder: nextSortOrder,
-      isPrimary: dto.isPrimary ?? existingImages.length === 0,
-      variantId: null,
-    });
+    // Try to create with the requested sortOrder; if it conflicts (concurrent
+    // requests can race on the same sortOrder), fall back to max + 1.
+    let nextSortOrder = dto.sortOrder ?? (await this.imageRepo.findMaxSortOrder(productId)) + 1;
+
+    let image;
+    try {
+      image = await this.imageRepo.create({
+        productId,
+        url: dto.url,
+        altText: dto.altText ?? null,
+        sortOrder: nextSortOrder,
+        isPrimary: dto.isPrimary ?? existingImages.length === 0,
+        variantId: null,
+      });
+    } catch (err: unknown) {
+      const pgCode = (err as any)?.cause?.originalCode;
+      if ((err as any)?.code === 'P2002' || pgCode === '23505') {
+        nextSortOrder = (await this.imageRepo.findMaxSortOrder(productId)) + 1;
+        image = await this.imageRepo.create({
+          productId,
+          url: dto.url,
+          altText: dto.altText ?? null,
+          sortOrder: nextSortOrder,
+          isPrimary: dto.isPrimary ?? existingImages.length === 0,
+          variantId: null,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     // If this is the first image, also set as thumbnailUrl on the product
     if (existingImages.length === 0 && !dto.isPrimary) {

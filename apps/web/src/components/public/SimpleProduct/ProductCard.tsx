@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, ShoppingCart, Package } from "lucide-react";
 import type { SimpleProductView } from "@/lib/api/catalog/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useAddToCart } from "@/lib/api/cart";
+import { AddToCartIsland } from "@/components/public/AddToCartIsland";
 
 interface ProductCardProps {
   product: SimpleProductView;
@@ -13,15 +17,19 @@ interface ProductCardProps {
 
 function formatPrice(price: number | null | undefined): string {
   if (!price) return "";
+  const sarPrice = price / 100;
   return new Intl.NumberFormat("en-SA", {
     style: "currency",
     currency: "SAR",
-  }).format(price);
+  }).format(sarPrice);
 }
 
 export function ProductCard({ product, basePath }: ProductCardProps) {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const primaryImage = product.images?.[0]?.url || null;
+  const addToCart = useAddToCart();
+  const inStock = product.quantity > 0;
+  const hasVariant = !!product.defaultVariantId;
 
   return (
     <Link
@@ -65,10 +73,47 @@ export function ProductCard({ product, basePath }: ProductCardProps) {
           <p className="text-xs text-gray-400 font-mono">SKU: {product.sku}</p>
         )}
         {product.price != null && (
-          <p className="text-base font-semibold text-gray-900 mt-auto pt-2">
+          <p className="text-base font-semibold text-gray-900">
             {formatPrice(product.price)}
           </p>
         )}
+
+        {/* Add to Cart / Out of Stock */}
+        <div className="mt-auto pt-2" onClick={(e) => e.preventDefault()}>
+          {inStock && hasVariant ? (
+            <AddToCartIsland
+              onAuthenticated={() => {
+                addToCart.mutate({ variantId: product.defaultVariantId!, qty: 1 });
+              }}
+            >
+              {({ trigger }) => (
+                <Button
+                  className="w-full bg-(--dht-red) hover:bg-(--dht-red-hover) text-white h-9 text-sm gap-1.5"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    trigger();
+                  }}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  Add to Cart
+                </Button>
+              )}
+            </AddToCartIsland>
+          ) : inStock && !hasVariant ? (
+            <p className="text-xs text-muted-foreground text-center py-1">
+              Unavailable
+            </p>
+          ) : (
+            <Badge
+              variant="secondary"
+              className="w-full justify-center py-1 text-xs bg-gray-100 text-gray-500 hover:bg-gray-100"
+            >
+              <Package className="w-3 h-3 mr-1" />
+              Out of Stock
+            </Badge>
+          )}
+        </div>
       </div>
     </Link>
   );
