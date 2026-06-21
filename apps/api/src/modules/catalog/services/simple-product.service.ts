@@ -181,7 +181,7 @@ export class SimpleProductService extends BaseService {
     const variantQuantity = dto.quantity ?? 1;
     await this.variantRepo.create({
       productId: product.id,
-      sku: this.generateVariantSku(),
+      sku: sku, // reuse product SKU so admin and frontend show the same identifier
       name: dto.name,
       price: dto.price ?? null,
       quantity: variantQuantity,
@@ -235,6 +235,24 @@ export class SimpleProductService extends BaseService {
     }
 
     await this.productRepo.update(productId, updateData);
+
+    // Sync the default variant's quantity and price when product fields change
+    // CartService checks variant.quantity/price, not product.quantity/price, so they must stay in sync
+    if (dto.quantity !== undefined || dto.price !== undefined) {
+      const defaultVariant = await this.variantRepo.findDefaultVariant(productId);
+      if (defaultVariant) {
+        const variantUpdate: Partial<{ quantity: number; price: number | null }> = {};
+        if (dto.quantity !== undefined && defaultVariant.quantity !== dto.quantity) {
+          variantUpdate.quantity = dto.quantity;
+        }
+        if (dto.price !== undefined && defaultVariant.price !== dto.price) {
+          variantUpdate.price = dto.price;
+        }
+        if (Object.keys(variantUpdate).length > 0) {
+          await this.variantRepo.update(defaultVariant.id, variantUpdate);
+        }
+      }
+    }
 
     return this.findById(productId);
   }
@@ -576,15 +594,6 @@ export class SimpleProductService extends BaseService {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return `P-${result}`;
-  }
-
-  private generateVariantSku(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let result = '';
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `V-${result}`;
   }
 
   private generateCellSku(): string {

@@ -43,80 +43,17 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     : path.map((s) => s);
 
   if (!currentCategory) {
-    let product: ProductDetailView | null = null;
-    try {
-      product = await getServerProductBySlug(lastSlug);
-    } catch {
-      // Product not found, will try simple product below
-    }
-
-    if (product) {
-      // If the product type is "simple", render the simple product detail page instead
-      if (product.type === 'simple') {
-        // Fetch attribute values via the simple product API
-        try {
-          const simpleProduct = await getServerSimpleProductBySlug(lastSlug);
-          const categoryPath = path.slice(0, -1);
-          const categorySlug = categoryPath[categoryPath.length - 1];
-
-          let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
-          if (categorySlug) {
-            try {
-              parentCategory = await getServerCategoryBySlugLookup(categorySlug);
-            } catch {
-              // Parent category not found
-            }
-          }
-
-          const categoryPathNames = parentCategory
-            ? [...parentCategory.ancestors.map((a) => a.name), parentCategory.category.name]
-            : categoryPath;
-
-          return (
-            <SimpleProductDetailPage
-              product={simpleProduct}
-              pathNames={categoryPathNames}
-              pathSlugs={categoryPath}
-            />
-          );
-        } catch {
-          // Fall through to variant ProductDetailPage if simple product fetch fails
-        }
-      }
-
-      const categoryPath = path.slice(0, -1);
+    // Build category path from all but the last slug (which is the product slug)
+    const buildCategoryInfo = (slugs: string[]) => {
+      const categoryPath = slugs.slice(0, -1);
       const categorySlug = categoryPath[categoryPath.length - 1];
+      return { categoryPath, categorySlug };
+    };
 
-      let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
-      if (categorySlug) {
-        try {
-          parentCategory = await getServerCategoryBySlugLookup(categorySlug);
-        } catch {
-          // Parent category not found
-        }
-      }
-
-      const categoryPathNames = parentCategory
-        ? [...parentCategory.ancestors.map((a) => a.name), parentCategory.category.name]
-        : categoryPath;
-
-      return (
-        <ProductDetailPage
-          product={product}
-          category={parentCategory?.category ?? null}
-          pathNames={categoryPathNames}
-          pathSlugs={categoryPath}
-        />
-      );
-    }
-
-    // Try simple product by slug before 404
+    // 1. Try simple product detail page first (handles simple products with attributes)
     try {
       const simpleProduct = await getServerSimpleProductBySlug(lastSlug);
-
-      // Build path info from the remaining path segments
-      const categoryPath = path.slice(0, -1);
-      const categorySlug = categoryPath[categoryPath.length - 1];
+      const { categoryPath, categorySlug } = buildCategoryInfo(path);
 
       let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
       if (categorySlug) {
@@ -139,7 +76,41 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
         />
       );
     } catch {
-      // Simple product not found either
+      // Not found via simple product API, try regular product API below
+    }
+
+    // 2. Try regular product detail (variable products or legacy simple products)
+    let product: ProductDetailView | null = null;
+    try {
+      product = await getServerProductBySlug(lastSlug);
+    } catch {
+      // Product not found
+    }
+
+    if (product) {
+      const { categoryPath, categorySlug } = buildCategoryInfo(path);
+
+      let parentCategory: Awaited<ReturnType<typeof getServerCategoryBySlugLookup>> | null = null;
+      if (categorySlug) {
+        try {
+          parentCategory = await getServerCategoryBySlugLookup(categorySlug);
+        } catch {
+          // Parent category not found
+        }
+      }
+
+      const categoryPathNames = parentCategory
+        ? [...parentCategory.ancestors.map((a) => a.name), parentCategory.category.name]
+        : categoryPath;
+
+      return (
+        <ProductDetailPage
+          product={product}
+          category={parentCategory?.category ?? null}
+          pathNames={categoryPathNames}
+          pathSlugs={categoryPath}
+        />
+      );
     }
 
     notFound();

@@ -28,7 +28,7 @@ export function PricingEditor({ items, isEditable, onSave, isSaving }: PricingEd
     if (amount === null) return "—";
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "INR",
+      currency: "SAR",
     }).format(amount);
   };
 

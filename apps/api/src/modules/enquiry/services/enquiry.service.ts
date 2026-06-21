@@ -64,16 +64,32 @@ export class EnquiryService extends BaseService {
       notes: dto.notes,
     });
 
-    const enquiryItems = cart.items.map((item) => ({
-      enquiryId: enquiry.id,
-      variantId: item.variantId,
-      productId: (item as any).variant?.productId || '',
-      sku: (item as any).variant?.sku || '',
-      qty: item.qty,
-    }));
+    const enquiryItems = cart.items.map((item) => {
+      const variant = (item as any).variant;
+      // variant.price is stored in cents (halalas), convert to SAR for enquiry display
+      const priceCents = variant?.price != null ? Number(variant.price) : undefined;
+      const price = priceCents !== undefined ? priceCents / 100 : undefined;
+      return {
+        enquiryId: enquiry.id,
+        variantId: item.variantId,
+        productId: variant?.productId || '',
+        sku: variant?.sku || '',
+        qty: item.qty,
+        price,
+        total: price !== undefined ? price * item.qty : undefined,
+      };
+    });
+
+    const grandTotal = enquiryItems.reduce(
+      (sum, item) => sum + (item.total ?? 0),
+      0,
+    );
 
     await this.txExecutor.execute(async () => {
       await this.enquiryItemRepo.createManyWithDetails(enquiryItems);
+      if (grandTotal > 0) {
+        await this.enquiryRepo.setGrandTotal(enquiry.id, grandTotal);
+      }
       await this.cartRepo.markSubmitted(cart.id);
       await this.cartRepo.createActiveCart(userId);
     });
@@ -110,16 +126,30 @@ export class EnquiryService extends BaseService {
       if (!variant) {
         throw new EnquiryNotFoundError(`Variant ${item.variantId} not found`);
       }
+      // variant.price is stored in cents (halalas), convert to SAR for enquiry display
+      const priceCents = variant.price != null ? Number(variant.price) : undefined;
+      const price = priceCents !== undefined ? priceCents / 100 : undefined;
       return {
         enquiryId: enquiry.id,
         variantId: item.variantId,
         productId: variant.productId,
         sku: variant.sku,
         qty: item.qty,
+        price,
+        total: price !== undefined ? price * item.qty : undefined,
       };
     });
 
+    const grandTotal = enquiryItems.reduce(
+      (sum, item) => sum + (item.total ?? 0),
+      0,
+    );
+
     await this.enquiryItemRepo.createManyWithDetails(enquiryItems);
+
+    if (grandTotal > 0) {
+      await this.enquiryRepo.setGrandTotal(enquiry.id, grandTotal);
+    }
 
     this.emit(ENQUIRY_EVENTS.ENQUIRY_CREATED, new EnquiryCreatedEvent(
       enquiry.id,

@@ -115,6 +115,8 @@ export class EnquiryItemRepository {
       productId: string;
       sku: string;
       qty: number;
+      price?: number;
+      total?: number;
       _createdBy?: string;
     },
   ): Promise<EnquiryItemEntity> {
@@ -125,6 +127,8 @@ export class EnquiryItemRepository {
         productId: data.productId,
         sku: data.sku,
         qty: data.qty,
+        ...(data.price !== undefined ? { price: data.price } : {}),
+        ...(data.total !== undefined ? { total: data.total } : {}),
       },
       include: {
         variant: true,
@@ -139,6 +143,8 @@ export class EnquiryItemRepository {
       productId: string;
       sku: string;
       qty: number;
+      price?: number;
+      total?: number;
       _createdBy?: string;
     }>,
   ): Promise<{ count: number }> {
@@ -149,6 +155,8 @@ export class EnquiryItemRepository {
         productId: item.productId,
         sku: item.sku,
         qty: item.qty,
+        ...(item.price !== undefined ? { price: item.price } : {}),
+        ...(item.total !== undefined ? { total: item.total } : {}),
       })),
     });
   }

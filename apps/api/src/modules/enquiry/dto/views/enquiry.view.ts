@@ -27,7 +27,7 @@ export class EnquiryView {
     view.email = entity.email;
     view.phone = entity.phone;
     view.status = entity.status;
-    view.grandTotal = entity.grandTotal;
+    view.grandTotal = (entity.grandTotal ?? items.reduce((sum, item) => sum + (item.total ?? 0), 0)) || null;
     view.items = items;
     view.itemCount = items.length;
     view.notes = entity.notes;

@@ -32,7 +32,7 @@ const formatCurrency = (amount: number | null) => {
   if (amount === null) return "—"
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "INR",
+    currency: "SAR",
   }).format(amount)
 }
 

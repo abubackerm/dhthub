@@ -43,8 +43,14 @@ export class EnquiryItemView {
     view.productName = product.name;
     view.variantName = variant.name;
     view.image = (product as any).primaryImageUrl || null;
-    view.price = entity.price ? Number(entity.price) : null;
-    view.total = entity.total ? Number(entity.total) : null;
+    // entity.price is in SAR (stored from enquiry creation)
+    // variant.price is in cents (halalas) — only use as fallback and convert
+    view.price = entity.price != null
+      ? Number(entity.price)
+      : (variant.price != null ? Number(variant.price) / 100 : null);
+    view.total = entity.total != null
+      ? Number(entity.total)
+      : (view.price != null ? view.price * entity.qty : null);
     view.qty = entity.qty;
     view.createdAt = entity.createdAt;
     view.updatedAt = entity.updatedAt;
