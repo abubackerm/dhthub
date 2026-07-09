@@ -710,6 +710,7 @@ enum ImportType {
   CATEGORY_CREATE
   CATEGORY_UPDATE
   CATEGORY_EDIT
+  SIMPLE_PRODUCTS
 }
 
 model ImportJob {

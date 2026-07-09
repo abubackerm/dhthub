@@ -35,6 +35,7 @@ export const QUEUES = {
   EXPORT: 'export',
   NOTIFICATION: 'notification',
   IMAGE_PROCESSING: 'image-processing',
+  SIMPLE_PRODUCT_IMPORT: 'simple-product-import',
 } as const;
 
 /**

@@ -122,7 +122,7 @@ export class ImportController {
     // Route to appropriate upload method based on file type
     const isZip = file.filename.endsWith('.zip');
     const result = isZip
-      ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId, importType: ImportType.CATALOG })
+      ? await this.importService.uploadZip(file, { createdBy, mode, warehouseId, importType: importType ?? ImportType.CATALOG })
       : await this.importService.uploadCsv(file, { createdBy, mode, warehouseId, importType });
 
     return {
@@ -285,9 +285,10 @@ export class ImportController {
   async getTemplate(
     @Query('cellId') cellId?: string,
     @Query('mode') mode?: 'create' | 'edit',
+    @Query('importType') importType?: string,
   ) {
-    const templateInfo = await this.importService.getTemplateInfo(cellId, mode);
-    const templateContent = await this.importService.getTemplate(cellId, mode);
+    const templateInfo = await this.importService.getTemplateInfo(cellId, mode, importType);
+    const templateContent = await this.importService.getTemplate(cellId, mode, importType);
 
     return {
       filename: templateInfo.filename,
@@ -305,9 +306,10 @@ export class ImportController {
   async downloadTemplate(
     @Query('cellId') cellId?: string,
     @Query('mode') mode?: 'create' | 'edit',
+    @Query('importType') importType?: string,
   ) {
-    const templateContent = await this.importService.getTemplate(cellId, mode);
-    const templateInfo = await this.importService.getTemplateInfo(cellId, mode);
+    const templateContent = await this.importService.getTemplate(cellId, mode, importType);
+    const templateInfo = await this.importService.getTemplateInfo(cellId, mode, importType);
 
     return {
       filename: templateInfo.filename,

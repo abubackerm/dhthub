@@ -3,6 +3,7 @@ import { ImportJobService } from './import-job.service';
 import { CsvParserService } from './csv-parser.service';
 import { ImportValidationService, ValidationResult } from './import-validation.service';
 import { ImportFileType, ImportMode, ImportType } from '../entities';
+import { TemplatePackService } from './template-pack.service';
 import { InvalidFileFormatError, InvalidImportDataError } from '../domain/errors/import.errors';
 import { Readable } from 'stream';
 import { StorageService } from '@modules/storage/storage.service';
@@ -56,6 +57,7 @@ export class ImportService {
     private readonly variantRepo: ProductVariantRepository,
     private readonly productTableColumnRepo: ProductTableColumnRepository,
     private readonly cellRepo: CellRepository,
+    private readonly templatePackService: TemplatePackService,
   ) {}
 
   /**
@@ -315,7 +317,12 @@ export class ImportService {
   /**
    * Get CSV template headers and description
    */
-  async getTemplateInfo(_cellId?: string, mode?: 'create' | 'edit') {
+  async getTemplateInfo(_cellId?: string, mode?: 'create' | 'edit', importType?: string) {
+    // Return simple products template info when importType is SIMPLE_PRODUCTS
+    if (importType === 'SIMPLE_PRODUCTS') {
+      return this.getSimpleProductsTemplateInfo();
+    }
+
     // Build header list based on mode
     const headers = [];
 
@@ -355,9 +362,47 @@ export class ImportService {
   }
 
   /**
+   * Get simple products template info
+   */
+  private getSimpleProductsTemplateInfo() {
+    const headers = [
+      { name: 'category_sku', required: true, description: 'SKU of the leaf Category (e.g., CG-A1B2C3D4). Products go into this category.' },
+      { name: 'name', required: true, description: 'Product name' },
+      { name: 'description', required: false, description: 'Product description' },
+      { name: 'price', required: false, description: 'Price in cents (integer)' },
+      { name: 'quantity', required: false, description: 'Stock quantity' },
+      { name: 'attr_slug_1', required: false, description: 'Attribute slug for pair 1' },
+      { name: 'attr_value_1', required: false, description: 'Attribute value for pair 1' },
+      { name: 'attr_slug_2', required: false, description: 'Attribute slug for pair 2' },
+      { name: 'attr_value_2', required: false, description: 'Attribute value for pair 2' },
+      { name: 'attr_slug_3', required: false, description: 'Attribute slug for pair 3' },
+      { name: 'attr_value_3', required: false, description: 'Attribute value for pair 3' },
+      { name: 'attr_slug_4', required: false, description: 'Attribute slug for pair 4' },
+      { name: 'attr_value_4', required: false, description: 'Attribute value for pair 4' },
+      { name: 'attr_slug_5', required: false, description: 'Attribute slug for pair 5' },
+      { name: 'attr_value_5', required: false, description: 'Attribute value for pair 5' },
+      { name: 'attr_slug_6', required: false, description: 'Attribute slug for pair 6' },
+      { name: 'attr_value_6', required: false, description: 'Attribute value for pair 6' },
+      { name: 'attr_slug_7', required: false, description: 'Attribute slug for pair 7' },
+      { name: 'attr_value_7', required: false, description: 'Attribute value for pair 7' },
+    ];
+
+    return {
+      filename: 'simple-products_template.csv',
+      headers,
+      description: 'Template for simple product bulk import. Each row is a single product with flat fields and optional attribute pairs. SKUs are auto-generated.',
+    };
+  }
+
+  /**
    * Get CSV template content as string
    */
-  async getTemplate(_cellId?: string, mode?: 'create' | 'edit'): Promise<string> {
+  async getTemplate(_cellId?: string, mode?: 'create' | 'edit', importType?: string): Promise<string> {
+    // Return simple products template when importType is SIMPLE_PRODUCTS
+    if (importType === 'SIMPLE_PRODUCTS') {
+      return this.templatePackService.generateSimpleProductsTemplate();
+    }
+
     // Build headers based on mode
     const headers = [];
 

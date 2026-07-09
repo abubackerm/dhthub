@@ -2,10 +2,12 @@ import { Controller, Post, Body, Get, Logger, BadRequestException } from '@nestj
 import { ZipExtractorService } from '../services/zip-extractor.service';
 import { ExtractedFiles } from '../dto/extracted-files.dto';
 import { CatalogImportService } from '../services/catalog-import.service';
+import { SimpleProductImportService } from '../services/simple-product-import.service';
 import { ImportJobService } from '../services/import-job.service';
 import { ImageImportService, ImageUploadStrategy } from '../services/image-import.service';
 import { CategoryImportService } from '../services/category-import.service';
 import { ImportJobStatus } from '../entities/import-job-status.enum';
+import { ImportType } from '../entities';
 import { StorageService } from '@modules/storage/storage.service';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -25,6 +27,7 @@ export class ImportWorkerController {
   constructor(
     private readonly zipExtractorService: ZipExtractorService,
     private readonly catalogImportService: CatalogImportService,
+    private readonly simpleProductImportService: SimpleProductImportService,
     private readonly importJobService: ImportJobService,
     private readonly imageImportService: ImageImportService,
     private readonly categoryImportService: CategoryImportService,
@@ -80,7 +83,7 @@ export class ImportWorkerController {
       this.logger.log(`[processCatalog] ZIP validation passed for job ${jobId}`);
 
       const zipBuffer = fs.readFileSync(filePath);
-      extractedFiles = await this.zipExtractorService.extract(zipBuffer, 'CATALOG');
+      extractedFiles = await this.zipExtractorService.extract(zipBuffer, ImportType.CATALOG);
 
       this.logger.log(`[processCatalog] Extracted files: ${JSON.stringify(extractedFiles)}`);
 
@@ -90,6 +93,85 @@ export class ImportWorkerController {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[processCatalog] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
+      throw error;
+    } finally {
+      if (extractedFiles) {
+        await this.zipExtractorService.cleanup(extractedFiles).catch(() => {});
+      }
+      if (isTempFile) {
+        await this.cleanupTempFile(filePath);
+      }
+    }
+  }
+
+  /**
+   * Worker API: Process simple product import (called by BullMQ worker)
+   * POST /v1/import/worker/process-simple-products
+   */
+  @Post('process-simple-products')
+  async processSimpleProducts(@Body() body: { jobId: string; fileUrl: string }) {
+    const { jobId, fileUrl } = body;
+
+    this.logger.log(`[SimpleProductImport] Received request: jobId=${jobId}, fileUrl="${fileUrl}"`);
+
+    let actualFileUrl = fileUrl;
+    if (!actualFileUrl) {
+      this.logger.warn(`fileUrl not provided, retrieving from database for job ${jobId}`);
+      const job = await this.importJobService.findById(jobId);
+      actualFileUrl = job.fileUrl;
+      this.logger.log(`[SimpleProductImport] Retrieved fileUrl from database: "${actualFileUrl}"`);
+    }
+
+    if (!actualFileUrl) {
+      throw new BadRequestException(`fileUrl is required. Received: ${JSON.stringify(body)}`);
+    }
+
+    let filePath: string;
+    let isTempFile = false;
+
+    if (this.isSeaweedFSUrl(actualFileUrl)) {
+      filePath = await this.downloadFromSeaweedFS(actualFileUrl);
+      isTempFile = true;
+      this.logger.log(`[SimpleProductImport] Downloaded file from SeaweedFS to temp: ${filePath}`);
+    } else {
+      const relativePath = actualFileUrl.replace(/^\/uploads\/import\//, '');
+      filePath = path.join(process.cwd(), 'uploads', 'import', relativePath);
+      this.logger.log(`[SimpleProductImport] Resolved file path: ${filePath}`);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      throw new BadRequestException(`File not found: ${filePath} (from fileUrl: ${actualFileUrl})`);
+    }
+
+    let extractedFiles: ExtractedFiles | undefined;
+
+    try {
+      let csvPath = filePath;
+
+      if (filePath.endsWith('.zip')) {
+        this.logger.log(`[SimpleProductImport] Extracting ZIP for job ${jobId}`);
+        const zipBuffer = fs.readFileSync(filePath);
+        extractedFiles = await this.zipExtractorService.extract(zipBuffer, ImportType.SIMPLE_PRODUCTS);
+
+        this.logger.log(`[SimpleProductImport] Extracted files: ${JSON.stringify(extractedFiles)}`);
+
+        const productsUrl = extractedFiles.products;
+        if (!productsUrl) {
+          throw new BadRequestException(
+            'No product CSV found in ZIP. Expected simple-products.csv or products.csv.',
+          );
+        }
+        csvPath = productsUrl;
+      } else {
+        this.logger.log(`[SimpleProductImport] Processing plain CSV file for job ${jobId}: ${filePath}`);
+      }
+
+      await this.simpleProductImportService.processSimpleProductImport(jobId, csvPath);
+
+      return { success: true, jobId };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[SimpleProductImport] Job ${jobId} failed: ${msg}`, error instanceof Error ? error.stack : undefined);
       throw error;
     } finally {
       if (extractedFiles) {

@@ -47,7 +47,7 @@ import type { CategoryTreeNode } from "@/lib/api/catalog/types"
 
 type UploadStep = 1 | 2 | 3
 type UploadState = "idle" | "uploading" | "success" | "errors"
-type ImportTab = "create" | "edit"
+type ImportTab = "create" | "edit" | "simple"
 
 function extractBranchCategories(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
   const branches: CategoryTreeNode[] = [];
@@ -128,6 +128,16 @@ export default function UploadPage() {
       })
   }, [activeTab, categoriesLoaded])
 
+  // Reset step whenever the tab changes
+  useEffect(() => {
+    setStep(1)
+    setSelectedFile(null)
+    setUploadState("idle")
+    setJob(null)
+    setIsPolling(false)
+    setJobRecords([])
+  }, [activeTab])
+
   const toggleCategory = (id: string) => {
     setSelectedCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
@@ -169,12 +179,13 @@ export default function UploadPage() {
     setIsValidating(true)
     setJobRecords([])
 
-    // Use CREATE_ONLY for create tab, UPDATE_ONLY for edit tab
-    const mode: ImportMode = activeTab === "create" ? "CREATE_ONLY" : "UPDATE_ONLY"
+    // Use CREATE_ONLY for create and simple tabs, UPDATE_ONLY for edit tab
+    const mode: ImportMode = activeTab === "edit" ? "UPDATE_ONLY" : "CREATE_ONLY"
+    const importType = activeTab === "simple" ? "SIMPLE_PRODUCTS" : "CATALOG"
 
     createImportJob(selectedFile, {
       mode,
-      importType: 'CATALOG',
+      importType,
     })
       .then((response) => {
         toast.success("Import job created")
@@ -255,6 +266,25 @@ export default function UploadPage() {
       .catch((error) => {
         console.error("Failed to download variants template", error)
         toast.error("Failed to download variants template")
+      })
+  }
+
+  const handleDownloadSimpleProductsTemplate = () => {
+    downloadTemplate({ importType: 'SIMPLE_PRODUCTS' })
+      .then((template) => {
+        const blob = new Blob([template.content], { type: "text/csv" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = template.filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      })
+      .catch((error) => {
+        console.error("Failed to download simple products template", error)
+        toast.error("Failed to download simple products template")
       })
   }
 
@@ -371,9 +401,10 @@ export default function UploadPage() {
 
       {/* Create/Edit Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ImportTab)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="create">Create New Products</TabsTrigger>
           <TabsTrigger value="edit">Edit Existing Products</TabsTrigger>
+          <TabsTrigger value="simple">Simple Products</TabsTrigger>
         </TabsList>
 
         {/* Create Tab */}
@@ -1232,6 +1263,392 @@ export default function UploadPage() {
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={handleReset}>
                           Update More
+                        </Button>
+                        <Button asChild>
+                          <Link href="/dhthub-admin/products">View Products</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Simple Products Tab */}
+        <TabsContent value="simple">
+          {/* Step Indicator */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 1
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 1 ? <Check className="h-4 w-4" /> : "1"}
+              </div>
+              <span className={step >= 1 ? "text-foreground" : "text-muted-foreground"}>
+                Download Template
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 2
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 2 ? <Check className="h-4 w-4" /> : "2"}
+              </div>
+              <span className={step >= 2 ? "text-foreground" : "text-muted-foreground"}>
+                Upload File
+              </span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= 3
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {step > 3 ? <Check className="h-4 w-4" /> : "3"}
+              </div>
+              <span className={step >= 3 ? "text-foreground" : "text-muted-foreground"}>
+                Review Results
+              </span>
+            </div>
+          </div>
+
+          {/* Step 1: Download Template */}
+          {step === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Download Simple Products Template</CardTitle>
+                <CardDescription>
+                  Download the CSV template for simple products. Each row represents one product with flat fields (no variants).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Simple Products Template</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Flat product data with category_sku, name, description, price, quantity, and up to 7 attribute pairs
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                    <div>
+                      <p className="text-sm font-medium">simple-products_template.csv</p>
+                      <p className="text-xs text-muted-foreground">
+                        Simple product definitions with attribute pairs
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleDownloadSimpleProductsTemplate}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Required Columns</h3>
+                    <div className="grid gap-2 text-sm">
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">category_sku</span> - SKU of the leaf Category (e.g., <code className="text-xs">CG-A1B2C3D4</code>)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">name</span> - Product name (required)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">price</span> - Price in cents (integer, optional)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">quantity</span> - Stock quantity (optional)
+                      </div>
+                      <div className="rounded-md bg-muted/70 px-3 py-1.5">
+                        <span className="font-medium">attr_slug_N / attr_value_N</span> - Up to 7 attribute slug/value pairs (optional)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={() => setStep(2)}>
+                    Continue to Upload
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Upload File */}
+          {step === 2 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Upload CSV/ZIP File</CardTitle>
+                    <CardDescription>
+                      Upload your filled CSV or ZIP file with simple products data.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline">Step 2 of 3</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/40 px-6 py-10 text-center transition-colors hover:border-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".csv,.xlsx,.zip"
+                    onChange={handleFileSelect}
+                  />
+                  <UploadIcon className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Drag and drop your CSV or ZIP file</p>
+                    <p className="text-xs text-muted-foreground">or click to browse</p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    CSV up to 200MB and 500k rows, or ZIP with single CSV file.
+                  </p>
+                </div>
+
+                {selectedFile && (
+                  <div className="space-y-2 rounded-md border bg-muted/60 p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{selectedFile.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
+                        </div>
+                      </div>
+                      <Badge variant="outline">Ready</Badge>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-4">
+                  <Button variant="outline" onClick={() => setStep(1)}>
+                    Back
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleUploadAndValidate}
+                      disabled={!selectedFile || uploadState === "uploading" || isValidating}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {isValidating ? "Starting Import..." : "Start Import"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Review Results */}
+          {step === 3 && (
+            <div className="space-y-6">
+              {isPolling && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4 animate-spin" />
+                      <AlertTitle>Processing Import...</AlertTitle>
+                      <AlertDescription>
+                        {job?.status === "PENDING"
+                          ? "Waiting for worker to pick up job..."
+                          : job?.totalRows
+                            ? `${job.processedRows} of ${job.totalRows} rows processed.`
+                            : "Extracting and processing files..."}
+                      </AlertDescription>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length === 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertTitle className="text-green-800 dark:text-green-300">
+                        Upload Complete
+                      </AlertTitle>
+                      <AlertDescription className="text-green-700 dark:text-green-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} products imported successfully.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Products</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Imported</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Imported Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Imported
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} imported products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 mt-6">
+                      <Button variant="outline" onClick={handleReset}>
+                        Upload Another
+                      </Button>
+                      <Button asChild>
+                        <Link href="/dhthub-admin/products">View Products</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isPolling && job && validationErrors.length > 0 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800 dark:text-amber-300">
+                        {job.successRows > 0 ? "Upload Completed with Errors" : "Upload Failed"}
+                      </AlertTitle>
+                      <AlertDescription className="text-amber-700 dark:text-amber-400">
+                        {job.successRows} of {job.totalRows || job.processedRows} products imported successfully. {job.failedRows} rows had errors.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex gap-8 mt-6 p-4 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-2xl font-bold">{job.totalRows || job.processedRows}</p>
+                        <p className="text-sm text-muted-foreground">Total Products</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{job.successRows}</p>
+                        <p className="text-sm text-muted-foreground">Imported</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">{job.failedRows}</p>
+                        <p className="text-sm text-muted-foreground">Errors</p>
+                      </div>
+                    </div>
+
+                    {importedProducts.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Imported Products</h3>
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[60px]">Row #</TableHead>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {importedProducts.slice(0, 100).map((record, i) => (
+                                <TableRow key={record.id ?? i}>
+                                  <TableCell>{record.rowNumber}</TableCell>
+                                  <TableCell>{record.message.replace("Created: ", "")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400">
+                                      Imported
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        {importedProducts.length > 100 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Showing first 100 of {importedProducts.length} imported products.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold mb-3">Error Details</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Row #</TableHead>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Error</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {validationErrors.map((error, i) => (
+                            <TableRow key={error.id ?? i}>
+                              <TableCell>{error.rowNumber}</TableCell>
+                              <TableCell>{error.rawData?.name ? String(error.rawData.name) : (error.sku ?? "-")}</TableCell>
+                              <TableCell className="text-destructive">
+                                {error.message}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="flex justify-between mt-6">
+                      <Button variant="outline" onClick={handleDownloadErrorReport}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Error Report
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleReset}>
+                          Upload Another
                         </Button>
                         <Button asChild>
                           <Link href="/dhthub-admin/products">View Products</Link>

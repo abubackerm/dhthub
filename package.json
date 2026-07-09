@@ -5,13 +5,13 @@
   "description": "Dynamic Hub - Monorepo with NestJS Backend and Next.js Frontend",
   "scripts": {
     "dev": "turbo run dev",
-    "build": "turbo run build",
+    "build": "dotenv -e .env -- turbo run build",
     "lint": "turbo run lint",
     "start": "turbo run start",
     "dev:web": "pnpm --filter web dev",
     "dev:api": "pnpm --filter api dev",
-    "build:web": "pnpm --filter web build",
-    "build:api": "pnpm --filter api build",
+    "build:web": "dotenv -e .env -- pnpm --filter web build",
+    "build:api": "dotenv -e .env -- pnpm --filter api build",
     "start:web": "pnpm --filter web start",
     "start:api": "pnpm --filter api start",
     "db:generate": "pnpm --filter api db:generate",
@@ -30,6 +30,7 @@
   "packageManager": "pnpm@9.15.0",
   "devDependencies": {
     "@types/pg": "^8.18.0",
+    "dotenv-cli": "^11.0.0",
     "turbo": "^2.8.12"
   },
   "dependencies": {

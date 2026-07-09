@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Logger, BadRequestException } from '@nestjs/common';
 import { ZipExtractorService } from '@modules/import/services/zip-extractor.service';
 import { ExtractedFiles } from '@modules/import/dto/extracted-files.dto';
+import { ImportType } from '@modules/import/entities';
 import { AttributeImportService } from '../services/attribute-import.service';
 import { ImportJobService } from '@modules/import/services/import-job.service';
 import * as fs from 'fs';
@@ -58,7 +59,7 @@ export class AttributesWorkerController {
 
     try {
       const zipBuffer = fs.readFileSync(filePath);
-      extractedFiles = await this.zipExtractorService.extract(zipBuffer, 'ATTRIBUTES');
+      extractedFiles = await this.zipExtractorService.extract(zipBuffer, ImportType.ATTRIBUTES);
 
       this.logger.log(`[processAttributeImport] Extracted files: ${JSON.stringify(extractedFiles)}`);
 

@@ -14,3 +14,5 @@ export { ZipExtractorService } from './zip-extractor.service';
 export { CategoryImportService } from './category-import.service';
 export { ImageImportService } from './image-import.service';
 export type { ImportedImage } from './image-import.service';
+export { SimpleProductImportService } from './simple-product-import.service';
+export { SimpleProductImportProcessorService } from './simple-product-import-processor.service';

@@ -1,14 +1,13 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import { ExtractedFiles, ZipValidationResult, CATALOG_REQUIRED_CSV_FILES, ATTRIBUTE_REQUIRED_CSV_FILES, OPTIONAL_CSV_FILES } from '../dto';
+import { ImportType } from '../entities';
 import { StorageService } from '@modules/storage/storage.service';
-
-export type ImportType = 'CATALOG' | 'ATTRIBUTES';
 
 @Injectable()
 export class ZipExtractorService {
   private readonly logger = new Logger(ZipExtractorService.name);
-  private readonly allowedFiles = [...CATALOG_REQUIRED_CSV_FILES, ...ATTRIBUTE_REQUIRED_CSV_FILES, ...OPTIONAL_CSV_FILES];
+  private readonly allowedFiles = [...CATALOG_REQUIRED_CSV_FILES, ...ATTRIBUTE_REQUIRED_CSV_FILES, ...OPTIONAL_CSV_FILES, 'simple-products.csv'];
 
   constructor(private readonly storageService: StorageService) {}
 
@@ -17,7 +16,7 @@ export class ZipExtractorService {
    */
   async extract(
     zipBuffer: Buffer,
-    importType: ImportType = 'CATALOG',
+    importType: ImportType = ImportType.CATALOG,
   ): Promise<ExtractedFiles> {
     this.logger.log(`Extracting ZIP and uploading to SeaweedFS (importType: ${importType})`);
 
@@ -57,7 +56,7 @@ export class ZipExtractorService {
 
         this.logger.debug(`Extracted and uploaded: ${entry.entryName} -> ${fileUrl}`);
 
-        if (normalizedName === 'products.csv') {
+        if (normalizedName === 'products.csv' || normalizedName === 'simple-products.csv') {
           extractedFiles.products = fileUrl;
         } else if (normalizedName === 'variants.csv') {
           extractedFiles.variants = fileUrl;
@@ -85,6 +84,13 @@ export class ZipExtractorService {
         );
       }
 
+      if (importType === 'SIMPLE_PRODUCTS' && !extractedFiles.products) {
+        throw new BadRequestException(
+          'A product CSV is required but not found in ZIP archive. ' +
+          'Accepted names: simple-products.csv, products.csv, or *_products.csv (at root or inside a folder).',
+        );
+      }
+
       return extractedFiles;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -104,7 +110,7 @@ export class ZipExtractorService {
   /**
    * Validate that required files are present in extracted files
    */
-  validateRequiredFiles(files: ExtractedFiles, importType: ImportType = 'CATALOG'): ZipValidationResult {
+  validateRequiredFiles(files: ExtractedFiles, importType: ImportType = ImportType.CATALOG): ZipValidationResult {
     const errors: string[] = [];
 
     // Check required files based on import type
@@ -115,6 +121,10 @@ export class ZipExtractorService {
     } else if (importType === 'ATTRIBUTES') {
       if (!files.attributes) {
         errors.push('attributes.csv is required but not found in archive');
+      }
+    } else if (importType === 'SIMPLE_PRODUCTS') {
+      if (!files.products) {
+        errors.push('A product CSV (simple-products.csv or products.csv) is required but not found in archive');
       }
     }
 
@@ -132,7 +142,9 @@ export class ZipExtractorService {
       }
     }
 
-    const requiredFiles = importType === 'CATALOG' ? CATALOG_REQUIRED_CSV_FILES : ATTRIBUTE_REQUIRED_CSV_FILES;
+    const requiredFiles = importType === 'CATALOG' ? CATALOG_REQUIRED_CSV_FILES
+      : importType === 'ATTRIBUTES' ? ATTRIBUTE_REQUIRED_CSV_FILES
+      : ['simple-products.csv'];
 
     return {
       isValid: errors.length === 0,
@@ -169,6 +181,7 @@ export class ZipExtractorService {
   private mapFileNameToKey(fileName: string): string {
     const mapping: Record<string, string> = {
       'products.csv': 'products',
+      'simple-products.csv': 'products',
       'variants.csv': 'variants',
       'images.csv': 'images',
       'attributes.csv': 'attributes',

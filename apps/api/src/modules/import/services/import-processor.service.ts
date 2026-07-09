@@ -52,6 +52,12 @@ export class ImportProcessorService {
       return;
     }
 
+    // Skip simple product imports - handled by SimpleProductImportProcessorService
+    if (event.importType === 'SIMPLE_PRODUCTS') {
+      this.logger.log(`Skipping simple product job ${event.jobId} - handled by BullMQ worker`);
+      return;
+    }
+
     const workerId = `processor-${process.pid}`;
 
     try {

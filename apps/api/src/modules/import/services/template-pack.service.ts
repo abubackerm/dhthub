@@ -19,6 +19,7 @@ export class TemplatePackService {
     zip.addFile('images_template.csv', Buffer.from(this.generateImagesTemplate()));
     zip.addFile('attributes_template.csv', Buffer.from(this.generateAttributesTemplate()));
     zip.addFile('attribute-options_template.csv', Buffer.from(this.generateAttributeOptionsTemplate()));
+    zip.addFile('simple-products_template.csv', Buffer.from(this.generateSimpleProductsTemplate()));
     zip.addFile('README.txt', Buffer.from(this.generateReadme()));
 
     return zip.toBuffer();
@@ -105,6 +106,19 @@ export class TemplatePackService {
   }
 
   /**
+   * Generate simple-products.csv template
+   */
+  generateSimpleProductsTemplate(): string {
+    const headers = ['category_sku', 'name', 'description', 'price', 'quantity', 'attr_slug_1', 'attr_value_1', 'attr_slug_2', 'attr_value_2', 'attr_slug_3', 'attr_value_3', 'attr_slug_4', 'attr_value_4', 'attr_slug_5', 'attr_value_5', 'attr_slug_6', 'attr_value_6', 'attr_slug_7', 'attr_value_7'];
+    const exampleRows = [
+      'CG-A1B2C3D4,Widget A,High quality widget,1500,100,diameter,1/4,length,1.75,material,Steel,finish,Zinc,,,,,,,,,',
+      'CG-X9Y8Z7W6,Widget B,Another widget,2000,50,diameter,3/8,length,2.0,material,Brass,,,,,,,,,,,',
+    ];
+
+    return [headers.join(','), ...exampleRows].join('\n');
+  }
+
+  /**
    * Generate README.txt with usage instructions
    */
   private generateReadme(): string {
@@ -115,11 +129,12 @@ This ZIP file contains CSV templates for importing large industrial catalogs (50
 
 FILES
 ------
-1. products_template.csv     - Product family definitions
-2. variants_template.csv     - SKU/product variant details (required)
-3. images_template.csv       - Product variant images
-4. attributes_template.csv   - Attribute metadata (optional)
-5. attribute-options_template.csv - Attribute enum values (optional)
+1. products_template.csv           - Product family definitions
+2. variants_template.csv           - SKU/product variant details (required)
+3. images_template.csv             - Product variant images
+4. attributes_template.csv         - Attribute metadata (optional)
+5. attribute-options_template.csv  - Attribute enum values (optional)
+6. simple-products_template.csv    - Simple/flat products (no variants)
 
 USAGE
 -----

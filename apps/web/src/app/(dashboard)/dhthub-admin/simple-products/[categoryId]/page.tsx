@@ -12,6 +12,8 @@ import {
   Trash2,
   Package,
   Loader2,
+  Copy,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -68,6 +70,18 @@ export default function CategorySimpleProductsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<SimpleProductView | null>(null)
   const [attributesProduct, setAttributesProduct] = useState<SimpleProductView | null>(null)
+  const [copiedSku, setCopiedSku] = useState<string | null>(null)
+
+  const handleCopySku = async (sku: string) => {
+    try {
+      await navigator.clipboard.writeText(sku)
+      setCopiedSku(sku)
+      toast.success("SKU copied to clipboard")
+      setTimeout(() => setCopiedSku(null), 2000)
+    } catch {
+      toast.error("Failed to copy SKU")
+    }
+  }
 
   const category = useMemo(() => {
     if (!categoryTree) return null
@@ -223,8 +237,27 @@ export default function CategorySimpleProductsPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {product.sku || "-"}
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-sm">{product.sku || "-"}</span>
+                      {product.sku && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCopySku(product.sku!)
+                          }}
+                          className="inline-flex items-center justify-center h-6 w-6 rounded hover:bg-muted transition-colors"
+                          title="Copy SKU"
+                        >
+                          {copiedSku === product.sku ? (
+                            <Check className="h-3.5 w-3.5 text-green-500" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {product.price != null ? `SAR ${(product.price / 100).toFixed(2)}` : "-"}

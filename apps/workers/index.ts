@@ -21,6 +21,7 @@ export { CatalogImportWorker } from './catalog-import.worker';
 export { AttributeImportWorker } from './attribute-import.worker';
 export { CategoryImportWorker } from './category-import.worker';
 export { ImageImportWorker } from './image-import.worker';
+export { SimpleProductImportWorker } from './simple-product-import.worker';
 
 // Start all workers when running this file directly
 if (require.main === module) {
@@ -49,16 +50,19 @@ if (require.main === module) {
     const { AttributeImportWorker } = require('./attribute-import.worker');
     const { CategoryImportWorker } = require('./category-import.worker');
     const { ImageImportWorker } = require('./image-import.worker');
+    const { SimpleProductImportWorker } = require('./simple-product-import.worker');
 
     const catalogWorker = new CatalogImportWorker();
     const attributeWorker = new AttributeImportWorker();
     const categoryImportWorker = new CategoryImportWorker();
     const imageWorker = new ImageImportWorker();
+    const simpleProductWorker = new SimpleProductImportWorker();
 
     workers.push(catalogWorker);
     workers.push(attributeWorker);
     workers.push(categoryImportWorker);
     workers.push(imageWorker);
+    workers.push(simpleProductWorker);
 
     console.log('All workers initialized');
 
@@ -72,6 +76,7 @@ if (require.main === module) {
       attributeWorker.start(),
       categoryImportWorker.start(),
       imageWorker.start(),
+      simpleProductWorker.start(),
     ]).then(() => {
       console.log('All workers started and ready');
     }).catch((error) => {

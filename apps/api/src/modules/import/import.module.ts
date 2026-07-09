@@ -12,6 +12,8 @@ import { ImportProcessorService } from './services/import-processor.service';
 import { CatalogImportProcessorService } from './services/catalog-import-processor.service';
 import { CategoryImportProcessorService } from './services/category-import-processor.service';
 import { ImageImportProcessorService } from './services/image-import-processor.service';
+import { SimpleProductImportProcessorService } from './services/simple-product-import-processor.service';
+import { SimpleProductImportService } from './services/simple-product-import.service';
 import { CatalogImportService } from './services/catalog-import.service';
 import { TemplatePackService } from './services/template-pack.service';
 import { ZipExtractorService } from './services/zip-extractor.service';
@@ -97,6 +99,24 @@ import { SearchModule } from '../search/search.module';
         },
       },
     }),
+    BullModule.registerQueue({
+      name: 'simple-product-import',
+      defaultJobOptions: {
+        removeOnComplete: {
+          count: 100,
+          age: 3600,
+        },
+        removeOnFail: {
+          count: 500,
+          age: 7 * 24 * 3600,
+        },
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      },
+    }),
     StorageModule,
     // Import CatalogModule for ProductService, CategoryService, CategoryRepository
     CatalogModule,
@@ -120,6 +140,8 @@ import { SearchModule } from '../search/search.module';
     CatalogImportProcessorService,
     CategoryImportProcessorService,
     ImageImportProcessorService,
+    SimpleProductImportProcessorService,
+    SimpleProductImportService,
     CatalogImportService,
     CsvParserService,
     ImportValidationService,
@@ -142,6 +164,8 @@ import { SearchModule } from '../search/search.module';
     ZipExtractorService,
     ImageImportService,
     CategoryImportService,
+    SimpleProductImportProcessorService,
+    SimpleProductImportService,
   ],
 })
 export class ImportModule {}

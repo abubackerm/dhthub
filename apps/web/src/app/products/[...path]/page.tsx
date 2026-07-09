@@ -16,7 +16,7 @@ import { EmptyLeafPage } from "@/components/public/EmptyLeafPage";
 import { SimpleProductGridPage } from "@/components/public/SimpleProduct/SimpleProductGridPage";
 import { SimpleProductDetailPage } from "@/components/public/SimpleProduct/SimpleProductDetailPage";
 import type { Cell } from "@/lib/api/catalog";
-import type { ProductDetailView } from "@/lib/api/catalog/types";
+import type { ProductDetailView, SimpleProductView } from "@/lib/api/catalog/types";
 
 // Product detail pages - more frequent revalidation (60s)
 // Category pages - standard revalidation (120s)
@@ -138,6 +138,32 @@ export default async function DynamicCategoryPage({ params }: PageProps) {
     ) ?? false;
 
     if (allChildrenAreLeaves) {
+      // Check if ALL children are SIMPLE_GRID categories
+      // If so, aggregate their simple products and show the grid view
+      // instead of the consolidated leaf table view
+      const allChildrenSimpleGrid = fullCategory?.children?.every(
+        (child: any) => child.displayMode === 'SIMPLE_GRID',
+      ) ?? false;
+
+      if (allChildrenSimpleGrid) {
+        const childSlugs = fullCategory?.children?.map((c: any) => c.slug) ?? [];
+        const allProducts = await Promise.all(
+          childSlugs.map((slug: string) =>
+            getServerSimpleProductsBySlug(slug).catch(() => [] as SimpleProductView[]),
+          ),
+        );
+        const aggregatedProducts = allProducts.flat();
+
+        return (
+          <SimpleProductGridPage
+            categorySlug={lastSlug}
+            pathNames={pathNames}
+            pathSlugs={path}
+            serverData={aggregatedProducts}
+          />
+        );
+      }
+
       const [consolidatedData, filterData] = await Promise.all([
         getServerConsolidatedLeafData(lastSlug).catch(() => null),
         getServerAggregatedFilterData(lastSlug).catch(() => null),

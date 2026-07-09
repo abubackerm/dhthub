@@ -37,6 +37,7 @@ import { SimpleProductsController } from './controllers/simple-products.controll
     // Services (Public API)
     ProductService,
     CategoryService,
+    SimpleProductService,
     // Repositories (read-only for queries)
     ProductRepository,
     ProductVariantRepository,

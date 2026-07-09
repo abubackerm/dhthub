@@ -69,13 +69,16 @@ export async function searchCategories(query: string, limit = 20, leafOnly = tru
   );
 }
 
-export async function downloadTemplate(options?: { cellId?: string; mode?: 'create' | 'edit' }) {
+export async function downloadTemplate(options?: { cellId?: string; mode?: 'create' | 'edit'; importType?: string }) {
   const params = new URLSearchParams();
   if (options?.cellId) {
     params.set('cellId', options.cellId);
   }
   if (options?.mode) {
     params.set('mode', options.mode);
+  }
+  if (options?.importType) {
+    params.set('importType', options.importType);
   }
   const query = params.toString();
   const endpoint = `/v1/import/template${query ? `?${query}` : ''}`;

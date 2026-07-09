@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "postgres-mcp": {
+      "command": "C:\\Users\\abuca\\.local\\bin\\uvx.exe",
+      "args": [
+        "postgres-mcp",
+        "postgresql://dht_admin:your_secure_password@localhost:5433/dht_hub"
+      ]
+    }
+  }
+}
